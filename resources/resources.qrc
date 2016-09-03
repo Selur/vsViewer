@@ -29,7 +29,7 @@
 		<file alias="font.png">font.png</file>
 		<file alias="color_picker.png">color_picker.png</file>
 
-		<file alias="readme">../README</file>
+		<file alias="readme">../README.md</file>
 
 		<file alias="fonts/DigitalMini.ttf">fonts/DigitalMini.ttf</file>
 	</qresource>

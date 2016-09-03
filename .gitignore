@@ -2,3 +2,11 @@ build-pro-Desktop-Release
 build
 generated
 /pro/pro.pro.user
+/vapoursynth-editor.pro.user
+/Makefile
+/Makefile.Debug
+/Makefile.Release
+/.cproject
+/.gitignore
+/.project
+/.csettings/
