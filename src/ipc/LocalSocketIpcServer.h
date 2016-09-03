@@ -1,0 +1,33 @@
+/*
+ * LocalSocketIpcServer.h
+ *
+ *  Created on: 19.10.2014
+ *      Author: Selur
+ */
+
+#ifndef HELPER_LOCALSOCKETIPCSERVER_H_
+#define HELPER_LOCALSOCKETIPCSERVER_H_
+
+#include <QObject>
+#include <QString>
+#include <QLocalServer>
+
+class LocalSocketIpcServer : public QObject
+{
+  Q_OBJECT
+  public:
+    LocalSocketIpcServer(QString servername, QObject *parent);
+    ~LocalSocketIpcServer();
+
+  private:
+    QLocalServer* m_server;
+
+  public slots:
+    void socket_new_connection();
+
+  signals:
+    void messageReceived(QString message);
+
+};
+
+#endif /* HELPER_LOCALSOCKETIPCSERVER_H_ */
