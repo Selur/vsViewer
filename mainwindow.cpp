@@ -134,6 +134,9 @@ void MainWindow::slotInsertLineIntoScript(const QString & a_line)
   QPoint cursorPosition = m_ui.scriptEdit->cursorPosition();
   m_ui.scriptEdit->setCursorPosition(cursorPosition.x() + 1, 0);
   m_ui.scriptEdit->insertPlainText(a_line + "\n");
+  if (m_ipcClient != nullptr && (a_line.contains("core.std.CropAbs") || a_line.contains("core.std.CropRel"))){
+    m_ipcClient->send_MessageToServer(a_line);
+  }
 }
 
 // END OF void MainWindow::slotInsertLineIntoScript(const QString & a_line)
