@@ -1,4 +1,5 @@
-CONFIG += qt
+CONFIG += qt \
+console
 QT += widgets
 QT += network
 CONFIG(debug, debug|release) { 

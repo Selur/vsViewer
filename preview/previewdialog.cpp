@@ -18,9 +18,6 @@
 #include <QAction>
 #include <QByteArray>
 #include <QClipboard>
-#include <cassert>
-#include <algorithm>
-#include <cmath>
 
 #include <vapoursynth/VapourSynth.h>
 
@@ -148,7 +145,7 @@ void PreviewDialog::previewScript(const QString& a_script, const QString& a_scri
   setWindowTitle(title);
 
   m_cpVideoInfo = m_pVapourSynthScriptProcessor->videoInfo();
-  assert(m_cpVideoInfo);
+  Q_ASSERT(m_cpVideoInfo);
 
   int lastFrameNumber = m_cpVideoInfo->numFrames - 1;
   m_ui.frameNumberSpinBox->setMaximum(lastFrameNumber);
@@ -240,18 +237,18 @@ void PreviewDialog::keyPressEvent(QKeyEvent * a_pEvent)
     QDialog::keyPressEvent(a_pEvent);
     return;
   }
-  assert(m_cpVideoInfo);
+  Q_ASSERT(m_cpVideoInfo);
 
   int key = a_pEvent->key();
 
   if ((key == Qt::Key_Left) || (key == Qt::Key_Down))
-    slotShowFrame(std::max(0, m_currentFrame - 1));
+    slotShowFrame(qMax(0, m_currentFrame - 1));
   else if ((key == Qt::Key_Right) || (key == Qt::Key_Up)) {
-    slotShowFrame(std::min(m_cpVideoInfo->numFrames - 1, m_currentFrame + 1));
+    slotShowFrame(qMin(m_cpVideoInfo->numFrames - 1, m_currentFrame + 1));
   } else if (key == Qt::Key_PageDown)
-    slotShowFrame(std::max(0, m_currentFrame - m_bigFrameStep));
+    slotShowFrame(qMax(0, m_currentFrame - m_bigFrameStep));
   else if (key == Qt::Key_PageUp) {
-    slotShowFrame(std::min(m_cpVideoInfo->numFrames - 1, m_currentFrame + m_bigFrameStep));
+    slotShowFrame(qMin(m_cpVideoInfo->numFrames - 1, m_currentFrame + m_bigFrameStep));
   } else if (key == Qt::Key_Home)
     slotShowFrame(0);
   else if (key == Qt::Key_End)
@@ -434,6 +431,26 @@ void PreviewDialog::slotCropModeChanged()
   }
 
   m_pSettingsManager->setCropMode(cropMode);
+}
+
+void PreviewDialog::adjustCrop(const QString& cropping, const int cropLeft, const int cropRight,
+    const int cropTop, const int cropBottom)
+{
+  BEGIN_CROP_VALUES_CHANGE
+  m_ui.cropCheckButton->setChecked(cropping == "true");
+  this->slotToggleCropPanelVisible(cropping == "true");
+  m_ui.cropCheckButton->setEnabled(cropping != "off");
+  if (cropping != "off") {
+    this->resetCropSpinBoxes();
+  } else {
+    m_ui.cropLeftSpinBox->setValue(cropLeft);
+    m_ui.cropRightSpinBox->setValue(cropRight);
+    m_ui.cropTopSpinBox->setValue(cropTop);
+    m_ui.cropBottomSpinBox->setValue(cropBottom);
+  }
+  this->recalculateCropMods();
+  this->setPreviewPixmap();
+  END_CROP_VALUES_CHANGE
 }
 
 // END OF void PreviewDialog::slotCropModeChanged()
@@ -771,7 +788,8 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
     QString colorString = QString("G:%1").arg(value1);
     m_ui.colorPickerLabel->setText(colorString);
     return;
-  } else if ((colorFamily == cmYUV) || (formatID == pfCompatYUY2)) {
+  }
+  if ((colorFamily == cmYUV) || (formatID == pfCompatYUY2)) {
     l1 = "Y";
     l2 = "U";
     l3 = "V";

@@ -21,6 +21,7 @@ class LocalSocketIpcServer : public QObject
 
   private:
     QLocalServer* m_server;
+    QString m_serverName;
 
   public slots:
     void socket_new_connection();

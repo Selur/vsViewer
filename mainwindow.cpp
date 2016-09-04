@@ -134,7 +134,8 @@ void MainWindow::slotInsertLineIntoScript(const QString & a_line)
   QPoint cursorPosition = m_ui.scriptEdit->cursorPosition();
   m_ui.scriptEdit->setCursorPosition(cursorPosition.x() + 1, 0);
   m_ui.scriptEdit->insertPlainText(a_line + "\n");
-  if (m_ipcClient != nullptr && (a_line.contains("core.std.CropAbs") || a_line.contains("core.std.CropRel"))){
+  if (m_ipcClient != nullptr
+      && (a_line.contains("core.std.CropAbs") || a_line.contains("core.std.CropRel"))) {
     m_ipcClient->send_MessageToServer(a_line);
   }
 }
@@ -295,7 +296,7 @@ QString readAll(const QString& fileName, const QString& type = "auto")
   return input;
 }
 
-void MainWindow::callMethod(const QString& typ, const QString& value, const QString &input)
+void MainWindow::callMethod(const QString& typ, const QString& value, const QString &optionString)
 {
   if (typ == "changeTo" && QFile::exists(value)) {
     m_pVapourSynthScriptProcessor->finalize();
@@ -303,6 +304,11 @@ void MainWindow::callMethod(const QString& typ, const QString& value, const QStr
         && m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
       m_pVapourSynthScriptProcessor->finalize();
       m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
+    }
+    if (!optionString.isEmpty()) {
+      QStringList options = optionString.split("#");
+      m_pPreviewDialog->adjustCrop(options.at(0), options.at(1).toInt(), options.at(2).toInt(),
+          options.at(3).toInt(), options.at(4).toInt());
     }
     return;
   }
@@ -731,6 +737,7 @@ void MainWindow::loadStartUpScript()
   }
   // ipc&co
   QString option, filePath, ipcID, remoteName;
+  QStringList cropSettings;
   for (int i = 1; i < argc; ++i) {
     option = argumentsList.at(i);
     if (option == "--preview-only" && i + 1 <= argc) {
@@ -774,6 +781,13 @@ void MainWindow::loadStartUpScript()
       }
       continue;
     }
+    if (option == "--crop" && i + 1 <= argc) {
+      cropSettings = argumentsList.at(++i).split("#");
+    }
+  }
+  if (cropSettings.count() == 5) {
+    m_pPreviewDialog->adjustCrop(cropSettings.at(0), cropSettings.at(1).toInt(),
+        cropSettings.at(2).toInt(), cropSettings.at(3).toInt(), cropSettings.at(4).toInt());
   }
 }
 

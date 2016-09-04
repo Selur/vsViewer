@@ -36,6 +36,8 @@ class PreviewDialog : public QDialog
     virtual ~PreviewDialog();
 
     void previewScript(const QString& a_script, const QString& a_scriptName);
+    void adjustCrop(const QString& cropping, const int cropLeft, const int cropRight,
+        const int cropTop, const int cropBottom);
 
   protected:
 
