@@ -27,6 +27,7 @@ class LocalSocketIpcServer : public QObject
 
   signals:
     void messageReceived(QString message);
+    void signalWriteLogMessage(int a_messageType, const QString & a_message);
 
 };
 

@@ -33,6 +33,9 @@ class LocalSocketIpcClient : public QObject
 
     void socket_readReady();
     void socket_error(QLocalSocket::LocalSocketError);
+
+  signals:
+    void signalWriteLogMessage(int a_messageType, const QString & a_message);
 };
 
 #endif /* LOCALSOCKETIPCCLIENT_H_ */

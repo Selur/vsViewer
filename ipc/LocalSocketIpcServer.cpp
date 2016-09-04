@@ -7,15 +7,15 @@
 
 #include "LocalSocketIpcServer.h"
 #include <QLocalSocket>
-#include <iostream>
 #include <QDataStream>
+#include <vapoursynth/VapourSynth.h>
 
 LocalSocketIpcServer::LocalSocketIpcServer(QString servername, QObject *parent)
     : QObject(parent)
 {
   m_server = new QLocalServer(this);
   if (!m_server->listen(servername)) {
-    std::cerr << "Not able to start the Server " << qPrintable(servername) << std::endl;
+    emit signalWriteLogMessage(mtWarning, QString("Not able to start %1!").arg(servername));
   } else {
     connect(m_server, SIGNAL(newConnection()), this, SLOT(socket_new_connection()));
   }

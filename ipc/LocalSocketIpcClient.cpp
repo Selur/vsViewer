@@ -6,8 +6,8 @@
  */
 
 #include "LocalSocketIpcClient.h"
-#include <iostream>
 #include <QDataStream>
+#include <vapoursynth/VapourSynth.h>
 
 LocalSocketIpcClient::LocalSocketIpcClient(QString remoteServername, QObject *parent)
     : QObject(parent), m_blockSize(0)
@@ -50,15 +50,15 @@ void LocalSocketIpcClient::socket_connected()
 
 void LocalSocketIpcClient::socket_disconnected()
 {
-  std::cout << "VSE - socket_disconnected" << endl;
+  emit signalWriteLogMessage(mtDebug, "socket_disconnected");
 }
 
 void LocalSocketIpcClient::socket_readReady()
 {
-  std::cout << "VSE - socket_readReady" << endl;
+  emit signalWriteLogMessage(mtDebug, "socket_readReady");
 }
 
 void LocalSocketIpcClient::socket_error(QLocalSocket::LocalSocketError error)
 {
-  std::cerr << "VSE - socket_error: " << error << endl;
+  emit signalWriteLogMessage(mtWarning, QString("socket_error: %1").arg(error));
 }

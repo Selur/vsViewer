@@ -113,6 +113,9 @@ MainWindow::~MainWindow()
 
 void MainWindow::slotWriteLogMessage(int a_messageType, const QString & a_message)
 {
+  if (m_ipcClient != nullptr) {
+    m_ipcClient->send_MessageToServer(a_message);
+  }
   if ((a_messageType == mtFatal) || (a_messageType == mtCritical))
     m_ui.logEdit->setTextColor(QColor(255, 0, 0));
   else if (a_messageType == mtWarning)
@@ -341,9 +344,6 @@ void MainWindow::slotCheckScript()
         "Output video info:\n");
     message += vsedit::videoInfoString(m_pVapourSynthScriptProcessor->videoInfo());
     slotWriteLogMessage(mtDebug, message);
-    if (m_ipcClient != nullptr) {
-      m_ipcClient->send_MessageToServer(message);
-    }
   }
   m_pVapourSynthScriptProcessor->finalize();
 }
@@ -757,6 +757,8 @@ void MainWindow::loadStartUpScript()
         m_ipcServer = new LocalSocketIpcServer(ipcID + "VSE", this);
         connect(m_ipcServer, SIGNAL(messageReceived(QString)), this,
             SLOT(ipcMessageReceived(QString)));
+        connect(m_ipcServer, SIGNAL(signalWriteLogMessage(int, const QString &)), this,
+            SLOT(slotWriteLogMessage(int, const QString &)));
       }
       continue;
     }
@@ -764,6 +766,8 @@ void MainWindow::loadStartUpScript()
       if (m_ipcClient == nullptr && remoteName.isEmpty()) {
         remoteName = argumentsList.at(++i);
         m_ipcClient = new LocalSocketIpcClient(ipcID + remoteName, this);
+        connect(m_ipcClient, SIGNAL(signalWriteLogMessage(int, const QString &)), this,
+            SLOT(slotWriteLogMessage(int, const QString &)));
       }
       continue;
     }
