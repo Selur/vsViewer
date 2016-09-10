@@ -113,15 +113,15 @@ MainWindow::~MainWindow()
 
 void MainWindow::slotWriteLogMessage(int a_messageType, const QString & a_message)
 {
-  if (m_ipcClient != nullptr) {
-    m_ipcClient->send_MessageToServer(a_message);
-  }
   if ((a_messageType == mtFatal) || (a_messageType == mtCritical))
     m_ui.logEdit->setTextColor(QColor(255, 0, 0));
   else if (a_messageType == mtWarning)
     m_ui.logEdit->setTextColor(QColor(0, 0, 255));
   else
     m_ui.logEdit->setTextColor(QColor(0, 0, 0));
+  if (m_ipcClient != nullptr) {
+    m_ipcClient->send_MessageToServer(a_message);
+  }
   m_ui.logEdit->append(a_message);
 }
 
@@ -736,29 +736,16 @@ void MainWindow::loadStartUpScript()
     return;
   }
   // ipc&co
-  QString option, filePath, ipcID, remoteName;
+  QString option, input, previewOnly, ipcID, remoteName;
   QStringList cropSettings;
   for (int i = 1; i < argc; ++i) {
     option = argumentsList.at(i);
     if (option == "--preview-only" && i + 1 <= argc) {
-      QString filePath = argumentsList.at(++i);
-      if (!filePath.endsWith(".vpy", Qt::CaseInsensitive)) {
-        continue;
-      }
-      if (loadScriptFromFile(filePath)
-          && m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
-        m_pVapourSynthScriptProcessor->finalize();
-        m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
-        QTimer::singleShot(100, this, SLOT(hide())); // hide main window, this will also cause the editor to close once the preview window is closed
-      }
+      previewOnly = argumentsList.at(++i);
       continue;
     }
     if (option == "--input" && i + 1 <= argc) {
-      QString filePath = argumentsList.at(++i);
-      if (!filePath.endsWith(".vpy", Qt::CaseInsensitive)) {
-        continue;
-      }
-      loadScriptFromFile(filePath);
+      input = argumentsList.at(++i);
       continue;
     }
     if (m_ipcServer == nullptr && ipcID.isEmpty()) {
@@ -784,6 +771,14 @@ void MainWindow::loadStartUpScript()
     if (option == "--crop" && i + 1 <= argc) {
       cropSettings = argumentsList.at(++i).split("#");
     }
+  }
+  if (previewOnly.endsWith(".vpy", Qt::CaseInsensitive) && loadScriptFromFile(previewOnly)
+      && m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
+    m_pVapourSynthScriptProcessor->finalize();
+    m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
+    QTimer::singleShot(100, this, SLOT(hide())); // hide main window, this will also cause the editor to close once the preview window is closed
+  } else if (previewOnly.endsWith(".vpy", Qt::CaseInsensitive)) {
+    loadScriptFromFile(previewOnly);
   }
   if (cropSettings.count() == 5) {
     m_pPreviewDialog->adjustCrop(cropSettings.at(0), cropSettings.at(1).toInt(),
