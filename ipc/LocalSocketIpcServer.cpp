@@ -26,6 +26,11 @@ LocalSocketIpcServer::~LocalSocketIpcServer()
 {
 }
 
+void LocalSocketIpcServer::deleteClient(QLocalSocket *clientConnection)
+{
+ clientConnection->close();
+}
+
 void LocalSocketIpcServer::socket_new_connection()
 {
   QLocalSocket *clientConnection = m_server->nextPendingConnection();
@@ -33,7 +38,7 @@ void LocalSocketIpcServer::socket_new_connection()
     while (clientConnection->bytesAvailable() < (int) sizeof(quint32)) {
       clientConnection->waitForReadyRead();
     }
-    connect(clientConnection, SIGNAL(disconnected()), clientConnection, SLOT(delete()));
+    connect(clientConnection, SIGNAL(disconnected()), clientConnection, SLOT(deleteClient()));
 
     QDataStream in(clientConnection);
     in.setVersion(QDataStream::Qt_4_6); //TODO: adjust once QT 4.6 support is dropped

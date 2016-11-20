@@ -776,7 +776,9 @@ void MainWindow::loadStartUpScript()
       && m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
     m_pVapourSynthScriptProcessor->finalize();
     m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
+    m_pPreviewDialog->activateWindow();
     QTimer::singleShot(100, this, SLOT(hide())); // hide main window, this will also cause the editor to close once the preview window is closed
+    this->setVisible(false);
   } else if (previewOnly.endsWith(".vpy", Qt::CaseInsensitive)) {
     loadScriptFromFile(previewOnly);
   }

@@ -26,6 +26,9 @@ class LocalSocketIpcServer : public QObject
   public slots:
     void socket_new_connection();
 
+  private slots:
+    void deleteClient(QLocalSocket *clientConnection);
+
   signals:
     void messageReceived(QString message);
     void signalWriteLogMessage(int a_messageType, const QString & a_message);
