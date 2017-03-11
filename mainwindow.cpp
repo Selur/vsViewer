@@ -298,13 +298,27 @@ QString readAll(const QString& fileName, const QString& type = "auto")
 
 void MainWindow::callMethod(const QString& typ, const QString& value, const QString &optionString)
 {
-  if (typ == "changeTo" && QFile::exists(value)) {
+  if (m_ipcClient == nullptr) {
+    return;
+  }
+  m_ipcClient->send_MessageToServer(typ + ' => ' + value);
+
+  if (typ == "changeTo") {
     m_pVapourSynthScriptProcessor->finalize();
-    if (loadScriptFromFile(value)
-        && m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
-      m_pVapourSynthScriptProcessor->finalize();
-      m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
+    if (!QFile::exists(value)) {
+      m_ipcClient->send_MessageToServer(value + " doesn't exist!");
+      return;
     }
+    if(!loadScriptFromFile(value)) {
+      m_ipcClient->send_MessageToServer(value + " couldn't be loaded!");
+      return;
+    }
+    if(!m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
+      m_ipcClient->send_MessageToServer(value + " initialization failed");
+      return;
+    }
+    m_pVapourSynthScriptProcessor->finalize();
+    m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
     if (!optionString.isEmpty()) {
       QStringList options = optionString.split("#");
       m_pPreviewDialog->adjustCrop(options.at(0), options.at(1).toInt(), options.at(2).toInt(),
@@ -772,15 +786,20 @@ void MainWindow::loadStartUpScript()
       cropSettings = argumentsList.at(++i).split("#");
     }
   }
-  if (previewOnly.endsWith(".vpy", Qt::CaseInsensitive) && loadScriptFromFile(previewOnly)
-      && m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
-    m_pVapourSynthScriptProcessor->finalize();
-    m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
-    m_pPreviewDialog->activateWindow();
-    QTimer::singleShot(100, this, SLOT(hide())); // hide main window, this will also cause the editor to close once the preview window is closed
-    this->setVisible(false);
-  } else if (previewOnly.endsWith(".vpy", Qt::CaseInsensitive)) {
-    loadScriptFromFile(previewOnly);
+  if (previewOnly.endsWith(".vpy", Qt::CaseInsensitive)) {
+    this->sendMessagToIPC(" loading " + previewOnly);
+    if (loadScriptFromFile(previewOnly)) {
+      if (m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath)) {
+        this->sendMessagToIPC("evaluated: " + vsedit::videoInfoString(m_pVapourSynthScriptProcessor->videoInfo()));
+        m_pVapourSynthScriptProcessor->finalize();
+        m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
+        QTimer::singleShot(300, this, SLOT(hide()));
+      } else {
+        this->sendMessagToIPC(" initalization failed for " + previewOnly);
+      }
+    } else {
+      this->sendMessagToIPC(" loading failed for " + previewOnly);
+    }
   }
   if (cropSettings.count() == 5) {
     m_pPreviewDialog->adjustCrop(cropSettings.at(0), cropSettings.at(1).toInt(),
@@ -800,4 +819,13 @@ void MainWindow::loadFonts()
 }
 
 // END OF void MainWindow::loadFonts()
+//==============================================================================
+
+void MainWindow::sendMessagToIPC(const QString& message)
+{
+  if (m_ipcClient != nullptr) {
+    m_ipcClient->send_MessageToServer(message);
+  }
+}
+// END OF void MainWindow::sendMessagToIPC(const QString& message)
 //==============================================================================

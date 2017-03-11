@@ -85,6 +85,8 @@ class MainWindow : public QMainWindow
 
     void callMethod(const QString& typ, const QString& value, const QString &input);
 
+    void sendMessagToIPC(const QString& message);
+
     Ui::MainWindow m_ui;
 
     SettingsManager * m_pSettingsManager;
