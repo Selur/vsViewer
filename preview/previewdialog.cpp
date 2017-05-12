@@ -444,10 +444,21 @@ void PreviewDialog::adjustCrop(const QString& cropping, const int cropLeft, cons
   if (!crop) {
     this->resetCropSpinBoxes();
   } else {
+    int width = m_cpVideoInfo->width;
+    int height = m_cpVideoInfo->height;
+    m_ui.cropLeftSpinBox->setMaximum(width - 1);
     m_ui.cropLeftSpinBox->setValue(cropLeft);
-    m_ui.cropRightSpinBox->setValue(cropRight);
+    m_ui.cropTopSpinBox->setMaximum(height - 1);
     m_ui.cropTopSpinBox->setValue(cropTop);
+    m_ui.cropRightSpinBox->setMaximum(width - 1);
+    m_ui.cropRightSpinBox->setValue(cropRight);
+    m_ui.cropBottomSpinBox->setMaximum(height - 1);
     m_ui.cropBottomSpinBox->setValue(cropBottom);
+
+    m_ui.cropWidthSpinBox->setMaximum(width -1);
+    m_ui.cropWidthSpinBox->setValue(width - cropLeft - cropRight);
+    m_ui.cropHeightSpinBox->setMaximum(height);
+    m_ui.cropHeightSpinBox->setValue(height - cropLeft - cropRight);
   }
   this->recalculateCropMods();
   this->setPreviewPixmap();
@@ -491,19 +502,20 @@ void PreviewDialog::slotCropLeftValueChanged(int a_value)
 void PreviewDialog::slotCropTopValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
-
   int remainder = m_cpVideoInfo->height - a_value;
   m_ui.cropHeightSpinBox->setMaximum(remainder);
   m_ui.cropBottomSpinBox->setMaximum(remainder - 1);
 
   CropMode cropMode = (CropMode) m_ui.cropModeComboBox->currentData().toInt();
   if (cropMode == CropMode::Absolute) {
-    if (m_ui.cropHeightSpinBox->value() > remainder)
+    if (m_ui.cropHeightSpinBox->value() > remainder) {
       m_ui.cropHeightSpinBox->setValue(remainder);
+    }
     m_ui.cropBottomSpinBox->setValue(remainder - m_ui.cropHeightSpinBox->value());
   } else {
-    if (m_ui.cropBottomSpinBox->value() > remainder - 1)
+    if (m_ui.cropBottomSpinBox->value() > remainder - 1) {
       m_ui.cropBottomSpinBox->setValue(remainder - 1);
+    }
     m_ui.cropHeightSpinBox->setValue(remainder - m_ui.cropBottomSpinBox->value());
   }
 
@@ -522,7 +534,6 @@ void PreviewDialog::slotCropTopValueChanged(int a_value)
 void PreviewDialog::slotCropWidthValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
-
   m_ui.cropRightSpinBox->setValue(m_cpVideoInfo->width - m_ui.cropLeftSpinBox->value() - a_value);
 
   recalculateCropMods();
@@ -540,7 +551,6 @@ void PreviewDialog::slotCropWidthValueChanged(int a_value)
 void PreviewDialog::slotCropHeightValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
-
   m_ui.cropBottomSpinBox->setValue(m_cpVideoInfo->height - m_ui.cropTopSpinBox->value() - a_value);
 
   recalculateCropMods();
@@ -558,7 +568,6 @@ void PreviewDialog::slotCropHeightValueChanged(int a_value)
 void PreviewDialog::slotCropRightValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
-
   m_ui.cropWidthSpinBox->setValue(m_cpVideoInfo->width - m_ui.cropLeftSpinBox->value() - a_value);
 
   recalculateCropMods();
@@ -576,7 +585,6 @@ void PreviewDialog::slotCropRightValueChanged(int a_value)
 void PreviewDialog::slotCropBottomValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
-
   m_ui.cropHeightSpinBox->setValue(m_cpVideoInfo->height - m_ui.cropTopSpinBox->value() - a_value);
 
   recalculateCropMods();
