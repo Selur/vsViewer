@@ -11,6 +11,7 @@
 #include <QObject>
 #include <QString>
 #include <QLocalServer>
+#include <QLocalSocket>
 
 class LocalSocketIpcServer : public QObject
 {
@@ -22,17 +23,17 @@ class LocalSocketIpcServer : public QObject
   private:
     QLocalServer* m_server;
     QString m_serverName;
+    QLocalSocket* m_clientConnection;
+    void currentState(QLocalSocket::LocalSocketState state);
 
   public slots:
     void socket_new_connection();
-
-  private slots:
-    void deleteClient(QLocalSocket *clientConnection);
+    void socket_readReady();
+    void socket_disconnected();
 
   signals:
     void messageReceived(QString message);
     void signalWriteLogMessage(int a_messageType, const QString & a_message);
-
 };
 
 #endif /* HELPER_LOCALSOCKETIPCSERVER_H_ */

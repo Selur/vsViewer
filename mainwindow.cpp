@@ -120,10 +120,11 @@ void MainWindow::slotWriteLogMessage(int a_messageType, const QString & a_messag
   } else {
     m_ui.logEdit->setTextColor(QColor(0, 0, 0));
   }
-
+#if QT_DEBUG
   if (m_ipcClient != nullptr) {
     m_ipcClient->send_MessageToServer(a_message);
   }
+#endif
   if (a_messageType != mtDebug) {
     m_ui.logEdit->append(a_message);
   }
@@ -809,7 +810,6 @@ void MainWindow::loadStartUpScript()
     }
   }
   if (cropSettings.count() == 5) {
-    this->sendMessagToIPC(" Adjusting to crop settings " + cropSettings.join("#"));
     m_pPreviewDialog->adjustCrop(cropSettings.at(0), cropSettings.at(1).toInt(),
         cropSettings.at(2).toInt(), cropSettings.at(3).toInt(), cropSettings.at(4).toInt());
   }

@@ -1,32 +1,32 @@
 CONFIG += qt
 QT += widgets
 QT += network
-CONFIG(debug, debug|release) { 
-    contains(QMAKE_HOST.arch, x86_64) { 
-        contains(QMAKE_COMPILER, gcc) { 
+CONFIG(debug, debug|release) {
+    contains(QMAKE_HOST.arch, x86_64) {
+        contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/debug-64bit-gcc
             TARGET = vsedit-debug-64bit-gcc
             OBJECTS_DIR = generated/obj-debug-64bit-gcc
         }
-        contains(QMAKE_COMPILER, msvc) { 
+        contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/debug-64bit-msvc
             TARGET = vsedit-debug-64bit-msvc
             OBJECTS_DIR = generated/obj-debug-64bit-msvc
         }
     }
-    else { 
-        contains(QMAKE_COMPILER, gcc) { 
+    else {
+        contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/debug-32bit-gcc
             TARGET = vsedit-debug-32bit-gcc
             OBJECTS_DIR = generated/obj-debug-32bit-gcc
         }
-        contains(QMAKE_COMPILER, msvc) { 
+        contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/debug-32bit-msvc
             TARGET = vsedit-debug-32bit-msvc
             OBJECTS_DIR = generated/obj-debug-32bit-msvc
         }
     }
-    contains(QMAKE_COMPILER, gcc) { 
+    contains(QMAKE_COMPILER, gcc) {
         QMAKE_CXXFLAGS += -O0
         QMAKE_CXXFLAGS += -g
         QMAKE_CXXFLAGS += -ggdb3
@@ -34,59 +34,59 @@ CONFIG(debug, debug|release) {
         QMAKE_CXXFLAGS += -Wextra
         QMAKE_CXXFLAGS += -Wredundant-decls
         QMAKE_CXXFLAGS += -Wshadow
-        
+
         # QMAKE_CXXFLAGS += -Weffc++
         QMAKE_CXXFLAGS += -pedantic
     }
 }
-else { 
+else {
     CONFIG += warn_off
-    contains(QMAKE_HOST.arch, x86_64) { 
-        contains(QMAKE_COMPILER, gcc) { 
+    contains(QMAKE_HOST.arch, x86_64) {
+        contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/release-64bit-gcc
             TARGET = vsedit
             OBJECTS_DIR = generated/obj-release-64bit-gcc
         }
-        contains(QMAKE_COMPILER, msvc) { 
+        contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/release-64bit-msvc
             TARGET = vsedit
             OBJECTS_DIR = generated/obj-release-64bit-msvc
         }
     }
-    else { 
-        contains(QMAKE_COMPILER, gcc) { 
+    else {
+        contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/release-32bit-gcc
             TARGET = vsedit-32bit
             OBJECTS_DIR = generated/obj-release-32bit-gcc
         }
-        contains(QMAKE_COMPILER, msvc) { 
+        contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/release-32bit-msvc
             TARGET = vsedit-32bit
             OBJECTS_DIR = generated/obj-release-32bit-msvc
         }
     }
     DEFINES += NDEBUG
-    contains(QMAKE_COMPILER, gcc) { 
+    contains(QMAKE_COMPILER, gcc) {
         QMAKE_CXXFLAGS += -O2
         QMAKE_CXXFLAGS += -fexpensive-optimizations
         QMAKE_CXXFLAGS += -funit-at-a-time
     }
 }
-macx { 
+macx {
     INCLUDEPATH += /usr/local/include
     ICON = resources/vsedit.icns
 }
-win32 { 
+win32 {
     INCLUDEPATH += 'C:/Program Files (x86)/VapourSynth/sdk/include/'
     contains(QMAKE_HOST.arch, x86_64):message("x86_64 build")
-    else { 
+    else {
         message("x86 build")
         contains(QMAKE_COMPILER, gcc):QMAKE_LFLAGS += -Wl,--large-address-aware
         contains(QMAKE_COMPILER, msvc):QMAKE_LFLAGS += /LARGEADDRESSAWARE
     }
 }
 contains(QMAKE_COMPILER, clang):QMAKE_CXXFLAGS += -stdlib=libc++
-contains(QMAKE_COMPILER, gcc) { 
+contains(QMAKE_COMPILER, gcc) {
     QMAKE_CXXFLAGS += -std=c++11
     LIBS += -L$$[QT_INSTALL_LIBS]
 }
