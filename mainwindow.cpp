@@ -113,16 +113,20 @@ MainWindow::~MainWindow()
 
 void MainWindow::slotWriteLogMessage(int a_messageType, const QString & a_message)
 {
-  if ((a_messageType == mtFatal) || (a_messageType == mtCritical))
+  if ((a_messageType == mtFatal) || (a_messageType == mtCritical)) {
     m_ui.logEdit->setTextColor(QColor(255, 0, 0));
-  else if (a_messageType == mtWarning)
+  } else if (a_messageType == mtWarning) {
     m_ui.logEdit->setTextColor(QColor(0, 0, 255));
-  else
+  } else {
     m_ui.logEdit->setTextColor(QColor(0, 0, 0));
+  }
+
   if (m_ipcClient != nullptr) {
     m_ipcClient->send_MessageToServer(a_message);
   }
-  m_ui.logEdit->append(a_message);
+  if (a_messageType != mtDebug) {
+    m_ui.logEdit->append(a_message);
+  }
 }
 
 // END OF void MainWindow::slotWriteLogMessage(int a_messageType,
@@ -256,14 +260,13 @@ void MainWindow::ipcMessageReceived(const QString& message)
   QStringList typeAndValue = message.split("###");
   switch (typeAndValue.count()){
     case 3 :
-      this->callMethod(typeAndValue.at(0).trimmed(), typeAndValue.at(1).trimmed(),
-          typeAndValue.at(2).trimmed());
+      this->callMethod(typeAndValue.at(0).trimmed(), typeAndValue.at(1).trimmed(), typeAndValue.at(2).trimmed());
       break;
     case 2 :
       this->callMethod(typeAndValue.at(0).trimmed(), typeAndValue.at(1).trimmed(), QString());
       break;
     default :
-      slotWriteLogMessage(mtDebug, tr("ignoring received message: %1").arg(message));
+      this->slotWriteLogMessage(mtDebug, tr("ignoring received message: %1").arg(message));
       break;
   }
 }
@@ -302,7 +305,6 @@ void MainWindow::callMethod(const QString& typ, const QString& value, const QStr
     return;
   }
   m_ipcClient->send_MessageToServer(typ + ' => ' + value);
-
   if (typ == "changeTo") {
     m_pVapourSynthScriptProcessor->finalize();
     if (!QFile::exists(value)) {
@@ -324,6 +326,11 @@ void MainWindow::callMethod(const QString& typ, const QString& value, const QStr
       m_pPreviewDialog->adjustCrop(options.at(0), options.at(1).toInt(), options.at(2).toInt(),
           options.at(3).toInt(), options.at(4).toInt());
     }
+    return;
+  }
+  if (typ == "crop") {
+    QStringList options = value.split("#");
+    m_pPreviewDialog->adjustCrop(options.at(0), options.at(1).toInt(), options.at(2).toInt(), options.at(3).toInt(), options.at(4).toInt());
     return;
   }
 }
@@ -802,6 +809,7 @@ void MainWindow::loadStartUpScript()
     }
   }
   if (cropSettings.count() == 5) {
+    this->sendMessagToIPC(" Adjusting to crop settings " + cropSettings.join("#"));
     m_pPreviewDialog->adjustCrop(cropSettings.at(0), cropSettings.at(1).toInt(),
         cropSettings.at(2).toInt(), cropSettings.at(3).toInt(), cropSettings.at(4).toInt());
   }

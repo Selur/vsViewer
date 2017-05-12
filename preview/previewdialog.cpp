@@ -437,10 +437,11 @@ void PreviewDialog::adjustCrop(const QString& cropping, const int cropLeft, cons
     const int cropTop, const int cropBottom)
 {
   BEGIN_CROP_VALUES_CHANGE
-  m_ui.cropCheckButton->setChecked(cropping == "true");
-  this->slotToggleCropPanelVisible(cropping == "true");
-  m_ui.cropCheckButton->setEnabled(cropping != "off");
-  if (cropping != "off") {
+  bool crop = cropping == "on";
+  m_ui.cropCheckButton->setChecked(crop);
+  this->slotToggleCropPanelVisible(crop);
+  m_ui.cropCheckButton->setEnabled(!crop);
+  if (!crop) {
     this->resetCropSpinBoxes();
   } else {
     m_ui.cropLeftSpinBox->setValue(cropLeft);
@@ -599,24 +600,30 @@ void PreviewDialog::slotCropZoomRatioValueChanged(int a_cropZoomRatio)
 // END OF void PreviewDialog::slotCropZoomRatioValueChanged(int a_cropZoomRatio)
 //==============================================================================
 
-void PreviewDialog::slotPasteCropSnippetIntoScript()
+QString PreviewDialog::buildCropString() const
 {
-  if (!m_ui.cropPanel->isVisible())
-    return;
-
   CropMode cropMode = (CropMode) m_ui.cropModeComboBox->currentData().toInt();
+  QString cropString;
   if (cropMode == CropMode::Absolute) {
-    QString cropString = QString("***CLIP*** = core.std.CropAbs"
+    cropString = QString("***CLIP*** = core.std.CropAbs"
         "(***CLIP***, x=%1, y=%2, width=%3, height=%4)").arg(m_ui.cropLeftSpinBox->value()).arg(
         m_ui.cropTopSpinBox->value()).arg(m_ui.cropWidthSpinBox->value()).arg(
         m_ui.cropHeightSpinBox->value());
-    emit signalInsertLineIntoScript(cropString);
   } else {
-    QString cropString =
+    cropString =
         QString("***CLIP*** = core.std.CropRel"
             "(***CLIP***, left=%1, top=%2, right=%3, bottom=%4)").arg(m_ui.cropLeftSpinBox->value()).arg(
             m_ui.cropTopSpinBox->value()).arg(m_ui.cropRightSpinBox->value()).arg(
             m_ui.cropBottomSpinBox->value());
+  }
+  return cropString;
+}
+
+
+void PreviewDialog::slotPasteCropSnippetIntoScript()
+{
+  if (m_ui.cropPanel->isVisible()) {
+    QString cropString = this->buildCropString();
     emit signalInsertLineIntoScript(cropString);
   }
 }
@@ -1274,14 +1281,10 @@ void PreviewDialog::setUpCropPanel()
   connect(m_ui.cropLeftSpinBox, SIGNAL(valueChanged(int)), this,
       SLOT(slotCropLeftValueChanged(int)));
   connect(m_ui.cropTopSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropTopValueChanged(int)));
-  connect(m_ui.cropWidthSpinBox, SIGNAL(valueChanged(int)), this,
-      SLOT(slotCropWidthValueChanged(int)));
-  connect(m_ui.cropHeightSpinBox, SIGNAL(valueChanged(int)), this,
-      SLOT(slotCropHeightValueChanged(int)));
-  connect(m_ui.cropRightSpinBox, SIGNAL(valueChanged(int)), this,
-      SLOT(slotCropRightValueChanged(int)));
-  connect(m_ui.cropBottomSpinBox, SIGNAL(valueChanged(int)), this,
-      SLOT(slotCropBottomValueChanged(int)));
+  connect(m_ui.cropWidthSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropWidthValueChanged(int)));
+  connect(m_ui.cropHeightSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropHeightValueChanged(int)));
+  connect(m_ui.cropRightSpinBox, SIGNAL(valueChanged(int)), this,  SLOT(slotCropRightValueChanged(int)));
+  connect(m_ui.cropBottomSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropBottomValueChanged(int)));
   connect(m_ui.cropZoomRatioSpinBox, SIGNAL(valueChanged(int)), this,
       SLOT(slotCropZoomRatioValueChanged(int)));
 }

@@ -139,6 +139,8 @@ class PreviewDialog : public QDialog
 
     void resetCropSpinBoxes();
 
+    QString buildCropString() const;
+
     Ui::PreviewDialog m_ui;
 
     VapourSynthScriptProcessor * m_pVapourSynthScriptProcessor;
