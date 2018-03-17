@@ -458,7 +458,7 @@ void PreviewDialog::adjustCrop(const QString& cropping, const int cropLeft, cons
     m_ui.cropWidthSpinBox->setMaximum(width -1);
     m_ui.cropWidthSpinBox->setValue(width - cropLeft - cropRight);
     m_ui.cropHeightSpinBox->setMaximum(height);
-    m_ui.cropHeightSpinBox->setValue(height - cropLeft - cropRight);
+    m_ui.cropHeightSpinBox->setValue(height - cropTop - cropBottom);
   }
   this->recalculateCropMods();
   this->setPreviewPixmap();
