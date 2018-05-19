@@ -5,24 +5,24 @@ CONFIG(debug, debug|release) {
     contains(QMAKE_HOST.arch, x86_64) {
         contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/debug-64bit-gcc
-            TARGET = vsedit-debug-64bit-gcc
+            TARGET = vsViewer-debug-64bit-gcc
             OBJECTS_DIR = generated/obj-debug-64bit-gcc
         }
         contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/debug-64bit-msvc
-            TARGET = vsedit-debug-64bit-msvc
+            TARGET = vsViewer-debug-64bit-msvc
             OBJECTS_DIR = generated/obj-debug-64bit-msvc
         }
     }
     else {
         contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/debug-32bit-gcc
-            TARGET = vsedit-debug-32bit-gcc
+            TARGET = vsViewer-debug-32bit-gcc
             OBJECTS_DIR = generated/obj-debug-32bit-gcc
         }
         contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/debug-32bit-msvc
-            TARGET = vsedit-debug-32bit-msvc
+            TARGET = vsViewer-debug-32bit-msvc
             OBJECTS_DIR = generated/obj-debug-32bit-msvc
         }
     }
@@ -44,24 +44,24 @@ else {
     contains(QMAKE_HOST.arch, x86_64) {
         contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/release-64bit-gcc
-            TARGET = vsedit
+            TARGET = vsViewer
             OBJECTS_DIR = generated/obj-release-64bit-gcc
         }
         contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/release-64bit-msvc
-            TARGET = vsedit
+            TARGET = vsViewer
             OBJECTS_DIR = generated/obj-release-64bit-msvc
         }
     }
     else {
         contains(QMAKE_COMPILER, gcc) {
             DESTDIR = build/release-32bit-gcc
-            TARGET = vsedit-32bit
+            TARGET = vsViewer
             OBJECTS_DIR = generated/obj-release-32bit-gcc
         }
         contains(QMAKE_COMPILER, msvc) {
             DESTDIR = build/release-32bit-msvc
-            TARGET = vsedit-32bit
+            TARGET = vsViewer
             OBJECTS_DIR = generated/obj-release-32bit-msvc
         }
     }
@@ -74,7 +74,7 @@ else {
 }
 macx {
     INCLUDEPATH += /usr/local/include
-    ICON = resources/vsedit.icns
+    ICON = resources/vsViewer.icns
 }
 win32 {
     INCLUDEPATH += 'C:/Program Files (x86)/VapourSynth/sdk/include/'
@@ -97,12 +97,12 @@ D = $$replace(D, $$escape_expand(\\), $$S)
 D = $$replace(D, /, $$S)
 E = $$escape_expand(\n\t)
 QMAKE_POST_LINK += $${QMAKE_COPY} \
-    resources$${S}vsedit.ico \
-    $${D}$${S}vsedit.ico \
+    resources$${S}vsViewer.ico \
+    $${D}$${S}vsViewer.ico \
     $${E}
 QMAKE_POST_LINK += $${QMAKE_COPY} \
-    resources$${S}vsedit.svg \
-    $${D}$${S}vsedit.svg \
+    resources$${S}vsViewer.svg \
+    $${D}$${S}vsViewer.svg \
     $${E}
 QMAKE_POST_LINK += $${QMAKE_COPY} \
     README.md \

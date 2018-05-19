@@ -14,7 +14,7 @@
 // Icon resources
 //
 LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
-IDI_ICON1          ICON           ".\\vsedit.ico"
+IDI_ICON1          ICON           ".\\vsViewer.ico"
 
 
 

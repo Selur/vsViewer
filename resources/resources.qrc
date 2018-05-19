@@ -14,7 +14,7 @@
 		<file alias="zoom_fit_to_frame.png">zoom_fit.png</file>
 		<file alias="crop.png">transform_crop.png</file>
 		<file alias="paste.png">paste_plain.png</file>
-		<file alias="vsedit.ico">vsedit.ico</file>
+		<file alias="vsViewer.ico">vsViewer.ico</file>
 		<file alias="settings.png">cog.png</file>
 		<file alias="folder.png">folder.png</file>
 		<file alias="folder_add.png">folder_add.png</file>

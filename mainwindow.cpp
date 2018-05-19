@@ -48,7 +48,7 @@ MainWindow::MainWindow()
 
   m_ui.setupUi(this);
 
-  setWindowIcon(QIcon(":vsedit.ico"));
+  setWindowIcon(QIcon(":vsViewer.ico"));
 
   m_pSettingsManager = new SettingsManager(this);
   m_pSettingsDialog = new SettingsDialog(m_pSettingsManager, nullptr);
