@@ -16,7 +16,7 @@ class LocalSocketIpcClient : public QObject
 {
   Q_OBJECT
   public:
-    LocalSocketIpcClient(QString remoteServername, QObject *parent = 0);
+    LocalSocketIpcClient(QString remoteServername, QObject *parent = nullptr);
     ~LocalSocketIpcClient();
 
   private:

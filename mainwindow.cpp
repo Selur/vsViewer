@@ -61,8 +61,8 @@ MainWindow::MainWindow()
   m_pVapourSynthPluginsManager = new VapourSynthPluginsManager(m_pSettingsManager, this);
 
   // Just a debug.
-//	for(const QString & function : m_pVapourSynthPluginsManager->functions())
-//		slotWriteLogMessage(mtDebug, QString("core.") + function);
+//  for(const QString & function : m_pVapourSynthPluginsManager->functions())
+//    slotWriteLogMessage(mtDebug, QString("core.") + function);
 
   m_ui.scriptEdit->setPluginsList(m_pVapourSynthPluginsManager->pluginsList());
   m_ui.scriptEdit->setCharactersTypedToStartCompletion(
@@ -110,7 +110,6 @@ MainWindow::~MainWindow()
 
 // END OF MainWindow::~MainWindow()
 //==============================================================================
-
 void MainWindow::slotWriteLogMessage(int a_messageType, const QString & a_message)
 {
   if ((a_messageType == mtFatal) || (a_messageType == mtCritical)) {
@@ -128,6 +127,7 @@ void MainWindow::slotWriteLogMessage(int a_messageType, const QString & a_messag
   if (a_messageType != mtDebug) {
     m_ui.logEdit->append(a_message);
   }
+
 }
 
 // END OF void MainWindow::slotWriteLogMessage(int a_messageType,

@@ -43,7 +43,7 @@ void LocalSocketIpcClient::socket_connected()
   }
   QByteArray block;
   QDataStream out(&block, QIODevice::WriteOnly);
-  out.setVersion(QDataStream::Qt_4_6); //TODO: adjust once QT 4.6 support is dropped
+  out.setVersion(QDataStream::Qt_5_5);
   out << m_message;
   out.device()->seek(0);
   m_message = QString();
@@ -69,30 +69,30 @@ void LocalSocketIpcClient::socket_error(QLocalSocket::LocalSocketError error)
 {
 #if QT_DEBUG
   QString message;
-  if (error == QAbstractSocket::ConnectionRefusedError) {
+  if (error == QLocalSocket::ConnectionRefusedError) {
     message = "connection was refused by the peer (or timed out).";
-  } else if (error == QAbstractSocket::RemoteHostClosedError) {
+  } else if (error == QLocalSocket::PeerClosedError) {
     message = "remote socket closed the connection. Note that the client socket (i.e., this socket) will be closed after the remote close notification has been sent.";
-  } else if (error == QAbstractSocket::HostNotFoundError) {
+  } else if (error == QLocalSocket::ServerNotFoundError) {
     message = "local socket name was not found.";
-  } else if (error == QAbstractSocket::SocketAccessError) {
+  } else if (error == QLocalSocket::SocketAccessError) {
     message = "socket operation failed because the application lacked the required privileges.";
-  } else if (error == QAbstractSocket::SocketResourceError) {
+  } else if (error == QLocalSocket::SocketResourceError) {
     message = "local system ran out of resources (e.g., too many sockets).";
-  } else if (error == QAbstractSocket::SocketTimeoutError) {
+  } else if (error == QLocalSocket::SocketTimeoutError) {
     message = "socket operation timed out.";
-  } else if (error == QAbstractSocket::DatagramTooLargeError) {
+  } else if (error == QLocalSocket::DatagramTooLargeError) {
     message = "datagram was larger than the operating system's limit (which can be as low as 8192 bytes).";
-  } else if (error == QAbstractSocket::NetworkError) {
+  } else if (error == QLocalSocket::ConnectionError) {
     message = "An error occurred with the connection.";
   }
-  if (error == QAbstractSocket::UnsupportedSocketOperationError) {
+  if (error == QLocalSocket::UnsupportedSocketOperationError) {
     message = "requested socket operation is not supported by the local operating system.";
   }
-  if (error == QAbstractSocket::OperationError) {
+  if (error == QLocalSocket::OperationError) {
     message = "An operation was attempted while the socket was in a state that did not permit it.";
   }
-  if (error == QAbstractSocket::UnknownSocketError) {
+  if (error == QLocalSocket::UnknownSocketError) {
     message = "An unidentified error occurred.";
   }
   emit signalWriteLogMessage(0, "[VSE Client]: socket error - " + message);
