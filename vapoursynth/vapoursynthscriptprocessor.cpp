@@ -30,8 +30,8 @@ VapourSynthScriptProcessor::VapourSynthScriptProcessor(SettingsManager * a_pSett
         m_error(), m_vsScriptInitialized(false), m_initialized(false), m_cpVSAPI(nullptr),
         m_pVSScript(nullptr), m_pOutputNode(nullptr), m_pPreviewNode(nullptr),
         m_cpVideoInfo(nullptr), m_currentFrame(0), m_cpCurrentFrameRef(nullptr),
-        m_chromaResamplingFilter(), m_chromaPlacement(), m_resamplingFilterParameterA(NAN),
-        m_resamplingFilterParameterB(NAN), m_yuvMatrix(), m_vsScriptLibrary(this)
+        m_chromaResamplingFilter(), m_chromaPlacement(), m_resamplingFilterParameterA(qQNaN()),
+        m_resamplingFilterParameterB(qQNaN()), m_yuvMatrix(), m_vsScriptLibrary(this)
 {
   initLibrary();
   slotSettingsChanged();
@@ -48,41 +48,35 @@ VapourSynthScriptProcessor::~VapourSynthScriptProcessor()
 
 // END OF VapourSynthScriptProcessor::~VapourSynthScriptProcessor()
 //==============================================================================
-
 bool VapourSynthScriptProcessor::initialize(const QString& a_script, const QString& a_scriptName)
 {
   if (m_initialized) {
-    m_error = trUtf8("Script processor is already in use.");
+    m_error = QObject::tr("Script processor is already in use.");
     emit signalWriteLogMessage(mtCritical, m_error);
     return false;
   }
-
-  if (!initLibrary())
+  if (!initLibrary()) {
     return false;
-
+  }
   int opresult = vssInit();
   if (!opresult) {
-    m_error = trUtf8("Failed to initialize VapourSynth");
+    m_error = QObject::tr("Failed to initialize VapourSynth");
     emit signalWriteLogMessage(mtCritical, m_error);
     return false;
   }
   m_vsScriptInitialized = true;
-
   m_cpVSAPI = vssGetVSApi();
   if (!m_cpVSAPI) {
-    m_error = trUtf8("Failed to get VapourSynth API!");
+    m_error = QObject::tr("Failed to get VapourSynth API!");
     emit signalWriteLogMessage(mtCritical, m_error);
     finalize();
     return false;
   }
-
   m_cpVSAPI->setMessageHandler(::vsMessageHandler, static_cast<void *>(this));
-
   opresult = vssEvaluateScript(&m_pVSScript, a_script.toUtf8().constData(),
       a_scriptName.toUtf8().constData(), efSetWorkingDir);
-
   if (opresult) {
-    m_error = trUtf8("Failed to evaluate the script");
+    m_error = QObject::tr("Failed to evaluate the script");
     const char * vsError = vssGetError(m_pVSScript);
     if (vsError)
       m_error += QString(":\n") + vsError;
@@ -93,17 +87,15 @@ bool VapourSynthScriptProcessor::initialize(const QString& a_script, const QStri
     finalize();
     return false;
   }
-
   if (m_cpVSAPI->getCoreInfo(vssGetCore(m_pVSScript))->core < 29) {
-    m_error = trUtf8("VapourSynth R29+ required for preview.");
+    m_error = QObject::tr("VapourSynth R29+ required for preview.");
     emit signalWriteLogMessage(mtCritical, m_error);
     finalize();
     return false;
   }
-
   m_pOutputNode = vssGetOutput(m_pVSScript, 0);
   if (!m_pOutputNode) {
-    m_error = trUtf8("Failed to get the script output node.");
+    m_error = QObject::tr("Failed to get the script output node.");
     emit signalWriteLogMessage(mtCritical, m_error);
     finalize();
     return false;
@@ -204,7 +196,7 @@ bool VapourSynthScriptProcessor::requestFrame(int a_frameNumber)
       getFrameErrorMessage, sizeof(getFrameErrorMessage) - 1);
 
   if (!cpNewFrameRef) {
-    m_error = trUtf8("Error getting the frame number %1:\n%2").arg(a_frameNumber).arg(
+    m_error = QObject::tr("Error getting the frame number %1:\n%2").arg(a_frameNumber).arg(
         QString::fromUtf8(getFrameErrorMessage));
     emit signalWriteLogMessage(mtCritical, m_error);
     return false;
@@ -253,7 +245,7 @@ QPixmap VapourSynthScriptProcessor::pixmap(int a_frameNumber)
       getFrameErrorMessage, sizeof(getFrameErrorMessage) - 1);
 
   if (!cpFrameRef) {
-    m_error = trUtf8("Error getting the frame number %1:\n%2").arg(a_frameNumber).arg(
+    m_error = QObject::tr("Error getting the frame number %1:\n%2").arg(a_frameNumber).arg(
         QString::fromUtf8(getFrameErrorMessage));
     emit signalWriteLogMessage(mtCritical, m_error);
     return QPixmap();
@@ -262,7 +254,7 @@ QPixmap VapourSynthScriptProcessor::pixmap(int a_frameNumber)
   QPixmap framePixmap = pixmapFromFrame(cpFrameRef);
 
   if (framePixmap.isNull()) {
-    m_error = trUtf8("Can not convert from format \"%1\" for preview!").arg(
+    m_error = QObject::tr("Can not convert from format \"%1\" for preview!").arg(
         m_cpVideoInfo->format->name);
     emit signalWriteLogMessage(mtCritical, m_error);
   }
@@ -335,8 +327,8 @@ void VapourSynthScriptProcessor::slotSettingsChanged()
   m_yuvMatrix = m_pSettingsManager->getYuvToRgbConversionMatrix();
 
   m_chromaResamplingFilter = m_pSettingsManager->getChromaResamplingFilter();
-  m_resamplingFilterParameterA = NAN;
-  m_resamplingFilterParameterB = NAN;
+  m_resamplingFilterParameterA = qQNaN();
+  m_resamplingFilterParameterB = qQNaN();
   if (m_chromaResamplingFilter == ResamplingFilter::Bicubic) {
     m_resamplingFilterParameterA = m_pSettingsManager->getBicubicFilterParameterB();
     m_resamplingFilterParameterB = m_pSettingsManager->getBicubicFilterParameterC();
@@ -396,18 +388,15 @@ bool VapourSynthScriptProcessor::initLibrary()
     assert(vssFinalize);
     return true;
   }
-
 #ifdef Q_OS_WIN
   QString libraryName("vsscript");
 #else
   QString libraryName("vapoursynth-script");
 #endif // Q_OS_WIN
-
   QString libraryFullPath;
   m_vsScriptLibrary.setFileName(libraryName);
   m_vsScriptLibrary.setLoadHints(QLibrary::ExportExternalSymbolsHint);
   bool loaded = m_vsScriptLibrary.load();
-
 #ifdef Q_OS_WIN
   if(!loaded)
   {
@@ -420,14 +409,12 @@ bool VapourSynthScriptProcessor::initLibrary()
       libraryFullPath = settings.value(
           "Wow6432Node/VapourSynth/VSScriptDLL").toString();
     }
-
     if(!libraryFullPath.isEmpty())
     {
       m_vsScriptLibrary.setFileName(libraryFullPath);
       loaded = m_vsScriptLibrary.load();
     }
   }
-
   if(!loaded)
   {
     QProcessEnvironment environment =
@@ -473,7 +460,7 @@ bool VapourSynthScriptProcessor::initLibrary()
   };
 
   Entry vssEntries[] = { { (QFunctionPointer *) &vssInit, "vsscript_init", "_vsscript_init@0" }, {
-          (QFunctionPointer *) &vssGetVSApi, "vsscript_getVSApi", "_vsscript_getVSApi@0" }, {
+          (QFunctionPointer *) &vssGetVSApi, "vsscript_getVSApi", "_vsscript_getVSApi" }, {
           (QFunctionPointer *) &vssEvaluateScript, "vsscript_evaluateScript",
           "_vsscript_evaluateScript@16" }, { (QFunctionPointer *) &vssGetError, "vsscript_getError",
           "_vsscript_getError@4" }, { (QFunctionPointer *) &vssGetCore, "vsscript_getCore",
@@ -487,13 +474,13 @@ bool VapourSynthScriptProcessor::initLibrary()
     *entry.ppFunction = m_vsScriptLibrary.resolve(entry.name);
     if (!*entry.ppFunction) { // Win32 fallback
       *entry.ppFunction = m_vsScriptLibrary.resolve(entry.fallbackName);
-    }
-    if (!*entry.ppFunction) {
-      QString errorString = trUtf8("VapourSynth script processor: "
-          "Failed to get entry %1() in vapoursynth script library!").arg(entry.name);
-      emit signalWriteLogMessage(mtCritical, errorString);
-      freeLibrary();
-      return false;
+      if (!*entry.ppFunction) {
+        QString errorString = QObject::tr("VapourSynth script processor: "
+            "Failed to get entry %1() in vapoursynth script library!").arg(entry.name);
+        emit signalWriteLogMessage(mtCritical, errorString);
+        freeLibrary();
+        return false;
+      }
     }
   }
 
@@ -582,7 +569,7 @@ void VapourSynthScriptProcessor::initPreviewNode()
   }
 
   if (!m_pOutputNode) {
-    m_error = trUtf8("Failed to create preview node: "
+    m_error = QObject::tr("Failed to create preview node: "
         "there is no output node.\n");
     emit signalWriteLogMessage(mtCritical, m_error);
     return;
@@ -669,7 +656,7 @@ void VapourSynthScriptProcessor::initPreviewNode()
   const char * cpResultError = m_cpVSAPI->getError(pResultMap);
 
   if (cpResultError) {
-    m_error = trUtf8("Failed to convert to RGB:\n");
+    m_error = QObject::tr("Failed to convert to RGB:\n");
     m_error += cpResultError;
     emit signalWriteLogMessage(mtCritical, m_error);
     m_cpVSAPI->freeMap(pResultMap);
