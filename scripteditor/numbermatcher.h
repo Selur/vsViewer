@@ -7,15 +7,11 @@
 class NumberMatcher
 {
   public:
-
     NumberMatcher();
-
     bool beginsWithNumber(const QString & a_string, int a_matchFrom);
-
     int matchedLength() const;
 
   private:
-
     enum State
     {
       Initial, FirstZero, // Valid final state
@@ -33,9 +29,7 @@ class NumberMatcher
       ExpSign,
       ExpComplete, // Valid final state
     };
-
     State m_state;
-
     int m_lastValidLength;
 };
 

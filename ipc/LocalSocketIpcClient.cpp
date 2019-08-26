@@ -8,7 +8,7 @@
 #include "LocalSocketIpcClient.h"
 #include <QDataStream>
 
-LocalSocketIpcClient::LocalSocketIpcClient(QString remoteServername, QObject *parent)
+LocalSocketIpcClient::LocalSocketIpcClient(const QString &remoteServername, QObject *parent)
     : QObject(parent), m_blockSize(0)
 {
 
@@ -26,7 +26,7 @@ LocalSocketIpcClient::~LocalSocketIpcClient()
 {
 }
 
-void LocalSocketIpcClient::send_MessageToServer(QString message)
+void LocalSocketIpcClient::send_MessageToServer(const QString& message)
 {
   m_message = message;
   if (m_socket->state() != QLocalSocket::ConnectedState) {
@@ -53,21 +53,16 @@ void LocalSocketIpcClient::socket_connected()
 
 void LocalSocketIpcClient::socket_disconnected()
 {
-#if QT_DEBUG
   emit signalWriteLogMessage(0, "[VSE Client]: socket disconnected,..");
-#endif
 }
 
 void LocalSocketIpcClient::socket_readReady()
 {
-#if QT_DEBUG
   emit signalWriteLogMessage(0, "[VSE Client]: socket read ready,..");
-#endif
 }
 
 void LocalSocketIpcClient::socket_error(QLocalSocket::LocalSocketError error)
 {
-#if QT_DEBUG
   QString message;
   if (error == QLocalSocket::ConnectionRefusedError) {
     message = "connection was refused by the peer (or timed out).";
@@ -85,18 +80,12 @@ void LocalSocketIpcClient::socket_error(QLocalSocket::LocalSocketError error)
     message = "datagram was larger than the operating system's limit (which can be as low as 8192 bytes).";
   } else if (error == QLocalSocket::ConnectionError) {
     message = "An error occurred with the connection.";
-  }
-  if (error == QLocalSocket::UnsupportedSocketOperationError) {
+  } else if (error == QLocalSocket::UnsupportedSocketOperationError) {
     message = "requested socket operation is not supported by the local operating system.";
-  }
-  if (error == QLocalSocket::OperationError) {
+  } else if (error == QLocalSocket::OperationError) {
     message = "An operation was attempted while the socket was in a state that did not permit it.";
-  }
-  if (error == QLocalSocket::UnknownSocketError) {
+  } else if (error == QLocalSocket::UnknownSocketError) {
     message = "An unidentified error occurred.";
   }
   emit signalWriteLogMessage(0, "[VSE Client]: socket error - " + message);
-#else
-  Q_UNUSED(error);
-#endif
 }

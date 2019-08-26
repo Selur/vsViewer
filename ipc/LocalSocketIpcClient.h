@@ -16,7 +16,7 @@ class LocalSocketIpcClient : public QObject
 {
   Q_OBJECT
   public:
-    LocalSocketIpcClient(QString remoteServername, QObject *parent = nullptr);
+    explicit LocalSocketIpcClient(const QString& remoteServername, QObject *parent = nullptr);
     ~LocalSocketIpcClient();
 
   private:
@@ -26,7 +26,7 @@ class LocalSocketIpcClient : public QObject
     QString m_serverName;
 
   public slots:
-    void send_MessageToServer(QString message);
+    void send_MessageToServer(const QString &message);
 
     void socket_connected();
     void socket_disconnected();

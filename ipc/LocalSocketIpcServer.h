@@ -17,7 +17,7 @@ class LocalSocketIpcServer : public QObject
 {
   Q_OBJECT
   public:
-    LocalSocketIpcServer(QString servername, QObject *parent);
+    explicit LocalSocketIpcServer(const QString &servername, QObject *parent);
     ~LocalSocketIpcServer();
 
   private:

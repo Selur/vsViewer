@@ -14,35 +14,24 @@ class SyntaxHighlighter : public QSyntaxHighlighter
   Q_OBJECT
 
   public:
-
-    SyntaxHighlighter(QTextDocument * a_pDocument, VSPluginsList a_pluginsList = VSPluginsList());
+    explicit SyntaxHighlighter(QTextDocument * a_pDocument, VSPluginsList a_pluginsList = VSPluginsList());
     virtual ~SyntaxHighlighter();
-
     void setSettingsManager(SettingsManager * a_pSettingsManager);
-
     void setCoreName(const QString & a_coreName);
-
     void setPluginsList(VSPluginsList a_pluginsList);
 
   public slots:
-
     void slotLoadSettings();
 
   protected:
-
     void highlightBlock(const QString & a_text);
 
   private:
-
     SettingsManager * m_pSettingsManager;
-
     QString m_coreName;
-
     VSPluginsList m_pluginsList;
-
     QStringList m_keywordsList;
     QStringList m_operatorsList;
-
     QTextCharFormat m_keywordFormat;
     QTextCharFormat m_operatorFormat;
     QTextCharFormat m_stringFormat;

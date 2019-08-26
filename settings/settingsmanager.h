@@ -101,167 +101,88 @@ class SettingsManager : public QObject
 {
   public:
 
-    SettingsManager(QObject * a_pParent);
+    explicit SettingsManager(QObject * a_pParent);
     virtual ~SettingsManager();
-
     //----------------------------------------------------------------------
-
     bool getPortableMode() const;
-
     bool setPortableMode(bool a_portableMod);
-
     //----------------------------------------------------------------------
-
     QKeySequence getDefaultHotkey(const QString & a_actionID) const;
-
     QKeySequence getHotkey(const QString & a_actionID) const;
-
     bool setHotkey(const QString & a_actionID, const QKeySequence & a_hotkey);
-
     //----------------------------------------------------------------------
-
     QTextCharFormat getDefaultTextFormat(const QString & a_textFormatID) const;
-
     QTextCharFormat getTextFormat(const QString & a_textFormatID) const;
-
     bool setTextFormat(const QString & a_textFormatID, const QTextCharFormat & a_format);
-
     //----------------------------------------------------------------------
-
     QColor getDefaultColor(const QString & a_colorID) const;
-
     QColor getColor(const QString & a_colorID) const;
-
     bool setColor(const QString & a_colorID, const QColor & a_color);
-
     //----------------------------------------------------------------------
-
     QString getLastUsedPath() const;
-
     bool setLastUsedPath(const QString& a_lastUsedPath);
-
     QByteArray getMainWindowGeometry() const;
-
     bool setMainWindowGeometry(const QByteArray & a_mainWindowGeometry);
-
     bool getMainWindowMaximized() const;
-
     bool setMainWindowMaximized(bool a_mainWindowMaximized);
-
     QByteArray getPreviewDialogGeometry() const;
-
     bool setPreviewDialogGeometry(const QByteArray & a_previewDialogGeometry);
-
     bool getPreviewDialogMaximized() const;
-
     bool setPreviewDialogMaximized(bool a_previewDialogMaximized);
-
     bool getAutoLoadLastScript() const;
-
     bool setAutoLoadLastScript(bool a_autoLoadLastScript);
-
     bool getZoomPanelVisible() const;
-
     bool setZoomPanelVisible(bool a_zoomPanelVisible);
-
     ZoomMode getZoomMode() const;
-
     bool setZoomMode(ZoomMode a_zoomMode);
-
     double getZoomRatio() const;
-
     bool setZoomRatio(double a_zoomRatio);
-
     Qt::TransformationMode getScaleMode() const;
-
     bool setScaleMode(Qt::TransformationMode a_scaleMode);
-
     CropMode getCropMode() const;
-
     bool setCropMode(CropMode a_cropMode);
-
     int getCropZoomRatio() const;
-
     bool setCropZoomRatio(int a_cropZoomRatio);
-
     bool getPromptToSaveChanges() const;
-
     bool setPromptToSaveChanges(bool a_prompt);
-
     QStringList getRecentFilesList() const;
-
     bool addToRecentFilesList(const QString & a_filePath);
-
     unsigned int getMaxRecentFilesNumber() const;
-
     bool setMaxRecentFilesNumber(unsigned int a_maxRecentFilesNumber);
-
     QStringList getVapourSynthLibraryPaths() const;
-
     bool setVapourSynthLibraryPaths(const QStringList & a_pathsList);
-
     QStringList getVapourSynthPluginsPaths() const;
-
     bool setVapourSynthPluginsPaths(const QStringList & a_pathsList);
-
     QStringList getVapourSynthDocumentationPaths() const;
-
     bool setVapourSynthDocumentationPaths(const QStringList & a_pathsList);
-
     int getCharactersTypedToStartCompletion() const;
-
     bool setCharactersTypedToStartCompletion(int a_charactersNumber);
-
     TimeLineSlider::DisplayMode getTimeLineMode() const;
-
     bool setTimeLineMode(TimeLineSlider::DisplayMode a_timeLineMode);
-
     double getTimeStep() const;
-
     bool setTimeStep(double a_timeStep);
-
     ResamplingFilter getChromaResamplingFilter() const;
-
     bool setChromaResamplingFilter(ResamplingFilter a_filter);
-
     YuvToRgbConversionMatrix getYuvToRgbConversionMatrix() const;
-
     bool setYuvToRgbConversionMatrix(YuvToRgbConversionMatrix a_matrix);
-
     ChromaPlacement getChromaPlacement() const;
-
     bool setChromaPlacement(ChromaPlacement a_placement);
-
     double getBicubicFilterParameterB() const;
-
     bool setBicubicFilterParameterB(double a_parameterB);
-
     double getBicubicFilterParameterC() const;
-
     bool setBicubicFilterParameterC(double a_parameterC);
-
     int getLanczosFilterTaps() const;
-
     bool setLanczosFilterTaps(int a_taps);
-
     bool getColorPickerVisible() const;
-
     bool setColorPickerVisible(bool a_colorPickerVisible);
-
-  private:
-
-    QVariant valueInGroup(const QString & a_group, const QString & a_key,
-        const QVariant & a_defaultValue = QVariant()) const;
-
+   private:
+    QVariant valueInGroup(const QString & a_group, const QString & a_key, const QVariant & a_defaultValue = QVariant()) const;
     bool setValueInGroup(const QString & a_group, const QString & a_key, const QVariant & a_value);
-
     QVariant value(const QString & a_key, const QVariant & a_defaultValue = QVariant()) const;
-
     bool setValue(const QString & a_key, const QVariant & a_value);
-
     QString m_settingsFilePath;
 };
 
-//==============================================================================
+//=============================================================================
 
 #endif // SETTINGSMANAGER_H

@@ -1,30 +1,16 @@
 CONFIG += qt
+CONFIG += console
 QT += widgets
 QT += network
+TARGET = vsViewer
 CONFIG(debug, debug|release) {
-    contains(QMAKE_HOST.arch, x86_64) {
-        contains(QMAKE_COMPILER, gcc) {
-            DESTDIR = build/debug-64bit-gcc
-            TARGET = vsViewer-debug-64bit-gcc
-            OBJECTS_DIR = generated/obj-debug-64bit-gcc
-        }
-        contains(QMAKE_COMPILER, msvc) {
-            DESTDIR = build/debug-64bit-msvc
-            TARGET = vsViewer-debug-64bit-msvc
-            OBJECTS_DIR = generated/obj-debug-64bit-msvc
-        }
+    contains(QMAKE_COMPILER, gcc) {
+        DESTDIR = build/release-gcc
+        OBJECTS_DIR = generated/obj-debug-gcc
     }
-    else {
-        contains(QMAKE_COMPILER, gcc) {
-            DESTDIR = build/debug-32bit-gcc
-            TARGET = vsViewer-debug-32bit-gcc
-            OBJECTS_DIR = generated/obj-debug-32bit-gcc
-        }
-        contains(QMAKE_COMPILER, msvc) {
-            DESTDIR = build/debug-32bit-msvc
-            TARGET = vsViewer-debug-32bit-msvc
-            OBJECTS_DIR = generated/obj-debug-32bit-msvc
-        }
+    contains(QMAKE_COMPILER, msvc) {
+        DESTDIR = build/obj-release-msvc
+        OBJECTS_DIR = generated/obj-debug-msvc
     }
     contains(QMAKE_COMPILER, gcc) {
         QMAKE_CXXFLAGS += -O0
@@ -40,31 +26,15 @@ CONFIG(debug, debug|release) {
     }
 }
 else {
+    contains(QMAKE_COMPILER, gcc) {
+        DESTDIR = build/release-gcc
+        OBJECTS_DIR = generated/obj-debug-gcc
+    }
+    contains(QMAKE_COMPILER, msvc) {
+        DESTDIR = build/obj-release-msvc
+        OBJECTS_DIR = generated/obj-debug-msvc
+    }
     CONFIG += warn_off
-    contains(QMAKE_HOST.arch, x86_64) {
-        contains(QMAKE_COMPILER, gcc) {
-            DESTDIR = build/release-64bit-gcc
-            TARGET = vsViewer
-            OBJECTS_DIR = generated/obj-release-64bit-gcc
-        }
-        contains(QMAKE_COMPILER, msvc) {
-            DESTDIR = build/release-64bit-msvc
-            TARGET = vsViewer
-            OBJECTS_DIR = generated/obj-release-64bit-msvc
-        }
-    }
-    else {
-        contains(QMAKE_COMPILER, gcc) {
-            DESTDIR = build/release-32bit-gcc
-            TARGET = vsViewer
-            OBJECTS_DIR = generated/obj-release-32bit-gcc
-        }
-        contains(QMAKE_COMPILER, msvc) {
-            DESTDIR = build/release-32bit-msvc
-            TARGET = vsViewer
-            OBJECTS_DIR = generated/obj-release-32bit-msvc
-        }
-    }
     DEFINES += NDEBUG
     contains(QMAKE_COMPILER, gcc) {
         QMAKE_CXXFLAGS += -O2
@@ -77,12 +47,13 @@ macx {
     ICON = resources/vsViewer.icns
 }
 win32 {
-    INCLUDEPATH += 'C:/Program Files (x86)/VapourSynth/sdk/include/'
+    #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
+    INCLUDEPATH += 'I:/Hybrid/64bit/VapourSynth/sdk/include/'
     contains(QMAKE_HOST.arch, x86_64):message("x86_64 build")
     else {
         message("x86 build")
-        contains(QMAKE_COMPILER, gcc):QMAKE_LFLAGS += -Wl,--large-address-aware
-        contains(QMAKE_COMPILER, msvc):QMAKE_LFLAGS += /LARGEADDRESSAWARE
+        contains(QMAKE_COMPILER, gcc):QMAKE_LFLAGS += -Wl,--large-addreress-aware
+        contains(QMAKE_COMPILER, msvc):QMAKE_LFLAGS += /LARGEADDRESSAWAWARE
     }
 }
 contains(QMAKE_COMPILER, clang):QMAKE_CXXFLAGS += -stdlib=libc++

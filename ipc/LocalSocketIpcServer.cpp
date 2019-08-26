@@ -8,14 +8,12 @@
 #include "LocalSocketIpcServer.h"
 #include <QDataStream>
 
-LocalSocketIpcServer::LocalSocketIpcServer(QString servername, QObject *parent)
+LocalSocketIpcServer::LocalSocketIpcServer(const QString& servername, QObject *parent)
     : QObject(parent), m_serverName(servername), m_clientConnection(nullptr)
 {
   m_server = new QLocalServer(this);
-  bool started = false;
   for (int i = 0; i < 10; ++i) {
-    started = m_server->listen(m_serverName);
-    if (started) {
+    if (m_server->listen(m_serverName)) {
       QObject::connect(m_server, SIGNAL(newConnection()), this, SLOT(socket_new_connection()));
       break;
     }
@@ -43,13 +41,9 @@ void LocalSocketIpcServer::currentState(QLocalSocket::LocalSocketState state)
 
 void LocalSocketIpcServer::socket_new_connection()
 {
-#if QT_DEBUG
   emit signalWriteLogMessage(0, "[VSE Server]: incoming connection");
-#endif
   m_clientConnection = m_server->nextPendingConnection();
-#if QT_DEBUG
   this->currentState(m_clientConnection->state());
-#endif
   QObject::connect(m_clientConnection, SIGNAL(disconnected()), this, SLOT(socket_disconnected()));
   QObject::connect(m_clientConnection, SIGNAL(readyRead()), this, SLOT(socket_readReady()));
 }
@@ -63,34 +57,28 @@ void LocalSocketIpcServer::socket_disconnected()
   m_clientConnection->deleteLater();
   m_clientConnection = nullptr;
 }
-
+#include <iostream>
 void LocalSocketIpcServer::socket_readReady()
 {
   if (m_clientConnection == nullptr) {
     emit signalWriteLogMessage(0, "[VSE Server]: socket_readReady no client connection");
     return;
   }
-#if QT_DEBUG
   emit signalWriteLogMessage(0, "[VSE Server]: socket is ready to be read");
   emit signalWriteLogMessage(0, "[VSE Server]: connection open: " + QString(m_clientConnection->isOpen() ? "true" : "false"));
   emit signalWriteLogMessage(0, "[VSE Server]: connection readable: " + QString(m_clientConnection->isReadable() ?  "true" : "false"));
-#endif
   QDataStream in(m_clientConnection);
   in.setVersion(QDataStream::Qt_5_5);
   try {
     while (m_clientConnection != nullptr && m_clientConnection->bytesAvailable() >= int(sizeof(quint16))) {
       QByteArray message;
       in >> message;
-#if QT_DEBUG
       emit signalWriteLogMessage(0, "[VSE Server] - Message received: " + message);
-#endif
       emit messageReceived(message);
     }
   } catch (...) {
-#ifdef QT_DEBUG
     std::cout << "[VSE Server]: Problem with client connection,..." << std::endl;
     m_clientConnection = nullptr;
-#endif
   }
 
 

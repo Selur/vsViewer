@@ -119,11 +119,9 @@ void MainWindow::slotWriteLogMessage(int a_messageType, const QString & a_messag
   } else {
     m_ui.logEdit->setTextColor(QColor(0, 0, 0));
   }
-#if QT_DEBUG
   if (m_ipcClient != nullptr) {
     m_ipcClient->send_MessageToServer(a_message);
   }
-#endif
   if (a_messageType != mtDebug) {
     m_ui.logEdit->append(a_message);
   }
@@ -241,11 +239,11 @@ bool MainWindow::slotSaveScriptAs()
   QString offeredFilePath = m_scriptFilePath;
   if (offeredFilePath.isEmpty()) {
     QFileInfo fileInfo(m_pSettingsManager->getLastUsedPath());
-    offeredFilePath = fileInfo.absoluteDir().path() + trUtf8("/Untitled.vpy");
+    offeredFilePath = fileInfo.absoluteDir().path() + QObject::tr("/Untitled.vpy");
   }
 
-  QString filePath = QFileDialog::getSaveFileName(this, trUtf8("Save VapourSynth script"),
-      offeredFilePath, trUtf8("VapourSynth script (*.vpy);;All files (*)"));
+  QString filePath = QFileDialog::getSaveFileName(this, QObject::tr("Save VapourSynth script"),
+      offeredFilePath, QObject::tr("VapourSynth script (*.vpy);;All files (*)"));
 
   if (!filePath.isEmpty())
     return saveScriptToFile(filePath);
@@ -305,7 +303,7 @@ void MainWindow::callMethod(const QString& typ, const QString& value, const QStr
   if (m_ipcClient == nullptr) {
     return;
   }
-  m_ipcClient->send_MessageToServer(typ + ' => ' + value);
+  m_ipcClient->send_MessageToServer(QString("%1 => %2").arg(typ).arg(value));
   if (typ == "changeTo") {
     m_pVapourSynthScriptProcessor->finalize();
     if (!QFile::exists(value)) {
@@ -344,8 +342,8 @@ bool MainWindow::slotOpenScript()
   QFileInfo fileInfo(m_pSettingsManager->getLastUsedPath());
   QString offeredPath = fileInfo.absoluteDir().path();
 
-  QString filePath = QFileDialog::getOpenFileName(this, trUtf8("Open VapourSynth script"),
-      offeredPath, trUtf8("VapourSynth script (*.vpy);;All files (*)"));
+  QString filePath = QFileDialog::getOpenFileName(this, QObject::tr("Open VapourSynth script"),
+      offeredPath, QObject::tr("VapourSynth script (*.vpy);;All files (*)"));
 
   return loadScriptFromFile(filePath);
 }
@@ -365,17 +363,21 @@ void MainWindow::slotPreview()
 
 void MainWindow::slotCheckScript()
 {
+  slotWriteLogMessage(mtCritical, "PING1");
   m_ui.logEdit->clear();
+  slotWriteLogMessage(mtCritical, "PING2");
   m_pPreviewDialog->close();
-
-  bool correct = m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(),
-      m_scriptFilePath);
+  slotWriteLogMessage(mtCritical, "PING3");
+  bool correct = m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath);
+  slotWriteLogMessage(mtCritical, "PING4");
   if (correct) {
-    QString message = trUtf8("Script was successfully evaluated. "
+    QString message = QObject::tr("Script was successfully evaluated. "
         "Output video info:\n");
     message += vsedit::videoInfoString(m_pVapourSynthScriptProcessor->videoInfo());
+    slotWriteLogMessage(mtCritical, "PING5");
     slotWriteLogMessage(mtDebug, message);
   }
+  slotWriteLogMessage(mtCritical, "PING6");
   m_pVapourSynthScriptProcessor->finalize();
 }
 
@@ -436,6 +438,7 @@ void MainWindow::slotOpenRecentScriptActionTriggered()
 
 void MainWindow::slotSettingsChanged()
 {
+
   QKeySequence hotkey;
   for (QAction * pAction : m_settableActionsList) {
     hotkey = m_pSettingsManager->getHotkey(pAction->data().toString());
@@ -444,8 +447,7 @@ void MainWindow::slotSettingsChanged()
 
   m_pVapourSynthPluginsManager->slotRefill();
   m_ui.scriptEdit->setPluginsList(m_pVapourSynthPluginsManager->pluginsList());
-  m_ui.scriptEdit->setCharactersTypedToStartCompletion(
-      m_pSettingsManager->getCharactersTypedToStartCompletion());
+  m_ui.scriptEdit->setCharactersTypedToStartCompletion(m_pSettingsManager->getCharactersTypedToStartCompletion());
 }
 
 // END OF void MainWindow::slotSettingsChanged()
@@ -457,12 +459,12 @@ void MainWindow::createActionsAndMenus()
 
 //------------------------------------------------------------------------------
 
-  QMenu * pFileMenu = m_ui.menuBar->addMenu(trUtf8("File"));
+  QMenu * pFileMenu = m_ui.menuBar->addMenu(QObject::tr("File"));
 
 //------------------------------------------------------------------------------
 
   m_pActionNewScript = new QAction(this);
-  m_pActionNewScript->setIconText(trUtf8("New script"));
+  m_pActionNewScript->setIconText(QObject::tr("New script"));
   m_pActionNewScript->setIcon(QIcon(QString(":new.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_NEW_SCRIPT);
   m_pActionNewScript->setShortcut(hotkey);
@@ -473,7 +475,7 @@ void MainWindow::createActionsAndMenus()
 //------------------------------------------------------------------------------
 
   m_pActionOpenScript = new QAction(this);
-  m_pActionOpenScript->setIconText(trUtf8("Open script"));
+  m_pActionOpenScript->setIconText(QObject::tr("Open script"));
   m_pActionOpenScript->setIcon(QIcon(QString(":load.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_OPEN_SCRIPT);
   m_pActionOpenScript->setShortcut(hotkey);
@@ -484,7 +486,7 @@ void MainWindow::createActionsAndMenus()
 //------------------------------------------------------------------------------
 
   m_pActionSaveScript = new QAction(this);
-  m_pActionSaveScript->setIconText(trUtf8("Save script"));
+  m_pActionSaveScript->setIconText(QObject::tr("Save script"));
   m_pActionSaveScript->setIcon(QIcon(QString(":save.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_SAVE_SCRIPT);
   m_pActionSaveScript->setShortcut(hotkey);
@@ -495,7 +497,7 @@ void MainWindow::createActionsAndMenus()
 //------------------------------------------------------------------------------
 
   m_pActionSaveScriptAs = new QAction(this);
-  m_pActionSaveScriptAs->setIconText(trUtf8("Save script as..."));
+  m_pActionSaveScriptAs->setIconText(QObject::tr("Save script as..."));
   m_pActionSaveScriptAs->setIcon(QIcon(QString(":saveas.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_SAVE_SCRIPT_AS);
   m_pActionSaveScriptAs->setShortcut(hotkey);
@@ -507,7 +509,7 @@ void MainWindow::createActionsAndMenus()
 
   pFileMenu->addSeparator();
 
-  m_pMenuRecentScripts = new QMenu(trUtf8("Recent scripts"), this);
+  m_pMenuRecentScripts = new QMenu(QObject::tr("Recent scripts"), this);
   pFileMenu->addMenu(m_pMenuRecentScripts);
   fillRecentScriptsMenu();
 
@@ -516,7 +518,7 @@ void MainWindow::createActionsAndMenus()
 //------------------------------------------------------------------------------
 
   m_pActionExit = new QAction(this);
-  m_pActionExit->setIconText(trUtf8("Exit"));
+  m_pActionExit->setIconText(QObject::tr("Exit"));
   m_pActionExit->setIcon(QIcon(QString(":exit.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_EXIT);
   m_pActionExit->setShortcut(hotkey);
@@ -526,12 +528,12 @@ void MainWindow::createActionsAndMenus()
 
 //------------------------------------------------------------------------------
 
-  QMenu * pEditMenu = m_ui.menuBar->addMenu(trUtf8("Edit"));
+  QMenu * pEditMenu = m_ui.menuBar->addMenu(QObject::tr("Edit"));
 
 //------------------------------------------------------------------------------
 
   m_pActionSettings = new QAction(this);
-  m_pActionSettings->setIconText(trUtf8("Settings"));
+  m_pActionSettings->setIconText(QObject::tr("Settings"));
   m_pActionSettings->setIcon(QIcon(QString(":settings.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_SETTINGS);
   m_pActionSettings->setShortcut(hotkey);
@@ -541,12 +543,12 @@ void MainWindow::createActionsAndMenus()
 
 //------------------------------------------------------------------------------
 
-  QMenu * pScriptMenu = m_ui.menuBar->addMenu(trUtf8("Script"));
+  QMenu * pScriptMenu = m_ui.menuBar->addMenu(QObject::tr("Script"));
 
 //------------------------------------------------------------------------------
 
   m_pActionPreview = new QAction(this);
-  m_pActionPreview->setIconText(trUtf8("Preview"));
+  m_pActionPreview->setIconText(QObject::tr("Preview"));
   m_pActionPreview->setIcon(QIcon(QString(":preview.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_PREVIEW);
   m_pActionPreview->setShortcut(hotkey);
@@ -557,7 +559,7 @@ void MainWindow::createActionsAndMenus()
 //------------------------------------------------------------------------------
 
   m_pActionCheckScript = new QAction(this);
-  m_pActionCheckScript->setIconText(trUtf8("Check script"));
+  m_pActionCheckScript->setIconText(QObject::tr("Check script"));
   m_pActionCheckScript->setIcon(QIcon(QString(":check.png")));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_CHECK_SCRIPT);
   m_pActionCheckScript->setShortcut(hotkey);
@@ -567,12 +569,12 @@ void MainWindow::createActionsAndMenus()
 
 //------------------------------------------------------------------------------
 
-  QMenu * pHelpMenu = m_ui.menuBar->addMenu(trUtf8("Help"));
+  QMenu * pHelpMenu = m_ui.menuBar->addMenu(QObject::tr("Help"));
 
 //------------------------------------------------------------------------------
 
   m_pActionAbout = new QAction(this);
-  m_pActionAbout->setIconText(trUtf8("About..."));
+  m_pActionAbout->setIconText(QObject::tr("About..."));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_ABOUT);
   m_pActionAbout->setShortcut(hotkey);
   pHelpMenu->addAction(m_pActionAbout);
@@ -582,7 +584,7 @@ void MainWindow::createActionsAndMenus()
 //------------------------------------------------------------------------------
 
   m_pActionAutocomplete = new QAction(this);
-  m_pActionAutocomplete->setIconText(trUtf8("Autocomplete"));
+  m_pActionAutocomplete->setIconText(QObject::tr("Autocomplete"));
   hotkey = m_pSettingsManager->getHotkey(ACTION_ID_AUTOCOMPLETE);
   m_pActionAutocomplete->setShortcut(hotkey);
   m_ui.scriptEdit->addAction(m_pActionAutocomplete);
@@ -697,8 +699,8 @@ bool MainWindow::safeToCloseFile()
 
   QMessageBox::StandardButton choice = QMessageBox::NoButton;
   if (m_scriptFilePath.isEmpty()) {
-    choice = QMessageBox::question(this, trUtf8("Save script?"),
-        trUtf8("Would you like to save your script before closing?"),
+    choice = QMessageBox::question(this, QObject::tr("Save script?"),
+        QObject::tr("Would you like to save your script before closing?"),
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
 
     if (choice == QMessageBox::Yes) {
@@ -707,8 +709,8 @@ bool MainWindow::safeToCloseFile()
         return false;
     }
   } else {
-    choice = QMessageBox::question(this, trUtf8("Save script?"),
-        trUtf8("Would you like to save script \"%1\" before closing?").arg(m_scriptFilePath),
+    choice = QMessageBox::question(this, QObject::tr("Save script?"),
+        QObject::tr("Would you like to save script \"%1\" before closing?").arg(m_scriptFilePath),
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
 
     if (choice == QMessageBox::Yes) {
@@ -821,8 +823,7 @@ void MainWindow::loadStartUpScript()
 void MainWindow::loadFonts()
 {
   QResource digitalMiniFontResource(":/fonts/DigitalMini.ttf");
-  QByteArray digitalMiniFontData((const char *) digitalMiniFontResource.data(),
-      digitalMiniFontResource.size());
+  QByteArray digitalMiniFontData((const char *) digitalMiniFontResource.data(), digitalMiniFontResource.size());
   QFontDatabase::addApplicationFontFromData(digitalMiniFontData);
 }
 

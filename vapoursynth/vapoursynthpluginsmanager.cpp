@@ -21,8 +21,7 @@ void VS_CC fakeConfigPlugin(const char * a_identifier,
   (void)a_readonly;
 
   // Dirty hack encouraged by Myrsloik himself.
-  VapourSynthPluginsManager * pManager =
-  (VapourSynthPluginsManager *)a_pPlugin;
+  VapourSynthPluginsManager * pManager = (VapourSynthPluginsManager *)a_pPlugin;
 
   QString id(a_identifier);
   for(const VSData::Plugin & plugin : pManager->m_pluginsList)
@@ -54,9 +53,7 @@ void VS_CC fakeRegisterFunction(const char * a_name, const char * a_args,
   (void)a_pFunctionData;
 
   // Dirty hack encouraged by Myrsloik himself.
-  VapourSynthPluginsManager * pManager =
-  (VapourSynthPluginsManager *)a_pPlugin;
-
+  VapourSynthPluginsManager * pManager = (VapourSynthPluginsManager *)a_pPlugin;
   if(pManager->m_pluginAlreadyLoaded)
   return;
 
@@ -93,7 +90,6 @@ VapourSynthPluginsManager::~VapourSynthPluginsManager()
 
 // END OF VapourSynthPluginsManager::~VapourSynthPluginsManager()
 //==============================================================================
-
 void VapourSynthPluginsManager::getCorePlugins()
 {
   QString libraryName("vapoursynth");
@@ -158,8 +154,7 @@ void VapourSynthPluginsManager::getCorePlugins()
     return;
   }
 
-  VSGetVapourSynthAPI getVapourSynthAPI = (VSGetVapourSynthAPI) vsLibrary.resolve(
-      "getVapourSynthAPI");
+  VSGetVapourSynthAPI getVapourSynthAPI = (VSGetVapourSynthAPI) vsLibrary.resolve("getVapourSynthAPI");
   if (!getVapourSynthAPI) { // Win32 fallback
     getVapourSynthAPI = (VSGetVapourSynthAPI) vsLibrary.resolve("_getVapourSynthAPI@4");
   }
@@ -169,11 +164,9 @@ void VapourSynthPluginsManager::getCorePlugins()
     vsLibrary.unload();
     return;
   }
-
   const VSAPI * cpVSAPI = getVapourSynthAPI(VAPOURSYNTH_API_VERSION);
   if (!cpVSAPI) {
-    emit signalWriteLogMessage(mtCritical, "VapourSynth plugins manager: "
-        "Failed to get VapourSynth API!");
+    emit signalWriteLogMessage(mtCritical, "VapourSynth plugins manager:\nFailed to get VapourSynth API!(2)");
     vsLibrary.unload();
     return;
   }
@@ -285,7 +278,6 @@ void VapourSynthPluginsManager::getCorePlugins()
 
 // END OF void VapourSynthPluginsManager::getCorePlugins()
 //==============================================================================
-
 void VapourSynthPluginsManager::pollPaths(const QStringList & a_pluginsPaths)
 {
   for (const QString & dirPath : a_pluginsPaths) {

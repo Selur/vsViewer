@@ -33,138 +33,76 @@ class PreviewDialog : public QDialog
     PreviewDialog(VapourSynthScriptProcessor * a_pVapourSynthScriptProcessor,
         SettingsManager * a_pSettingsManager, SettingsDialog * a_pSettingsDialog,
         QWidget * a_pParent = nullptr);
-    virtual ~PreviewDialog();
-
+    virtual ~PreviewDialog() override;
     void previewScript(const QString& a_script, const QString& a_scriptName);
-    void adjustCrop(const QString& cropping, const int cropLeft, const int cropRight,
-        const int cropTop, const int cropBottom);
+    void adjustCrop(const QString& cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom);
 
   protected:
-
     void closeEvent(QCloseEvent * a_pEvent) override;
-
     void moveEvent(QMoveEvent * a_pEvent) override;
-
     void resizeEvent(QResizeEvent * a_pEvent) override;
-
     void changeEvent(QEvent * a_pEvent) override;
-
     void keyPressEvent(QKeyEvent * a_pEvent) override;
 
   signals:
-
     void signalWriteLogMessage(int a_messageType, const QString & a_message);
-
     void signalInsertLineIntoScript(const QString& a_line);
 
   private slots:
-
     void slotShowFrame(int a_frameNumber);
-
     void slotSaveSnapshot();
-
     void slotToggleZoomPanelVisible(bool a_zoomPanelVisible);
-
     void slotZoomModeChanged();
-
     void slotZoomRatioChanged(double a_zoomRatio);
-
     void slotScaleModeChanged();
-
     void slotToggleCropPanelVisible(bool a_cropPanelVisible);
-
     void slotCropModeChanged();
-
     void slotCropLeftValueChanged(int a_value);
-
     void slotCropTopValueChanged(int a_value);
-
     void slotCropWidthValueChanged(int a_value);
-
     void slotCropHeightValueChanged(int a_value);
-
     void slotCropRightValueChanged(int a_value);
-
     void slotCropBottomValueChanged(int a_value);
-
     void slotCropZoomRatioValueChanged(int a_cropZoomRatio);
-
     void slotPasteCropSnippetIntoScript();
-
     void slotToggleTimeLinePanelVisible(bool a_timeLinePanelVisible);
-
     void slotTimeLineModeChanged();
-
     void slotTimeStepChanged(const QTime & a_time);
-
     void slotTimeStepForward();
-
     void slotTimeStepBack();
-
     void slotSettingsChanged();
-
     void slotPreviewAreaSizeChanged();
-
     void slotPreviewAreaCtrlWheel(QPoint a_angleDelta);
-
     void slotPreviewAreaMouseMiddleButtonReleased();
-
     void slotPreviewAreaMouseRightButtonReleased();
-
     void slotPreviewAreaMouseOverPoint(float a_normX, float a_normY);
-
     void slotFrameToClipboard();
-
     void slotAdvancedSettingsChanged();
-
     void slotToggleColorPicker(bool a_colorPickerVisible);
 
   private:
-
     void createActionsAndMenus();
-
     void setUpZoomPanel();
-
     void setUpTimeLinePanel();
-
     void setUpCropPanel();
-
     void evaluateScript(const QString& a_script, const QString& a_scriptName);
-
     bool showFrame(int a_frameNumber);
-
     void setPreviewPixmap();
-
     void recalculateCropMods();
-
     void resetCropSpinBoxes();
-
     QString buildCropString() const;
-
     Ui::PreviewDialog m_ui;
-
     VapourSynthScriptProcessor * m_pVapourSynthScriptProcessor;
-
     SettingsManager * m_pSettingsManager;
-
     SettingsDialog * m_pSettingsDialog;
-
     PreviewAdvancedSettingsDialog * m_pAdvancedSettingsDialog;
-
     QStatusBar * m_pStatusBar;
-
     int m_currentFrame;
-
     int m_bigFrameStep;
-
     QString m_scriptName;
-
     QPixmap m_framePixmap;
-
     const VSVideoInfo * m_cpVideoInfo;
-
     bool m_changingCropValues;
-
     QMenu * m_pPreviewContextMenu;
     QAction * m_pActionFrameToClipboard;
     QAction * m_pActionSaveSnapshot;
@@ -191,11 +129,8 @@ class PreviewDialog : public QDialog
     QAction * m_pActionToggleColorPicker;
 
     std::map<QString, ZoomMode> m_actionIDToZoomMode;
-
     std::map<QString, Qt::TransformationMode> m_actionIDToZoomScaleMode;
-
     std::map<QString, TimeLineSlider::DisplayMode> m_actionIDToTimeLineMode;
-
     std::vector<QAction *> m_settableActionsList;
 };
 

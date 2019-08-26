@@ -14,23 +14,23 @@ PreviewAdvancedSettingsDialog::PreviewAdvancedSettingsDialog(SettingsManager * a
   m_ui.setupUi(this);
   setWindowIcon(QIcon(":settings.png"));
 
-  m_ui.yuvToRgbConversionMatrixComboBox->addItem(trUtf8("BT.601 (SD content)"),
+  m_ui.yuvToRgbConversionMatrixComboBox->addItem(QObject::tr("BT.601 (SD content)"),
       (int) YuvToRgbConversionMatrix::Bt601);
-  m_ui.yuvToRgbConversionMatrixComboBox->addItem(trUtf8("BT.709 (HD content)"),
+  m_ui.yuvToRgbConversionMatrixComboBox->addItem(QObject::tr("BT.709 (HD content)"),
       (int) YuvToRgbConversionMatrix::Bt709);
 
-  m_ui.chromaResamplingFilterComboBox->addItem(trUtf8("Point"), (int) ResamplingFilter::Point);
-  m_ui.chromaResamplingFilterComboBox->addItem(trUtf8("Bilinear"),
+  m_ui.chromaResamplingFilterComboBox->addItem(QObject::tr("Point"), (int) ResamplingFilter::Point);
+  m_ui.chromaResamplingFilterComboBox->addItem(QObject::tr("Bilinear"),
       (int) ResamplingFilter::Bilinear);
-  m_ui.chromaResamplingFilterComboBox->addItem(trUtf8("Bicubic"), (int) ResamplingFilter::Bicubic);
-  m_ui.chromaResamplingFilterComboBox->addItem(trUtf8("Spline16"),
+  m_ui.chromaResamplingFilterComboBox->addItem(QObject::tr("Bicubic"), (int) ResamplingFilter::Bicubic);
+  m_ui.chromaResamplingFilterComboBox->addItem(QObject::tr("Spline16"),
       (int) ResamplingFilter::Spline16);
-  m_ui.chromaResamplingFilterComboBox->addItem(trUtf8("Spline36"),
+  m_ui.chromaResamplingFilterComboBox->addItem(QObject::tr("Spline36"),
       (int) ResamplingFilter::Spline36);
-  m_ui.chromaResamplingFilterComboBox->addItem(trUtf8("Lanczos"), (int) ResamplingFilter::Lanczos);
+  m_ui.chromaResamplingFilterComboBox->addItem(QObject::tr("Lanczos"), (int) ResamplingFilter::Lanczos);
 
-  m_ui.chromaPlacementComboBox->addItem(trUtf8("MPEG1"), (int) ChromaPlacement::MPEG1);
-  m_ui.chromaPlacementComboBox->addItem(trUtf8("MPEG2"), (int) ChromaPlacement::MPEG2);
+  m_ui.chromaPlacementComboBox->addItem(QObject::tr("MPEG1"), (int) ChromaPlacement::MPEG1);
+  m_ui.chromaPlacementComboBox->addItem(QObject::tr("MPEG2"), (int) ChromaPlacement::MPEG2);
 
   connect(m_ui.okButton, SIGNAL(clicked()), this, SLOT(slotOk()));
   connect(m_ui.applyButton, SIGNAL(clicked()), this, SLOT(slotApply()));

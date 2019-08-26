@@ -67,22 +67,26 @@ bool VapourSynthScriptProcessor::initialize(const QString& a_script, const QStri
   m_vsScriptInitialized = true;
   m_cpVSAPI = vssGetVSApi();
   if (!m_cpVSAPI) {
-    m_error = QObject::tr("Failed to get VapourSynth API!");
+    m_error = QObject::tr("Failed to get VapourSynth API(1)!");
     emit signalWriteLogMessage(mtCritical, m_error);
     finalize();
     return false;
   }
-  m_cpVSAPI->setMessageHandler(::vsMessageHandler, static_cast<void *>(this));
-  opresult = vssEvaluateScript(&m_pVSScript, a_script.toUtf8().constData(),
-      a_scriptName.toUtf8().constData(), efSetWorkingDir);
+
+  m_cpVSAPI->setMessageHandler(::vsMessageHandler, (void *)(this));
+  opresult = vssEvaluateScript(&m_pVSScript, a_script.toUtf8().constData(), a_scriptName.toUtf8().constData(), efSetWorkingDir);
   if (opresult) {
     m_error = QObject::tr("Failed to evaluate the script");
-    const char * vsError = vssGetError(m_pVSScript);
-    if (vsError)
-      m_error += QString(":\n") + vsError;
-    else
+    if (m_pVSScript != nullptr) {
+      const char * vsError = vssGetError(m_pVSScript);
+      if (vsError) {
+        m_error += QString(":\n") + vsError;
+      } else {
+        m_error += '.';
+      }
+    } else {
       m_error += '.';
-
+    }
     emit signalWriteLogMessage(mtCritical, m_error);
     finalize();
     return false;
@@ -254,8 +258,7 @@ QPixmap VapourSynthScriptProcessor::pixmap(int a_frameNumber)
   QPixmap framePixmap = pixmapFromFrame(cpFrameRef);
 
   if (framePixmap.isNull()) {
-    m_error = QObject::tr("Can not convert from format \"%1\" for preview!").arg(
-        m_cpVideoInfo->format->name);
+    m_error = QObject::tr("Can not convert from format \"%1\" for preview!").arg(m_cpVideoInfo->format->name);
     emit signalWriteLogMessage(mtCritical, m_error);
   }
 
