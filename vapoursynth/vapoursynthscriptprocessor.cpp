@@ -56,6 +56,8 @@ bool VapourSynthScriptProcessor::initialize(const QString& a_script, const QStri
     return false;
   }
   if (!initLibrary()) {
+    m_error = QObject::tr("initializing the Libraries failed");
+    emit signalWriteLogMessage(mtCritical, m_error);
     return false;
   }
   int opresult = vssInit();
@@ -72,8 +74,9 @@ bool VapourSynthScriptProcessor::initialize(const QString& a_script, const QStri
     finalize();
     return false;
   }
+  //m_cpVSAPI->setMessageHandler(::vsMessageHandler, (void *)(this));
+  m_cpVSAPI->addMessageHandler(::vsMessageHandler, nullptr, (void *)(this));
 
-  m_cpVSAPI->setMessageHandler(::vsMessageHandler, (void *)(this));
   opresult = vssEvaluateScript(&m_pVSScript, a_script.toUtf8().constData(), a_scriptName.toUtf8().constData(), efSetWorkingDir);
   if (opresult) {
     m_error = QObject::tr("Failed to evaluate the script");
@@ -104,15 +107,12 @@ bool VapourSynthScriptProcessor::initialize(const QString& a_script, const QStri
     finalize();
     return false;
   }
-
   m_cpVideoInfo = m_cpVSAPI->getVideoInfo(m_pOutputNode);
-
   initPreviewNode();
   if (!m_pPreviewNode) {
     finalize();
     return false;
   }
-
   m_currentFrame = 0;
   m_error.clear();
   m_initialized = true;
@@ -336,7 +336,7 @@ void VapourSynthScriptProcessor::slotSettingsChanged()
     m_resamplingFilterParameterA = m_pSettingsManager->getBicubicFilterParameterB();
     m_resamplingFilterParameterB = m_pSettingsManager->getBicubicFilterParameterC();
   } else if (m_chromaResamplingFilter == ResamplingFilter::Lanczos) {
-    m_resamplingFilterParameterA = (double) m_pSettingsManager->getLanczosFilterTaps();
+    m_resamplingFilterParameterA = double(m_pSettingsManager->getLanczosFilterTaps());
   }
 
   m_chromaPlacement = m_pSettingsManager->getChromaPlacement();

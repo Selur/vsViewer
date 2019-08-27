@@ -363,21 +363,15 @@ void MainWindow::slotPreview()
 
 void MainWindow::slotCheckScript()
 {
-  slotWriteLogMessage(mtCritical, "PING1");
   m_ui.logEdit->clear();
-  slotWriteLogMessage(mtCritical, "PING2");
   m_pPreviewDialog->close();
-  slotWriteLogMessage(mtCritical, "PING3");
   bool correct = m_pVapourSynthScriptProcessor->initialize(m_ui.scriptEdit->text(), m_scriptFilePath);
-  slotWriteLogMessage(mtCritical, "PING4");
   if (correct) {
     QString message = QObject::tr("Script was successfully evaluated. "
         "Output video info:\n");
     message += vsedit::videoInfoString(m_pVapourSynthScriptProcessor->videoInfo());
-    slotWriteLogMessage(mtCritical, "PING5");
     slotWriteLogMessage(mtDebug, message);
   }
-  slotWriteLogMessage(mtCritical, "PING6");
   m_pVapourSynthScriptProcessor->finalize();
 }
 
