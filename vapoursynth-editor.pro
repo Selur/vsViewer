@@ -42,6 +42,9 @@ else {
         QMAKE_CXXFLAGS += -funit-at-a-time
     }
 }
+linux {
+  INCLUDEPATH += /usr/local/include/vapoursynth
+}
 macx {
     INCLUDEPATH += /usr/local/include
     ICON = resources/vsViewer.icns
