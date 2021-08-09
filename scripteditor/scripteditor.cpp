@@ -168,8 +168,11 @@ void ScriptEditor::slotLoadSettings()
   document()->setDefaultFont(commonScriptTextFont);
 
   QFontMetrics metrics(commonScriptTextFont);
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+  setTabStopDistance(metrics.horizontalAdvance(' ') * 4);
+#else
   setTabStopWidth(metrics.width(' ') * 4);
-
+#endif
   m_backgroundColor = m_pSettingsManager->getColor(COLOR_ID_TEXT_BACKGROUND);
   QColor textColor = m_commonScriptTextFormat.foreground().color();
   QPalette newPalette = palette();
@@ -449,7 +452,11 @@ int ScriptEditor::sideBoxWidth() const
 
   QFont commonTextFont = m_commonScriptTextFormat.font();
   QFontMetrics metrics(commonTextFont);
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+  int space = metrics.horizontalAdvance(controlString);
+#else
   int space = metrics.width(controlString);
+#endif
   space += m_sideBoxTextMargin * 2;
   space += m_sideBoxLineWidth;
 

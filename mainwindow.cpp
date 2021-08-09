@@ -18,7 +18,9 @@
 #include <QFontDatabase>
 #include <QResource>
 #include <QTextStream>
+#if (QT_VERSION < QT_VERSION_CHECK(6,0,0))
 #include <QTextCodec>
+#endif
 #include <QTimer>
 
 #include "settings/settingsmanager.h"
@@ -283,6 +285,33 @@ QString readAll(const QString& fileName, const QString& type = "auto")
     return QString();
   }
   QTextStream stream(&file);
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+    QString subcode = type.toLocal8Bit();
+    if (subcode == QString("UTF-8")) {
+      stream.setEncoding(QStringConverter::Utf8);
+    } else if (subcode == QString("UTF-16")) {
+      stream.setEncoding(QStringConverter::Utf16);
+    } else if (subcode == QString("UTF-16BE")) {
+      stream.setEncoding(QStringConverter::Utf16BE);
+    } else if (subcode == QString("UTF-16LE")) {
+      stream.setEncoding(QStringConverter::Utf16LE);
+    } else if (subcode == QString("UTF-32")) {
+      stream.setEncoding(QStringConverter::Utf32);
+    } else if (subcode == QString("UTF-32BE")) {
+      stream.setEncoding(QStringConverter::Utf32BE);
+    } else if (subcode == QString("UTF-32LE")) {
+      stream.setEncoding(QStringConverter::Utf32LE);
+    } else if (subcode == QString("UTF-Latin1")) {
+      stream.setEncoding(QStringConverter::Latin1);
+    } else if (subcode == QString("UTF-System")) {
+      stream.setEncoding(QStringConverter::System);
+    } else if (type == "auto") {
+      stream.autoDetectUnicode();
+    } else {
+      stream.setEncoding(QStringConverter::Utf8);
+    }
+#else
   if (type == "auto") {
     stream.autoDetectUnicode();
   } else {
@@ -293,6 +322,7 @@ QString readAll(const QString& fileName, const QString& type = "auto")
       stream.setCodec(type.toUtf8());
     }
   }
+#endif
   input = stream.readAll();
   file.close();
   return input;

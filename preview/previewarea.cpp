@@ -163,11 +163,15 @@ void PreviewArea::mouseMoveEvent(QMouseEvent * a_pEvent)
 
   QPoint globalPoint = a_pEvent->globalPos();
   QPoint imagePoint = m_pPreviewLabel->mapFromGlobal(globalPoint);
-
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+  const QPixmap pPreviewPixmap = m_pPreviewLabel->pixmap();
+  int pixmapWidth = pPreviewPixmap.width();
+  int pixmapHeight = pPreviewPixmap.height();
+#else
   const QPixmap * pPreviewPixmap = m_pPreviewLabel->pixmap();
   int pixmapWidth = pPreviewPixmap->width();
   int pixmapHeight = pPreviewPixmap->height();
-
+#endif
   if ((imagePoint.x() < pixmapWidth) && (imagePoint.y() < pixmapHeight)) {
     float normX = (float) imagePoint.x() / (float) pixmapWidth;
     float normY = (float) imagePoint.y() / (float) pixmapHeight;
@@ -189,8 +193,14 @@ void PreviewArea::mouseReleaseEvent(QMouseEvent * a_pEvent)
     m_pScrollNavigator->setVisible(false);
     a_pEvent->accept();
     return;
-  } else if (releasedButton == Qt::MidButton)
+  }
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+  else if (releasedButton == Qt::MiddleButton)
     emit signalMouseMiddleButtonReleased();
+#else
+  else if (releasedButton == Qt::MidButton)
+    emit signalMouseMiddleButtonReleased();
+#endif
   else if (releasedButton == Qt::RightButton)
     emit signalMouseRightButtonReleased();
 
@@ -202,8 +212,13 @@ void PreviewArea::mouseReleaseEvent(QMouseEvent * a_pEvent)
 
 void PreviewArea::drawScrollNavigator()
 {
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+  int contentsWidth = m_pPreviewLabel->pixmap().width();
+  int contentsHeight = m_pPreviewLabel->pixmap().height();
+#else
   int contentsWidth = m_pPreviewLabel->pixmap()->width();
   int contentsHeight = m_pPreviewLabel->pixmap()->height();
+#endif
   int viewportX = -m_pPreviewLabel->x();
   int viewportY = -m_pPreviewLabel->y();
   int viewportWidth = viewport()->width();

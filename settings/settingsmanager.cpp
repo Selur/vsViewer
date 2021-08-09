@@ -287,7 +287,7 @@ QTextCharFormat SettingsManager::getDefaultTextFormat(const QString & a_textForm
   if (a_textFormatID == TEXT_FORMAT_ID_COMMON_SCRIPT_TEXT) {
     QFont commonScriptFont = defaultFormat.font();
     commonScriptFont.setFamily("monospace");
-    commonScriptFont.setStyleHint(QFont::Monospace);
+    commonScriptFont.setStyleHint(QFont::TypeWriter);
     commonScriptFont.setFixedPitch(true);
     commonScriptFont.setKerning(false);
     commonScriptFont.setPointSize(10);

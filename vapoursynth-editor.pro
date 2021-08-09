@@ -5,14 +5,6 @@ QT += network
 TARGET = vsViewer
 CONFIG(debug, debug|release) {
     contains(QMAKE_COMPILER, gcc) {
-        DESTDIR = build/release-gcc
-        OBJECTS_DIR = generated/obj-debug-gcc
-    }
-    contains(QMAKE_COMPILER, msvc) {
-        DESTDIR = build/obj-release-msvc
-        OBJECTS_DIR = generated/obj-debug-msvc
-    }
-    contains(QMAKE_COMPILER, gcc) {
         QMAKE_CXXFLAGS += -O0
         QMAKE_CXXFLAGS += -g
         QMAKE_CXXFLAGS += -ggdb3
@@ -61,13 +53,23 @@ win32 {
 }
 contains(QMAKE_COMPILER, clang):QMAKE_CXXFLAGS += -stdlib=libc++
 contains(QMAKE_COMPILER, gcc) {
-    QMAKE_CXXFLAGS += -std=c++11
+    lessThan(QT_MAJOR_VERSION, 6) {
+        QMAKE_CXXFLAGS += -std=c++11
+    } else  {
+      QMAKE_CXXFLAGS += -std=c++17
+    }
     LIBS += -L$$[QT_INSTALL_LIBS]
+} else{
+  lessThan(QT_MAJOR_VERSION, 6) {
+    CONFIG += c++11 # C++11 support
+  } else {
+    CONFIG += c++17 # C++17 support
+    QMAKE_CXXFLAGS += /std:c++17
+  }
 }
-else:CONFIG += c++11
 S = $${DIR_SEPARATOR}
 D = $$DESTDIR
-D = $$replace(D, $$escape_expand(\\), $$S)
+D = $$replace(D, $$escape_expand(\\\\), $$S)
 D = $$replace(D, /, $$S)
 E = $$escape_expand(\n\t)
 QMAKE_POST_LINK += $${QMAKE_COPY} \
