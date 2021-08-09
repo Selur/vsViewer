@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QPalette>
 #include <QFontMetricsF>
+#include <QFontDatabase>
 
 #include "settingsmanager.h"
 
@@ -285,9 +286,7 @@ QTextCharFormat SettingsManager::getDefaultTextFormat(const QString & a_textForm
   QTextCharFormat defaultFormat;
 
   if (a_textFormatID == TEXT_FORMAT_ID_COMMON_SCRIPT_TEXT) {
-    QFont commonScriptFont = defaultFormat.font();
-    commonScriptFont.setFamily("monospace");
-    commonScriptFont.setStyleHint(QFont::TypeWriter);
+    QFont commonScriptFont(QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
     commonScriptFont.setFixedPitch(true);
     commonScriptFont.setKerning(false);
     commonScriptFont.setPointSize(10);
