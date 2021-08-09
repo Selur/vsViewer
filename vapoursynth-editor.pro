@@ -39,6 +39,7 @@ linux {
 }
 macx {
     INCLUDEPATH += /usr/local/include
+    INCLUDEPATH +=  /Library/Frameworks/VapourSynth.framework/include/vapoursynth
     ICON = resources/vsViewer.icns
 }
 win32 {
