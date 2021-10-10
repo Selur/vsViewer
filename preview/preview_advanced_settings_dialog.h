@@ -7,25 +7,36 @@ class SettingsManager;
 
 class PreviewAdvancedSettingsDialog : public QDialog
 {
-  Q_OBJECT
-  public:
-    explicit PreviewAdvancedSettingsDialog(SettingsManager * a_pSettingsManager, QWidget * a_pParent =  nullptr);
-    virtual ~PreviewAdvancedSettingsDialog();
+	Q_OBJECT
 
-  public slots:
-    void slotCall();
+public:
 
-  signals:
-    void signalSettingsChanged();
+	PreviewAdvancedSettingsDialog(SettingsManager * a_pSettingsManager,
+		QWidget * a_pParent = nullptr);
 
-  private slots:
-    void slotOk();
-    void slotApply();
-    void slotResetToDefault();
+	virtual ~PreviewAdvancedSettingsDialog();
 
-  private:
-    Ui::PreviewAdvancedSettingsDialog m_ui;
-    SettingsManager * m_pSettingsManager;
+public slots:
+
+	void slotCall();
+
+signals:
+
+	void signalSettingsChanged();
+
+private slots:
+
+	void slotOk();
+
+	void slotApply();
+
+	void slotResetToDefault();
+
+private:
+
+	Ui::PreviewAdvancedSettingsDialog m_ui;
+
+	SettingsManager * m_pSettingsManager;
 };
 
 #endif // PREVIEW_ADVANCED_SETTINGS_DIALOG_H_INCLUDED
