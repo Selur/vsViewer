@@ -109,11 +109,14 @@ private:
 
   bool checkHybridScript();
 
+    void reloadTexts();
+
   Ui::MainWindow m_ui;
 
   SettingsManager * m_pSettingsManager;
   VapourSynthPluginsManager * m_pVapourSynthPluginsManager;
   VSScriptLibrary * m_pVSScriptLibrary;
+
 
   QAction * m_pActionNewScript;
   QAction * m_pActionOpenScript;

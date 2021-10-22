@@ -259,8 +259,8 @@ public:
 
         snapshotCompressionLevelSpinBox = new QSpinBox(commonSettingsTab);
         snapshotCompressionLevelSpinBox->setObjectName(QString::fromUtf8("snapshotCompressionLevelSpinBox"));
-        snapshotCompressionLevelSpinBox->setMaximum(100);
         snapshotCompressionLevelSpinBox->setMinimum(0);
+        snapshotCompressionLevelSpinBox->setMaximum(100);
         snapshotCompressionLevelSpinBox->setValue(0);
 
         horizontalLayout_3->addWidget(snapshotCompressionLevelSpinBox);
@@ -552,7 +552,7 @@ public:
         highlightSelectionMatchesMinLengthLabel->setText(QCoreApplication::translate("SettingsDialog", "Minimum legth to highlight", nullptr));
         rememberLastPreviewFrameCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Remember last previewed frame on exit", nullptr));
         alwaysKeepCurrentFrameCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Keep current frame when previewing different script", nullptr));
-        snapshotCompressionLevelLabel->setText(QCoreApplication::translate("SettingsDialog", "PNG snapshot compression level (0 - 100 for size factor)", nullptr));
+        snapshotCompressionLevelLabel->setText(QCoreApplication::translate("SettingsDialog", "PNG snapshot compression level (0-100 for size factor)", nullptr));
         portableModeLabel->setText(QCoreApplication::translate("SettingsDialog", "Portable mode means that editor stores its settings in the same folder with its executable. Editors determines if it is running in portable mode by looking for the configuration file in its folder. Please make sure you have the rights to write files in the editor's folder before you switch to this mode.", nullptr));
         portableModeCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Portable mode enabled", nullptr));
         settingsTabWidget->setTabText(settingsTabWidget->indexOf(commonSettingsTab), QCoreApplication::translate("SettingsDialog", "Common", nullptr));
