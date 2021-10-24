@@ -103,7 +103,7 @@ macx {
 }
 
 win32 {
- QT += winextras
+ #QT += winextras
 
  #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
  INCLUDEPATH += 'I:/Hybrid/64bit/VapourSynth/sdk/include/'
