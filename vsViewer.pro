@@ -92,10 +92,10 @@ SC = $$replace(SC, /, $$S)
 
 E = $$escape_expand(\n\t)
 
-QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}resources$${S}vsViewer.ico $${D}$${S}vsViewer.ico $${E}
-QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}resources$${S}vsViewer.svg $${D}$${S}vsViewer.svg $${E}
-QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}README $${D}$${S}README $${E}
-QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}LICENSE $${D}$${S}LICENSE $${E}
+#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}resources$${S}vsViewer.ico $${D}$${S}vsViewer.ico $${E}
+#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}resources$${S}vsViewer.svg $${D}$${S}vsViewer.svg $${E}
+#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}README $${D}$${S}README $${E}
+#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}LICENSE $${D}$${S}LICENSE $${E}
 
 macx {
  INCLUDEPATH += /usr/local/include
@@ -130,6 +130,7 @@ contains(QMAKE_COMPILER, clang) {
 }
 
 contains(QMAKE_COMPILER, gcc) {
+ INCLUDEPATH += /usr/local/include/vapoursynth
  QMAKE_CXXFLAGS += -std=c++17
  QMAKE_CXXFLAGS += -Wall
  QMAKE_CXXFLAGS += -Wextra
@@ -175,6 +176,7 @@ HEADERS +=  \
   ipc/LocalSocketIpcClient.h \
   ipc/LocalSocketIpcServer.h \
   common-src/helpers.h \
+  common-src/ipc_defines.h \
   common-src/aligned_vector.h \
   common-src/chrono.h \
   common-src/settings/settings_definitions_core.h \
@@ -335,12 +337,12 @@ SOURCES +=  \
   vapoursynth/vs_script_processor_dialog.cpp
 
 # libp2p
-SOURCES_P2P += \
-  common-src/libp2p/p2p_api.cpp \
-  common-src/libp2p/v210.cpp \
-  common-src/libp2p/simd/cpuinfo_x86.cpp \
-  common-src/libp2p/simd/p2p_simd.cpp \
-  common-src/libp2p/simd/p2p_sse41.cpp
+# libp2p
+SOURCES_P2P += common-src/libp2p/p2p_api.cpp
+SOURCES_P2P += common-src/libp2p/v210.cpp
+SOURCES_P2P += common-src/libp2p/simd/cpuinfo_x86.cpp
+SOURCES_P2P += common-src/libp2p/simd/p2p_simd.cpp
+SOURCES_P2P_SSE41 += common-src/libp2p/simd/p2p_sse41.cpp
 
 p2p.name = p2p
 p2p.input = SOURCES_P2P
@@ -378,6 +380,5 @@ macx {
  p2p_sse41.commands += -Wno-gnu
 }
 QMAKE_EXTRA_COMPILERS += p2p_sse41
-
 #include(common.pri)
 #include(local_quirks.pri)

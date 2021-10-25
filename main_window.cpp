@@ -1,10 +1,10 @@
 #include "main_window.h"
 
-#include "../../common-src/settings/settings_manager.h"
-#include "../../common-src/vapoursynth/vs_script_library.h"
-#include "../../common-src/vapoursynth/vapoursynth_script_processor.h"
-#include "../../common-src/helpers.h"
-#include "../../common-src/ipc_defines.h"
+#include "common-src/settings/settings_manager.h"
+#include "common-src/vapoursynth/vs_script_library.h"
+#include "common-src/vapoursynth/vapoursynth_script_processor.h"
+#include "common-src/helpers.h"
+#include "common-src/ipc_defines.h"
 
 #include "vapoursynth/vapoursynth_plugins_manager.h"
 #include "preview/preview_dialog.h"
