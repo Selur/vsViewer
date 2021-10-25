@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'styled_log_view_settings_dialog.ui'
 **
-** Created by: Qt User Interface Compiler version 5.15.2
+** Created by: Qt User Interface Compiler version 5.9.9
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -10,7 +10,9 @@
 #define UI_STYLED_LOG_VIEW_SETTINGS_DIALOG_H
 
 #include <QtCore/QVariant>
+#include <QtWidgets/QAction>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
@@ -39,14 +41,14 @@ public:
     void setupUi(QDialog *StyledLogViewSettingsDialog)
     {
         if (StyledLogViewSettingsDialog->objectName().isEmpty())
-            StyledLogViewSettingsDialog->setObjectName(QString::fromUtf8("StyledLogViewSettingsDialog"));
+            StyledLogViewSettingsDialog->setObjectName(QStringLiteral("StyledLogViewSettingsDialog"));
         StyledLogViewSettingsDialog->resize(306, 497);
         verticalLayout = new QVBoxLayout(StyledLogViewSettingsDialog);
         verticalLayout->setSpacing(4);
-        verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
+        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
         verticalLayout->setContentsMargins(2, 2, 2, 2);
         stylesView = new QTableView(StyledLogViewSettingsDialog);
-        stylesView->setObjectName(QString::fromUtf8("stylesView"));
+        stylesView->setObjectName(QStringLiteral("stylesView"));
         stylesView->setAlternatingRowColors(true);
         stylesView->setSelectionMode(QAbstractItemView::SingleSelection);
         stylesView->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -57,7 +59,7 @@ public:
         verticalLayout->addWidget(stylesView);
 
         fontLabel = new QLabel(StyledLogViewSettingsDialog);
-        fontLabel->setObjectName(QString::fromUtf8("fontLabel"));
+        fontLabel->setObjectName(QStringLiteral("fontLabel"));
         QSizePolicy sizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
@@ -69,19 +71,19 @@ public:
 
         horizontalLayout_2 = new QHBoxLayout();
         horizontalLayout_2->setSpacing(4);
-        horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
+        horizontalLayout_2->setObjectName(QStringLiteral("horizontalLayout_2"));
         fontButton = new QPushButton(StyledLogViewSettingsDialog);
-        fontButton->setObjectName(QString::fromUtf8("fontButton"));
+        fontButton->setObjectName(QStringLiteral("fontButton"));
 
         horizontalLayout_2->addWidget(fontButton);
 
         textColorButton = new QPushButton(StyledLogViewSettingsDialog);
-        textColorButton->setObjectName(QString::fromUtf8("textColorButton"));
+        textColorButton->setObjectName(QStringLiteral("textColorButton"));
 
         horizontalLayout_2->addWidget(textColorButton);
 
         backgroundColorButton = new QPushButton(StyledLogViewSettingsDialog);
-        backgroundColorButton->setObjectName(QString::fromUtf8("backgroundColorButton"));
+        backgroundColorButton->setObjectName(QStringLiteral("backgroundColorButton"));
 
         horizontalLayout_2->addWidget(backgroundColorButton);
 
@@ -90,19 +92,19 @@ public:
 
         horizontalLayout = new QHBoxLayout();
         horizontalLayout->setSpacing(4);
-        horizontalLayout->setObjectName(QString::fromUtf8("horizontalLayout"));
+        horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
         okButton = new QPushButton(StyledLogViewSettingsDialog);
-        okButton->setObjectName(QString::fromUtf8("okButton"));
+        okButton->setObjectName(QStringLiteral("okButton"));
 
         horizontalLayout->addWidget(okButton);
 
         applyButton = new QPushButton(StyledLogViewSettingsDialog);
-        applyButton->setObjectName(QString::fromUtf8("applyButton"));
+        applyButton->setObjectName(QStringLiteral("applyButton"));
 
         horizontalLayout->addWidget(applyButton);
 
         cancelButton = new QPushButton(StyledLogViewSettingsDialog);
-        cancelButton->setObjectName(QString::fromUtf8("cancelButton"));
+        cancelButton->setObjectName(QStringLiteral("cancelButton"));
 
         horizontalLayout->addWidget(cancelButton);
 
@@ -120,14 +122,14 @@ public:
 
     void retranslateUi(QDialog *StyledLogViewSettingsDialog)
     {
-        StyledLogViewSettingsDialog->setWindowTitle(QCoreApplication::translate("StyledLogViewSettingsDialog", "Log settings", nullptr));
+        StyledLogViewSettingsDialog->setWindowTitle(QApplication::translate("StyledLogViewSettingsDialog", "Log settings", Q_NULLPTR));
         fontLabel->setText(QString());
-        fontButton->setText(QCoreApplication::translate("StyledLogViewSettingsDialog", "Font", nullptr));
-        textColorButton->setText(QCoreApplication::translate("StyledLogViewSettingsDialog", "Text color", nullptr));
-        backgroundColorButton->setText(QCoreApplication::translate("StyledLogViewSettingsDialog", "Background color", nullptr));
-        okButton->setText(QCoreApplication::translate("StyledLogViewSettingsDialog", "OK", nullptr));
-        applyButton->setText(QCoreApplication::translate("StyledLogViewSettingsDialog", "Apply", nullptr));
-        cancelButton->setText(QCoreApplication::translate("StyledLogViewSettingsDialog", "Cancel", nullptr));
+        fontButton->setText(QApplication::translate("StyledLogViewSettingsDialog", "Font", Q_NULLPTR));
+        textColorButton->setText(QApplication::translate("StyledLogViewSettingsDialog", "Text color", Q_NULLPTR));
+        backgroundColorButton->setText(QApplication::translate("StyledLogViewSettingsDialog", "Background color", Q_NULLPTR));
+        okButton->setText(QApplication::translate("StyledLogViewSettingsDialog", "OK", Q_NULLPTR));
+        applyButton->setText(QApplication::translate("StyledLogViewSettingsDialog", "Apply", Q_NULLPTR));
+        cancelButton->setText(QApplication::translate("StyledLogViewSettingsDialog", "Cancel", Q_NULLPTR));
     } // retranslateUi
 
 };

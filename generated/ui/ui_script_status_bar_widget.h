@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'script_status_bar_widget.ui'
 **
-** Created by: Qt User Interface Compiler version 5.15.2
+** Created by: Qt User Interface Compiler version 5.9.9
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -10,8 +10,11 @@
 #define UI_SCRIPT_STATUS_BAR_WIDGET_H
 
 #include <QtCore/QVariant>
+#include <QtWidgets/QAction>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QHBoxLayout>
+#include <QtWidgets/QHeaderView>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QVBoxLayout>
@@ -38,7 +41,7 @@ public:
     void setupUi(QWidget *ScriptStatusBarWidget)
     {
         if (ScriptStatusBarWidget->objectName().isEmpty())
-            ScriptStatusBarWidget->setObjectName(QString::fromUtf8("ScriptStatusBarWidget"));
+            ScriptStatusBarWidget->setObjectName(QStringLiteral("ScriptStatusBarWidget"));
         ScriptStatusBarWidget->resize(674, 67);
         QSizePolicy sizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
         sizePolicy.setHorizontalStretch(0);
@@ -47,21 +50,21 @@ public:
         ScriptStatusBarWidget->setSizePolicy(sizePolicy);
         verticalLayout = new QVBoxLayout(ScriptStatusBarWidget);
         verticalLayout->setSpacing(2);
-        verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
+        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
         verticalLayout->setContentsMargins(2, 2, 2, 2);
         colorPickerWidget = new QWidget(ScriptStatusBarWidget);
-        colorPickerWidget->setObjectName(QString::fromUtf8("colorPickerWidget"));
+        colorPickerWidget->setObjectName(QStringLiteral("colorPickerWidget"));
         horizontalLayout = new QHBoxLayout(colorPickerWidget);
         horizontalLayout->setSpacing(4);
-        horizontalLayout->setObjectName(QString::fromUtf8("horizontalLayout"));
+        horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
         horizontalLayout->setContentsMargins(0, 0, 0, 0);
         colorPickerIconLabel = new QLabel(colorPickerWidget);
-        colorPickerIconLabel->setObjectName(QString::fromUtf8("colorPickerIconLabel"));
+        colorPickerIconLabel->setObjectName(QStringLiteral("colorPickerIconLabel"));
 
         horizontalLayout->addWidget(colorPickerIconLabel);
 
         colorPickerLabel = new QLabel(colorPickerWidget);
-        colorPickerLabel->setObjectName(QString::fromUtf8("colorPickerLabel"));
+        colorPickerLabel->setObjectName(QStringLiteral("colorPickerLabel"));
 
         horizontalLayout->addWidget(colorPickerLabel);
 
@@ -73,18 +76,18 @@ public:
         verticalLayout->addWidget(colorPickerWidget);
 
         scriptProcessonInfoPanel = new QWidget(ScriptStatusBarWidget);
-        scriptProcessonInfoPanel->setObjectName(QString::fromUtf8("scriptProcessonInfoPanel"));
+        scriptProcessonInfoPanel->setObjectName(QStringLiteral("scriptProcessonInfoPanel"));
         horizontalLayout_2 = new QHBoxLayout(scriptProcessonInfoPanel);
         horizontalLayout_2->setSpacing(4);
-        horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
+        horizontalLayout_2->setObjectName(QStringLiteral("horizontalLayout_2"));
         horizontalLayout_2->setContentsMargins(0, 0, 0, 0);
         scriptProcessorQueueIconLabel = new QLabel(scriptProcessonInfoPanel);
-        scriptProcessorQueueIconLabel->setObjectName(QString::fromUtf8("scriptProcessorQueueIconLabel"));
+        scriptProcessorQueueIconLabel->setObjectName(QStringLiteral("scriptProcessorQueueIconLabel"));
 
         horizontalLayout_2->addWidget(scriptProcessorQueueIconLabel);
 
         scriptProcessorQueueLabel = new QLabel(scriptProcessonInfoPanel);
-        scriptProcessorQueueLabel->setObjectName(QString::fromUtf8("scriptProcessorQueueLabel"));
+        scriptProcessorQueueLabel->setObjectName(QStringLiteral("scriptProcessorQueueLabel"));
 
         horizontalLayout_2->addWidget(scriptProcessorQueueLabel);
 
@@ -96,7 +99,7 @@ public:
         verticalLayout->addWidget(scriptProcessonInfoPanel);
 
         videoInfoLabel = new QLabel(ScriptStatusBarWidget);
-        videoInfoLabel->setObjectName(QString::fromUtf8("videoInfoLabel"));
+        videoInfoLabel->setObjectName(QStringLiteral("videoInfoLabel"));
         videoInfoLabel->setTextInteractionFlags(Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse);
 
         verticalLayout->addWidget(videoInfoLabel);
@@ -109,12 +112,12 @@ public:
 
     void retranslateUi(QWidget *ScriptStatusBarWidget)
     {
-        ScriptStatusBarWidget->setWindowTitle(QCoreApplication::translate("ScriptStatusBarWidget", "Form", nullptr));
-        colorPickerIconLabel->setText(QCoreApplication::translate("ScriptStatusBarWidget", "colorPickerIconLabel", nullptr));
-        colorPickerLabel->setText(QCoreApplication::translate("ScriptStatusBarWidget", "colorPickerLabel", nullptr));
-        scriptProcessorQueueIconLabel->setText(QCoreApplication::translate("ScriptStatusBarWidget", "scriptProcessorQueueIconLabel", nullptr));
-        scriptProcessorQueueLabel->setText(QCoreApplication::translate("ScriptStatusBarWidget", "scriptProcessorQueueLabel", nullptr));
-        videoInfoLabel->setText(QCoreApplication::translate("ScriptStatusBarWidget", "videoInfoLabel", nullptr));
+        ScriptStatusBarWidget->setWindowTitle(QApplication::translate("ScriptStatusBarWidget", "Form", Q_NULLPTR));
+        colorPickerIconLabel->setText(QApplication::translate("ScriptStatusBarWidget", "colorPickerIconLabel", Q_NULLPTR));
+        colorPickerLabel->setText(QApplication::translate("ScriptStatusBarWidget", "colorPickerLabel", Q_NULLPTR));
+        scriptProcessorQueueIconLabel->setText(QApplication::translate("ScriptStatusBarWidget", "scriptProcessorQueueIconLabel", Q_NULLPTR));
+        scriptProcessorQueueLabel->setText(QApplication::translate("ScriptStatusBarWidget", "scriptProcessorQueueLabel", Q_NULLPTR));
+        videoInfoLabel->setText(QApplication::translate("ScriptStatusBarWidget", "videoInfoLabel", Q_NULLPTR));
     } // retranslateUi
 
 };

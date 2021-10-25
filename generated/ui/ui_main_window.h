@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'main_window.ui'
 **
-** Created by: Qt User Interface Compiler version 5.15.2
+** Created by: Qt User Interface Compiler version 5.9.9
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -10,9 +10,12 @@
 #define UI_MAIN_WINDOW_H
 
 #include <QtCore/QVariant>
+#include <QtWidgets/QAction>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QDockWidget>
 #include <QtWidgets/QGridLayout>
+#include <QtWidgets/QHeaderView>
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QStatusBar>
@@ -39,45 +42,45 @@ public:
     void setupUi(QMainWindow *MainWindow)
     {
         if (MainWindow->objectName().isEmpty())
-            MainWindow->setObjectName(QString::fromUtf8("MainWindow"));
+            MainWindow->setObjectName(QStringLiteral("MainWindow"));
         MainWindow->resize(847, 721);
         centralWidget = new QWidget(MainWindow);
-        centralWidget->setObjectName(QString::fromUtf8("centralWidget"));
+        centralWidget->setObjectName(QStringLiteral("centralWidget"));
         verticalLayout = new QVBoxLayout(centralWidget);
         verticalLayout->setSpacing(0);
-        verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
+        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
         verticalLayout->setContentsMargins(0, 0, 0, 0);
         scriptEdit = new ScriptEditor(centralWidget);
-        scriptEdit->setObjectName(QString::fromUtf8("scriptEdit"));
+        scriptEdit->setObjectName(QStringLiteral("scriptEdit"));
 
         verticalLayout->addWidget(scriptEdit);
 
         MainWindow->setCentralWidget(centralWidget);
         menuBar = new QMenuBar(MainWindow);
-        menuBar->setObjectName(QString::fromUtf8("menuBar"));
+        menuBar->setObjectName(QStringLiteral("menuBar"));
         menuBar->setGeometry(QRect(0, 0, 847, 21));
         MainWindow->setMenuBar(menuBar);
         statusBar = new QStatusBar(MainWindow);
-        statusBar->setObjectName(QString::fromUtf8("statusBar"));
+        statusBar->setObjectName(QStringLiteral("statusBar"));
         MainWindow->setStatusBar(statusBar);
         dockWidget = new QDockWidget(MainWindow);
-        dockWidget->setObjectName(QString::fromUtf8("dockWidget"));
+        dockWidget->setObjectName(QStringLiteral("dockWidget"));
         dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
         dockWidget->setAllowedAreas(Qt::BottomDockWidgetArea);
         dockWidgetContents = new QWidget();
-        dockWidgetContents->setObjectName(QString::fromUtf8("dockWidgetContents"));
+        dockWidgetContents->setObjectName(QStringLiteral("dockWidgetContents"));
         gridLayout = new QGridLayout(dockWidgetContents);
         gridLayout->setSpacing(0);
-        gridLayout->setObjectName(QString::fromUtf8("gridLayout"));
+        gridLayout->setObjectName(QStringLiteral("gridLayout"));
         gridLayout->setContentsMargins(0, 0, 0, 0);
         logView = new VSEditorLog(dockWidgetContents);
-        logView->setObjectName(QString::fromUtf8("logView"));
+        logView->setObjectName(QStringLiteral("logView"));
         logView->setTextInteractionFlags(Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse);
 
         gridLayout->addWidget(logView, 0, 0, 1, 1);
 
         dockWidget->setWidget(dockWidgetContents);
-        MainWindow->addDockWidget(Qt::BottomDockWidgetArea, dockWidget);
+        MainWindow->addDockWidget(static_cast<Qt::DockWidgetArea>(8), dockWidget);
 
         retranslateUi(MainWindow);
 
@@ -86,8 +89,8 @@ public:
 
     void retranslateUi(QMainWindow *MainWindow)
     {
-        MainWindow->setWindowTitle(QCoreApplication::translate("MainWindow", "VapourSynth Editor", nullptr));
-        dockWidget->setWindowTitle(QCoreApplication::translate("MainWindow", "Log", nullptr));
+        MainWindow->setWindowTitle(QApplication::translate("MainWindow", "VapourSynth Editor", Q_NULLPTR));
+        dockWidget->setWindowTitle(QApplication::translate("MainWindow", "Log", Q_NULLPTR));
     } // retranslateUi
 
 };

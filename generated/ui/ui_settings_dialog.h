@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'settings_dialog.ui'
 **
-** Created by: Qt User Interface Compiler version 5.15.2
+** Created by: Qt User Interface Compiler version 5.9.9
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -10,7 +10,9 @@
 #define UI_SETTINGS_DIALOG_H
 
 #include <QtCore/QVariant>
+#include <QtWidgets/QAction>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QButtonGroup>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QFormLayout>
@@ -118,41 +120,41 @@ public:
     void setupUi(QDialog *SettingsDialog)
     {
         if (SettingsDialog->objectName().isEmpty())
-            SettingsDialog->setObjectName(QString::fromUtf8("SettingsDialog"));
+            SettingsDialog->setObjectName(QStringLiteral("SettingsDialog"));
         SettingsDialog->resize(512, 665);
         verticalLayout = new QVBoxLayout(SettingsDialog);
         verticalLayout->setSpacing(0);
-        verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
+        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
         verticalLayout->setContentsMargins(0, 0, 0, 0);
         settingsTabWidget = new QTabWidget(SettingsDialog);
-        settingsTabWidget->setObjectName(QString::fromUtf8("settingsTabWidget"));
+        settingsTabWidget->setObjectName(QStringLiteral("settingsTabWidget"));
         commonSettingsTab = new QWidget();
-        commonSettingsTab->setObjectName(QString::fromUtf8("commonSettingsTab"));
+        commonSettingsTab->setObjectName(QStringLiteral("commonSettingsTab"));
         verticalLayout_2 = new QVBoxLayout(commonSettingsTab);
         verticalLayout_2->setSpacing(4);
-        verticalLayout_2->setObjectName(QString::fromUtf8("verticalLayout_2"));
+        verticalLayout_2->setObjectName(QStringLiteral("verticalLayout_2"));
         verticalLayout_2->setContentsMargins(6, 6, 6, 6);
         autoLoadLastScriptCheckBox = new QCheckBox(commonSettingsTab);
-        autoLoadLastScriptCheckBox->setObjectName(QString::fromUtf8("autoLoadLastScriptCheckBox"));
+        autoLoadLastScriptCheckBox->setObjectName(QStringLiteral("autoLoadLastScriptCheckBox"));
         autoLoadLastScriptCheckBox->setChecked(true);
 
         verticalLayout_2->addWidget(autoLoadLastScriptCheckBox);
 
         promptToSaveChangesCheckBox = new QCheckBox(commonSettingsTab);
-        promptToSaveChangesCheckBox->setObjectName(QString::fromUtf8("promptToSaveChangesCheckBox"));
+        promptToSaveChangesCheckBox->setObjectName(QStringLiteral("promptToSaveChangesCheckBox"));
         promptToSaveChangesCheckBox->setChecked(true);
 
         verticalLayout_2->addWidget(promptToSaveChangesCheckBox);
 
         recentFilesSettingsLayout = new QHBoxLayout();
-        recentFilesSettingsLayout->setObjectName(QString::fromUtf8("recentFilesSettingsLayout"));
+        recentFilesSettingsLayout->setObjectName(QStringLiteral("recentFilesSettingsLayout"));
         maxRecentFilesLabel = new QLabel(commonSettingsTab);
-        maxRecentFilesLabel->setObjectName(QString::fromUtf8("maxRecentFilesLabel"));
+        maxRecentFilesLabel->setObjectName(QStringLiteral("maxRecentFilesLabel"));
 
         recentFilesSettingsLayout->addWidget(maxRecentFilesLabel);
 
         maxRecentFilesSpinBox = new QSpinBox(commonSettingsTab);
-        maxRecentFilesSpinBox->setObjectName(QString::fromUtf8("maxRecentFilesSpinBox"));
+        maxRecentFilesSpinBox->setObjectName(QStringLiteral("maxRecentFilesSpinBox"));
         maxRecentFilesSpinBox->setMinimum(1);
         maxRecentFilesSpinBox->setValue(10);
 
@@ -166,14 +168,14 @@ public:
         verticalLayout_2->addLayout(recentFilesSettingsLayout);
 
         autocompletionLayout = new QHBoxLayout();
-        autocompletionLayout->setObjectName(QString::fromUtf8("autocompletionLayout"));
+        autocompletionLayout->setObjectName(QStringLiteral("autocompletionLayout"));
         charactersTypedToStartCompletionLabel = new QLabel(commonSettingsTab);
-        charactersTypedToStartCompletionLabel->setObjectName(QString::fromUtf8("charactersTypedToStartCompletionLabel"));
+        charactersTypedToStartCompletionLabel->setObjectName(QStringLiteral("charactersTypedToStartCompletionLabel"));
 
         autocompletionLayout->addWidget(charactersTypedToStartCompletionLabel);
 
         charactersTypedToStartCompletionSpinBox = new QSpinBox(commonSettingsTab);
-        charactersTypedToStartCompletionSpinBox->setObjectName(QString::fromUtf8("charactersTypedToStartCompletionSpinBox"));
+        charactersTypedToStartCompletionSpinBox->setObjectName(QStringLiteral("charactersTypedToStartCompletionSpinBox"));
         charactersTypedToStartCompletionSpinBox->setMinimum(0);
         charactersTypedToStartCompletionSpinBox->setMaximum(10);
         charactersTypedToStartCompletionSpinBox->setValue(2);
@@ -188,19 +190,19 @@ public:
         verticalLayout_2->addLayout(autocompletionLayout);
 
         useSpacesAsTabCheckBox = new QCheckBox(commonSettingsTab);
-        useSpacesAsTabCheckBox->setObjectName(QString::fromUtf8("useSpacesAsTabCheckBox"));
+        useSpacesAsTabCheckBox->setObjectName(QStringLiteral("useSpacesAsTabCheckBox"));
 
         verticalLayout_2->addWidget(useSpacesAsTabCheckBox);
 
         horizontalLayout = new QHBoxLayout();
-        horizontalLayout->setObjectName(QString::fromUtf8("horizontalLayout"));
+        horizontalLayout->setObjectName(QStringLiteral("horizontalLayout"));
         spacesInTabLabel = new QLabel(commonSettingsTab);
-        spacesInTabLabel->setObjectName(QString::fromUtf8("spacesInTabLabel"));
+        spacesInTabLabel->setObjectName(QStringLiteral("spacesInTabLabel"));
 
         horizontalLayout->addWidget(spacesInTabLabel);
 
         spacesInTabSpinBox = new QSpinBox(commonSettingsTab);
-        spacesInTabSpinBox->setObjectName(QString::fromUtf8("spacesInTabSpinBox"));
+        spacesInTabSpinBox->setObjectName(QStringLiteral("spacesInTabSpinBox"));
         spacesInTabSpinBox->setMinimum(1);
         spacesInTabSpinBox->setMaximum(80);
         spacesInTabSpinBox->setValue(4);
@@ -215,19 +217,19 @@ public:
         verticalLayout_2->addLayout(horizontalLayout);
 
         highlightSelectionMatchesCheckBox = new QCheckBox(commonSettingsTab);
-        highlightSelectionMatchesCheckBox->setObjectName(QString::fromUtf8("highlightSelectionMatchesCheckBox"));
+        highlightSelectionMatchesCheckBox->setObjectName(QStringLiteral("highlightSelectionMatchesCheckBox"));
 
         verticalLayout_2->addWidget(highlightSelectionMatchesCheckBox);
 
         horizontalLayout_2 = new QHBoxLayout();
-        horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
+        horizontalLayout_2->setObjectName(QStringLiteral("horizontalLayout_2"));
         highlightSelectionMatchesMinLengthLabel = new QLabel(commonSettingsTab);
-        highlightSelectionMatchesMinLengthLabel->setObjectName(QString::fromUtf8("highlightSelectionMatchesMinLengthLabel"));
+        highlightSelectionMatchesMinLengthLabel->setObjectName(QStringLiteral("highlightSelectionMatchesMinLengthLabel"));
 
         horizontalLayout_2->addWidget(highlightSelectionMatchesMinLengthLabel);
 
         highlightSelectionMatchesMinLengthSpinBox = new QSpinBox(commonSettingsTab);
-        highlightSelectionMatchesMinLengthSpinBox->setObjectName(QString::fromUtf8("highlightSelectionMatchesMinLengthSpinBox"));
+        highlightSelectionMatchesMinLengthSpinBox->setObjectName(QStringLiteral("highlightSelectionMatchesMinLengthSpinBox"));
         highlightSelectionMatchesMinLengthSpinBox->setMaximum(80);
         highlightSelectionMatchesMinLengthSpinBox->setValue(3);
 
@@ -241,24 +243,24 @@ public:
         verticalLayout_2->addLayout(horizontalLayout_2);
 
         rememberLastPreviewFrameCheckBox = new QCheckBox(commonSettingsTab);
-        rememberLastPreviewFrameCheckBox->setObjectName(QString::fromUtf8("rememberLastPreviewFrameCheckBox"));
+        rememberLastPreviewFrameCheckBox->setObjectName(QStringLiteral("rememberLastPreviewFrameCheckBox"));
 
         verticalLayout_2->addWidget(rememberLastPreviewFrameCheckBox);
 
         alwaysKeepCurrentFrameCheckBox = new QCheckBox(commonSettingsTab);
-        alwaysKeepCurrentFrameCheckBox->setObjectName(QString::fromUtf8("alwaysKeepCurrentFrameCheckBox"));
+        alwaysKeepCurrentFrameCheckBox->setObjectName(QStringLiteral("alwaysKeepCurrentFrameCheckBox"));
 
         verticalLayout_2->addWidget(alwaysKeepCurrentFrameCheckBox);
 
         horizontalLayout_3 = new QHBoxLayout();
-        horizontalLayout_3->setObjectName(QString::fromUtf8("horizontalLayout_3"));
+        horizontalLayout_3->setObjectName(QStringLiteral("horizontalLayout_3"));
         snapshotCompressionLevelLabel = new QLabel(commonSettingsTab);
-        snapshotCompressionLevelLabel->setObjectName(QString::fromUtf8("snapshotCompressionLevelLabel"));
+        snapshotCompressionLevelLabel->setObjectName(QStringLiteral("snapshotCompressionLevelLabel"));
 
         horizontalLayout_3->addWidget(snapshotCompressionLevelLabel);
 
         snapshotCompressionLevelSpinBox = new QSpinBox(commonSettingsTab);
-        snapshotCompressionLevelSpinBox->setObjectName(QString::fromUtf8("snapshotCompressionLevelSpinBox"));
+        snapshotCompressionLevelSpinBox->setObjectName(QStringLiteral("snapshotCompressionLevelSpinBox"));
         snapshotCompressionLevelSpinBox->setMinimum(0);
         snapshotCompressionLevelSpinBox->setMaximum(100);
         snapshotCompressionLevelSpinBox->setValue(0);
@@ -273,20 +275,20 @@ public:
         verticalLayout_2->addLayout(horizontalLayout_3);
 
         delimiter = new QFrame(commonSettingsTab);
-        delimiter->setObjectName(QString::fromUtf8("delimiter"));
+        delimiter->setObjectName(QStringLiteral("delimiter"));
         delimiter->setFrameShape(QFrame::HLine);
         delimiter->setFrameShadow(QFrame::Sunken);
 
         verticalLayout_2->addWidget(delimiter);
 
         portableModeLabel = new QLabel(commonSettingsTab);
-        portableModeLabel->setObjectName(QString::fromUtf8("portableModeLabel"));
+        portableModeLabel->setObjectName(QStringLiteral("portableModeLabel"));
         portableModeLabel->setWordWrap(true);
 
         verticalLayout_2->addWidget(portableModeLabel);
 
         portableModeCheckBox = new QCheckBox(commonSettingsTab);
-        portableModeCheckBox->setObjectName(QString::fromUtf8("portableModeCheckBox"));
+        portableModeCheckBox->setObjectName(QStringLiteral("portableModeCheckBox"));
 
         verticalLayout_2->addWidget(portableModeCheckBox);
 
@@ -296,19 +298,19 @@ public:
 
         settingsTabWidget->addTab(commonSettingsTab, QString());
         pathsSettingsTab = new QWidget();
-        pathsSettingsTab->setObjectName(QString::fromUtf8("pathsSettingsTab"));
+        pathsSettingsTab->setObjectName(QStringLiteral("pathsSettingsTab"));
         verticalLayout_3 = new QVBoxLayout(pathsSettingsTab);
         verticalLayout_3->setSpacing(2);
-        verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
+        verticalLayout_3->setObjectName(QStringLiteral("verticalLayout_3"));
         verticalLayout_3->setContentsMargins(2, 2, 2, 2);
         vsLibraryPathsGroupBox = new QGroupBox(pathsSettingsTab);
-        vsLibraryPathsGroupBox->setObjectName(QString::fromUtf8("vsLibraryPathsGroupBox"));
+        vsLibraryPathsGroupBox->setObjectName(QStringLiteral("vsLibraryPathsGroupBox"));
         gridLayout_2 = new QGridLayout(vsLibraryPathsGroupBox);
         gridLayout_2->setSpacing(2);
-        gridLayout_2->setObjectName(QString::fromUtf8("gridLayout_2"));
+        gridLayout_2->setObjectName(QStringLiteral("gridLayout_2"));
         gridLayout_2->setContentsMargins(0, 0, 0, 0);
         vsLibraryPathsListWidget = new QListWidget(vsLibraryPathsGroupBox);
-        vsLibraryPathsListWidget->setObjectName(QString::fromUtf8("vsLibraryPathsListWidget"));
+        vsLibraryPathsListWidget->setObjectName(QStringLiteral("vsLibraryPathsListWidget"));
         vsLibraryPathsListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         vsLibraryPathsListWidget->setAlternatingRowColors(true);
         vsLibraryPathsListWidget->setTextElideMode(Qt::ElideNone);
@@ -316,7 +318,7 @@ public:
         gridLayout_2->addWidget(vsLibraryPathsListWidget, 0, 0, 3, 1);
 
         removeVSLibraryPathButton = new QToolButton(vsLibraryPathsGroupBox);
-        removeVSLibraryPathButton->setObjectName(QString::fromUtf8("removeVSLibraryPathButton"));
+        removeVSLibraryPathButton->setObjectName(QStringLiteral("removeVSLibraryPathButton"));
 
         gridLayout_2->addWidget(removeVSLibraryPathButton, 0, 1, 1, 1);
 
@@ -325,17 +327,17 @@ public:
         gridLayout_2->addItem(verticalSpacer_3, 1, 1, 1, 1);
 
         addVSLibraryPathButton = new QToolButton(vsLibraryPathsGroupBox);
-        addVSLibraryPathButton->setObjectName(QString::fromUtf8("addVSLibraryPathButton"));
+        addVSLibraryPathButton->setObjectName(QStringLiteral("addVSLibraryPathButton"));
 
         gridLayout_2->addWidget(addVSLibraryPathButton, 2, 1, 1, 1);
 
         vsLibraryPathEdit = new QLineEdit(vsLibraryPathsGroupBox);
-        vsLibraryPathEdit->setObjectName(QString::fromUtf8("vsLibraryPathEdit"));
+        vsLibraryPathEdit->setObjectName(QStringLiteral("vsLibraryPathEdit"));
 
         gridLayout_2->addWidget(vsLibraryPathEdit, 3, 0, 1, 1);
 
         selectVSLibraryPathButton = new QToolButton(vsLibraryPathsGroupBox);
-        selectVSLibraryPathButton->setObjectName(QString::fromUtf8("selectVSLibraryPathButton"));
+        selectVSLibraryPathButton->setObjectName(QStringLiteral("selectVSLibraryPathButton"));
 
         gridLayout_2->addWidget(selectVSLibraryPathButton, 3, 1, 1, 1);
 
@@ -343,13 +345,13 @@ public:
         verticalLayout_3->addWidget(vsLibraryPathsGroupBox);
 
         vsPluginsPathsGroupBox = new QGroupBox(pathsSettingsTab);
-        vsPluginsPathsGroupBox->setObjectName(QString::fromUtf8("vsPluginsPathsGroupBox"));
+        vsPluginsPathsGroupBox->setObjectName(QStringLiteral("vsPluginsPathsGroupBox"));
         gridLayout = new QGridLayout(vsPluginsPathsGroupBox);
         gridLayout->setSpacing(2);
-        gridLayout->setObjectName(QString::fromUtf8("gridLayout"));
+        gridLayout->setObjectName(QStringLiteral("gridLayout"));
         gridLayout->setContentsMargins(0, 0, 0, 0);
         vsPluginsPathsListWidget = new QListWidget(vsPluginsPathsGroupBox);
-        vsPluginsPathsListWidget->setObjectName(QString::fromUtf8("vsPluginsPathsListWidget"));
+        vsPluginsPathsListWidget->setObjectName(QStringLiteral("vsPluginsPathsListWidget"));
         vsPluginsPathsListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         vsPluginsPathsListWidget->setAlternatingRowColors(true);
         vsPluginsPathsListWidget->setTextElideMode(Qt::ElideNone);
@@ -357,7 +359,7 @@ public:
         gridLayout->addWidget(vsPluginsPathsListWidget, 0, 0, 3, 1);
 
         removeVSPluginsPathButton = new QToolButton(vsPluginsPathsGroupBox);
-        removeVSPluginsPathButton->setObjectName(QString::fromUtf8("removeVSPluginsPathButton"));
+        removeVSPluginsPathButton->setObjectName(QStringLiteral("removeVSPluginsPathButton"));
 
         gridLayout->addWidget(removeVSPluginsPathButton, 0, 1, 1, 1);
 
@@ -366,17 +368,17 @@ public:
         gridLayout->addItem(verticalSpacer_2, 1, 1, 1, 1);
 
         addVSPluginsPathButton = new QToolButton(vsPluginsPathsGroupBox);
-        addVSPluginsPathButton->setObjectName(QString::fromUtf8("addVSPluginsPathButton"));
+        addVSPluginsPathButton->setObjectName(QStringLiteral("addVSPluginsPathButton"));
 
         gridLayout->addWidget(addVSPluginsPathButton, 2, 1, 1, 1);
 
         vsPluginsPathEdit = new QLineEdit(vsPluginsPathsGroupBox);
-        vsPluginsPathEdit->setObjectName(QString::fromUtf8("vsPluginsPathEdit"));
+        vsPluginsPathEdit->setObjectName(QStringLiteral("vsPluginsPathEdit"));
 
         gridLayout->addWidget(vsPluginsPathEdit, 3, 0, 1, 1);
 
         selectVSPluginsPathButton = new QToolButton(vsPluginsPathsGroupBox);
-        selectVSPluginsPathButton->setObjectName(QString::fromUtf8("selectVSPluginsPathButton"));
+        selectVSPluginsPathButton->setObjectName(QStringLiteral("selectVSPluginsPathButton"));
 
         gridLayout->addWidget(selectVSPluginsPathButton, 3, 1, 1, 1);
 
@@ -384,13 +386,13 @@ public:
         verticalLayout_3->addWidget(vsPluginsPathsGroupBox);
 
         vsDocumentationPathsGroupBox = new QGroupBox(pathsSettingsTab);
-        vsDocumentationPathsGroupBox->setObjectName(QString::fromUtf8("vsDocumentationPathsGroupBox"));
+        vsDocumentationPathsGroupBox->setObjectName(QStringLiteral("vsDocumentationPathsGroupBox"));
         gridLayout_3 = new QGridLayout(vsDocumentationPathsGroupBox);
         gridLayout_3->setSpacing(2);
-        gridLayout_3->setObjectName(QString::fromUtf8("gridLayout_3"));
+        gridLayout_3->setObjectName(QStringLiteral("gridLayout_3"));
         gridLayout_3->setContentsMargins(0, 0, 0, 0);
         vsDocumentationPathsListWidget = new QListWidget(vsDocumentationPathsGroupBox);
-        vsDocumentationPathsListWidget->setObjectName(QString::fromUtf8("vsDocumentationPathsListWidget"));
+        vsDocumentationPathsListWidget->setObjectName(QStringLiteral("vsDocumentationPathsListWidget"));
         vsDocumentationPathsListWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         vsDocumentationPathsListWidget->setAlternatingRowColors(true);
         vsDocumentationPathsListWidget->setTextElideMode(Qt::ElideNone);
@@ -398,7 +400,7 @@ public:
         gridLayout_3->addWidget(vsDocumentationPathsListWidget, 0, 0, 3, 1);
 
         removeVSDocumentationPathButton = new QToolButton(vsDocumentationPathsGroupBox);
-        removeVSDocumentationPathButton->setObjectName(QString::fromUtf8("removeVSDocumentationPathButton"));
+        removeVSDocumentationPathButton->setObjectName(QStringLiteral("removeVSDocumentationPathButton"));
 
         gridLayout_3->addWidget(removeVSDocumentationPathButton, 0, 1, 1, 1);
 
@@ -407,17 +409,17 @@ public:
         gridLayout_3->addItem(verticalSpacer_4, 1, 1, 1, 1);
 
         addVSDocumentationPathButton = new QToolButton(vsDocumentationPathsGroupBox);
-        addVSDocumentationPathButton->setObjectName(QString::fromUtf8("addVSDocumentationPathButton"));
+        addVSDocumentationPathButton->setObjectName(QStringLiteral("addVSDocumentationPathButton"));
 
         gridLayout_3->addWidget(addVSDocumentationPathButton, 2, 1, 1, 1);
 
         vsDocumentationPathEdit = new QLineEdit(vsDocumentationPathsGroupBox);
-        vsDocumentationPathEdit->setObjectName(QString::fromUtf8("vsDocumentationPathEdit"));
+        vsDocumentationPathEdit->setObjectName(QStringLiteral("vsDocumentationPathEdit"));
 
         gridLayout_3->addWidget(vsDocumentationPathEdit, 3, 0, 1, 1);
 
         selectVSDocumentationPathButton = new QToolButton(vsDocumentationPathsGroupBox);
-        selectVSDocumentationPathButton->setObjectName(QString::fromUtf8("selectVSDocumentationPathButton"));
+        selectVSDocumentationPathButton->setObjectName(QStringLiteral("selectVSDocumentationPathButton"));
 
         gridLayout_3->addWidget(selectVSDocumentationPathButton, 3, 1, 1, 1);
 
@@ -426,13 +428,13 @@ public:
 
         settingsTabWidget->addTab(pathsSettingsTab, QString());
         hotkeysSettingsTab = new QWidget();
-        hotkeysSettingsTab->setObjectName(QString::fromUtf8("hotkeysSettingsTab"));
+        hotkeysSettingsTab->setObjectName(QStringLiteral("hotkeysSettingsTab"));
         verticalLayout_4 = new QVBoxLayout(hotkeysSettingsTab);
         verticalLayout_4->setSpacing(0);
-        verticalLayout_4->setObjectName(QString::fromUtf8("verticalLayout_4"));
+        verticalLayout_4->setObjectName(QStringLiteral("verticalLayout_4"));
         verticalLayout_4->setContentsMargins(0, 0, 0, 0);
         hotkeysTable = new QTableView(hotkeysSettingsTab);
-        hotkeysTable->setObjectName(QString::fromUtf8("hotkeysTable"));
+        hotkeysTable->setObjectName(QStringLiteral("hotkeysTable"));
         hotkeysTable->setEditTriggers(QAbstractItemView::AnyKeyPressed|QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed|QAbstractItemView::SelectedClicked);
         hotkeysTable->setAlternatingRowColors(true);
         hotkeysTable->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -447,19 +449,19 @@ public:
 
         settingsTabWidget->addTab(hotkeysSettingsTab, QString());
         themeSettingsTab = new QWidget();
-        themeSettingsTab->setObjectName(QString::fromUtf8("themeSettingsTab"));
+        themeSettingsTab->setObjectName(QStringLiteral("themeSettingsTab"));
         themeSettingsTab->setContextMenuPolicy(Qt::PreventContextMenu);
         verticalLayout_5 = new QVBoxLayout(themeSettingsTab);
         verticalLayout_5->setSpacing(4);
-        verticalLayout_5->setObjectName(QString::fromUtf8("verticalLayout_5"));
+        verticalLayout_5->setObjectName(QStringLiteral("verticalLayout_5"));
         verticalLayout_5->setContentsMargins(6, 6, 6, 6);
         themeElementsLabel = new QLabel(themeSettingsTab);
-        themeElementsLabel->setObjectName(QString::fromUtf8("themeElementsLabel"));
+        themeElementsLabel->setObjectName(QStringLiteral("themeElementsLabel"));
 
         verticalLayout_5->addWidget(themeElementsLabel);
 
         themeElementsList = new QListView(themeSettingsTab);
-        themeElementsList->setObjectName(QString::fromUtf8("themeElementsList"));
+        themeElementsList->setObjectName(QStringLiteral("themeElementsList"));
         themeElementsList->setEditTriggers(QAbstractItemView::NoEditTriggers);
         themeElementsList->setSelectionBehavior(QAbstractItemView::SelectRows);
         themeElementsList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
@@ -469,14 +471,14 @@ public:
         verticalLayout_5->addWidget(themeElementsList);
 
         formLayout = new QFormLayout();
-        formLayout->setObjectName(QString::fromUtf8("formLayout"));
+        formLayout->setObjectName(QStringLiteral("formLayout"));
         fontButton = new QPushButton(themeSettingsTab);
-        fontButton->setObjectName(QString::fromUtf8("fontButton"));
+        fontButton->setObjectName(QStringLiteral("fontButton"));
 
         formLayout->setWidget(0, QFormLayout::LabelRole, fontButton);
 
         fontLabel = new QLabel(themeSettingsTab);
-        fontLabel->setObjectName(QString::fromUtf8("fontLabel"));
+        fontLabel->setObjectName(QStringLiteral("fontLabel"));
         QSizePolicy sizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Minimum);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
@@ -486,12 +488,12 @@ public:
         formLayout->setWidget(0, QFormLayout::FieldRole, fontLabel);
 
         colourButton = new QPushButton(themeSettingsTab);
-        colourButton->setObjectName(QString::fromUtf8("colourButton"));
+        colourButton->setObjectName(QStringLiteral("colourButton"));
 
         formLayout->setWidget(1, QFormLayout::LabelRole, colourButton);
 
         colourFrame = new QFrame(themeSettingsTab);
-        colourFrame->setObjectName(QString::fromUtf8("colourFrame"));
+        colourFrame->setObjectName(QStringLiteral("colourFrame"));
         colourFrame->setAutoFillBackground(true);
         colourFrame->setFrameShape(QFrame::Box);
         colourFrame->setFrameShadow(QFrame::Plain);
@@ -507,23 +509,23 @@ public:
 
         decisionButtonsLayout = new QHBoxLayout();
         decisionButtonsLayout->setSpacing(2);
-        decisionButtonsLayout->setObjectName(QString::fromUtf8("decisionButtonsLayout"));
+        decisionButtonsLayout->setObjectName(QStringLiteral("decisionButtonsLayout"));
         horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         decisionButtonsLayout->addItem(horizontalSpacer);
 
         okButton = new QPushButton(SettingsDialog);
-        okButton->setObjectName(QString::fromUtf8("okButton"));
+        okButton->setObjectName(QStringLiteral("okButton"));
 
         decisionButtonsLayout->addWidget(okButton);
 
         applyButton = new QPushButton(SettingsDialog);
-        applyButton->setObjectName(QString::fromUtf8("applyButton"));
+        applyButton->setObjectName(QStringLiteral("applyButton"));
 
         decisionButtonsLayout->addWidget(applyButton);
 
         cancelButton = new QPushButton(SettingsDialog);
-        cancelButton->setObjectName(QString::fromUtf8("cancelButton"));
+        cancelButton->setObjectName(QStringLiteral("cancelButton"));
 
         decisionButtonsLayout->addWidget(cancelButton);
 
@@ -541,70 +543,70 @@ public:
 
     void retranslateUi(QDialog *SettingsDialog)
     {
-        SettingsDialog->setWindowTitle(QCoreApplication::translate("SettingsDialog", "Settings - VapourSynth Editor", nullptr));
-        autoLoadLastScriptCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Automatically load the last script", nullptr));
-        promptToSaveChangesCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Prompt to save changes when closing script file", nullptr));
-        maxRecentFilesLabel->setText(QCoreApplication::translate("SettingsDialog", "Limit the number of recent scripts in history to", nullptr));
-        charactersTypedToStartCompletionLabel->setText(QCoreApplication::translate("SettingsDialog", "Characters typed to start autocompletion", nullptr));
-        useSpacesAsTabCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Use spaces as Tab", nullptr));
-        spacesInTabLabel->setText(QCoreApplication::translate("SettingsDialog", "Space characters in Tab", nullptr));
-        highlightSelectionMatchesCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Highlight selection matches", nullptr));
-        highlightSelectionMatchesMinLengthLabel->setText(QCoreApplication::translate("SettingsDialog", "Minimum legth to highlight", nullptr));
-        rememberLastPreviewFrameCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Remember last previewed frame on exit", nullptr));
-        alwaysKeepCurrentFrameCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Keep current frame when previewing different script", nullptr));
-        snapshotCompressionLevelLabel->setText(QCoreApplication::translate("SettingsDialog", "PNG snapshot compression level (0-100 for size factor)", nullptr));
-        portableModeLabel->setText(QCoreApplication::translate("SettingsDialog", "Portable mode means that editor stores its settings in the same folder with its executable. Editors determines if it is running in portable mode by looking for the configuration file in its folder. Please make sure you have the rights to write files in the editor's folder before you switch to this mode.", nullptr));
-        portableModeCheckBox->setText(QCoreApplication::translate("SettingsDialog", "Portable mode enabled", nullptr));
-        settingsTabWidget->setTabText(settingsTabWidget->indexOf(commonSettingsTab), QCoreApplication::translate("SettingsDialog", "Common", nullptr));
-        vsLibraryPathsGroupBox->setTitle(QCoreApplication::translate("SettingsDialog", "VapourSynth library search paths", nullptr));
-#if QT_CONFIG(tooltip)
-        removeVSLibraryPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Remove VapourSynth library search path", nullptr));
-#endif // QT_CONFIG(tooltip)
+        SettingsDialog->setWindowTitle(QApplication::translate("SettingsDialog", "Settings - VapourSynth Editor", Q_NULLPTR));
+        autoLoadLastScriptCheckBox->setText(QApplication::translate("SettingsDialog", "Automatically load the last script", Q_NULLPTR));
+        promptToSaveChangesCheckBox->setText(QApplication::translate("SettingsDialog", "Prompt to save changes when closing script file", Q_NULLPTR));
+        maxRecentFilesLabel->setText(QApplication::translate("SettingsDialog", "Limit the number of recent scripts in history to", Q_NULLPTR));
+        charactersTypedToStartCompletionLabel->setText(QApplication::translate("SettingsDialog", "Characters typed to start autocompletion", Q_NULLPTR));
+        useSpacesAsTabCheckBox->setText(QApplication::translate("SettingsDialog", "Use spaces as Tab", Q_NULLPTR));
+        spacesInTabLabel->setText(QApplication::translate("SettingsDialog", "Space characters in Tab", Q_NULLPTR));
+        highlightSelectionMatchesCheckBox->setText(QApplication::translate("SettingsDialog", "Highlight selection matches", Q_NULLPTR));
+        highlightSelectionMatchesMinLengthLabel->setText(QApplication::translate("SettingsDialog", "Minimum legth to highlight", Q_NULLPTR));
+        rememberLastPreviewFrameCheckBox->setText(QApplication::translate("SettingsDialog", "Remember last previewed frame on exit", Q_NULLPTR));
+        alwaysKeepCurrentFrameCheckBox->setText(QApplication::translate("SettingsDialog", "Keep current frame when previewing different script", Q_NULLPTR));
+        snapshotCompressionLevelLabel->setText(QApplication::translate("SettingsDialog", "PNG snapshot compression level (0-100 for size factor)", Q_NULLPTR));
+        portableModeLabel->setText(QApplication::translate("SettingsDialog", "Portable mode means that editor stores its settings in the same folder with its executable. Editors determines if it is running in portable mode by looking for the configuration file in its folder. Please make sure you have the rights to write files in the editor's folder before you switch to this mode.", Q_NULLPTR));
+        portableModeCheckBox->setText(QApplication::translate("SettingsDialog", "Portable mode enabled", Q_NULLPTR));
+        settingsTabWidget->setTabText(settingsTabWidget->indexOf(commonSettingsTab), QApplication::translate("SettingsDialog", "Common", Q_NULLPTR));
+        vsLibraryPathsGroupBox->setTitle(QApplication::translate("SettingsDialog", "VapourSynth library search paths", Q_NULLPTR));
+#ifndef QT_NO_TOOLTIP
+        removeVSLibraryPathButton->setToolTip(QApplication::translate("SettingsDialog", "Remove VapourSynth library search path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         removeVSLibraryPathButton->setText(QString());
-#if QT_CONFIG(tooltip)
-        addVSLibraryPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Add VapourSynth library search path", nullptr));
-#endif // QT_CONFIG(tooltip)
+#ifndef QT_NO_TOOLTIP
+        addVSLibraryPathButton->setToolTip(QApplication::translate("SettingsDialog", "Add VapourSynth library search path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         addVSLibraryPathButton->setText(QString());
-#if QT_CONFIG(tooltip)
-        selectVSLibraryPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Select path", nullptr));
-#endif // QT_CONFIG(tooltip)
+#ifndef QT_NO_TOOLTIP
+        selectVSLibraryPathButton->setToolTip(QApplication::translate("SettingsDialog", "Select path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         selectVSLibraryPathButton->setText(QString());
-        vsPluginsPathsGroupBox->setTitle(QCoreApplication::translate("SettingsDialog", "VapourSynth plugins paths", nullptr));
-#if QT_CONFIG(tooltip)
-        removeVSPluginsPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Remove VapourSynth plugins path", nullptr));
-#endif // QT_CONFIG(tooltip)
+        vsPluginsPathsGroupBox->setTitle(QApplication::translate("SettingsDialog", "VapourSynth plugins paths", Q_NULLPTR));
+#ifndef QT_NO_TOOLTIP
+        removeVSPluginsPathButton->setToolTip(QApplication::translate("SettingsDialog", "Remove VapourSynth plugins path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         removeVSPluginsPathButton->setText(QString());
-#if QT_CONFIG(tooltip)
-        addVSPluginsPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Add VapourSynth plugins path", nullptr));
-#endif // QT_CONFIG(tooltip)
+#ifndef QT_NO_TOOLTIP
+        addVSPluginsPathButton->setToolTip(QApplication::translate("SettingsDialog", "Add VapourSynth plugins path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         addVSPluginsPathButton->setText(QString());
-#if QT_CONFIG(tooltip)
-        selectVSPluginsPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Select path", nullptr));
-#endif // QT_CONFIG(tooltip)
+#ifndef QT_NO_TOOLTIP
+        selectVSPluginsPathButton->setToolTip(QApplication::translate("SettingsDialog", "Select path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         selectVSPluginsPathButton->setText(QString());
-        vsDocumentationPathsGroupBox->setTitle(QCoreApplication::translate("SettingsDialog", "Documentation paths", nullptr));
-#if QT_CONFIG(tooltip)
-        removeVSDocumentationPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Remove VapourSynth documentation path", nullptr));
-#endif // QT_CONFIG(tooltip)
+        vsDocumentationPathsGroupBox->setTitle(QApplication::translate("SettingsDialog", "Documentation paths", Q_NULLPTR));
+#ifndef QT_NO_TOOLTIP
+        removeVSDocumentationPathButton->setToolTip(QApplication::translate("SettingsDialog", "Remove VapourSynth documentation path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         removeVSDocumentationPathButton->setText(QString());
-#if QT_CONFIG(tooltip)
-        addVSDocumentationPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Add VapourSynth documentation path", nullptr));
-#endif // QT_CONFIG(tooltip)
+#ifndef QT_NO_TOOLTIP
+        addVSDocumentationPathButton->setToolTip(QApplication::translate("SettingsDialog", "Add VapourSynth documentation path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         addVSDocumentationPathButton->setText(QString());
-#if QT_CONFIG(tooltip)
-        selectVSDocumentationPathButton->setToolTip(QCoreApplication::translate("SettingsDialog", "Select path", nullptr));
-#endif // QT_CONFIG(tooltip)
+#ifndef QT_NO_TOOLTIP
+        selectVSDocumentationPathButton->setToolTip(QApplication::translate("SettingsDialog", "Select path", Q_NULLPTR));
+#endif // QT_NO_TOOLTIP
         selectVSDocumentationPathButton->setText(QString());
-        settingsTabWidget->setTabText(settingsTabWidget->indexOf(pathsSettingsTab), QCoreApplication::translate("SettingsDialog", "Paths", nullptr));
-        settingsTabWidget->setTabText(settingsTabWidget->indexOf(hotkeysSettingsTab), QCoreApplication::translate("SettingsDialog", "Hotkeys", nullptr));
-        themeElementsLabel->setText(QCoreApplication::translate("SettingsDialog", "Theme elements", nullptr));
-        fontButton->setText(QCoreApplication::translate("SettingsDialog", "Font", nullptr));
+        settingsTabWidget->setTabText(settingsTabWidget->indexOf(pathsSettingsTab), QApplication::translate("SettingsDialog", "Paths", Q_NULLPTR));
+        settingsTabWidget->setTabText(settingsTabWidget->indexOf(hotkeysSettingsTab), QApplication::translate("SettingsDialog", "Hotkeys", Q_NULLPTR));
+        themeElementsLabel->setText(QApplication::translate("SettingsDialog", "Theme elements", Q_NULLPTR));
+        fontButton->setText(QApplication::translate("SettingsDialog", "Font", Q_NULLPTR));
         fontLabel->setText(QString());
-        colourButton->setText(QCoreApplication::translate("SettingsDialog", "Colour", nullptr));
-        settingsTabWidget->setTabText(settingsTabWidget->indexOf(themeSettingsTab), QCoreApplication::translate("SettingsDialog", "Theme", nullptr));
-        okButton->setText(QCoreApplication::translate("SettingsDialog", "OK", nullptr));
-        applyButton->setText(QCoreApplication::translate("SettingsDialog", "Apply", nullptr));
-        cancelButton->setText(QCoreApplication::translate("SettingsDialog", "Cancel", nullptr));
+        colourButton->setText(QApplication::translate("SettingsDialog", "Colour", Q_NULLPTR));
+        settingsTabWidget->setTabText(settingsTabWidget->indexOf(themeSettingsTab), QApplication::translate("SettingsDialog", "Theme", Q_NULLPTR));
+        okButton->setText(QApplication::translate("SettingsDialog", "OK", Q_NULLPTR));
+        applyButton->setText(QApplication::translate("SettingsDialog", "Apply", Q_NULLPTR));
+        cancelButton->setText(QApplication::translate("SettingsDialog", "Cancel", Q_NULLPTR));
     } // retranslateUi
 
 };
