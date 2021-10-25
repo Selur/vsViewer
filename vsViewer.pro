@@ -151,9 +151,9 @@ QMAKE_TARGET_DESCRIPTION = 'VapourSynth Viewer based on Vapoursynth script edito
 
 #SUBDIRS
 
-MOC_DIR = generated/moc
-UI_DIR = generated/ui
-RCC_DIR = generated/rcc
+#MOC_DIR = generated/moc
+#UI_DIR = generated/ui
+#RCC_DIR = generated/rcc
 
 #DEFINES
 
