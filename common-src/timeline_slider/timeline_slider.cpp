@@ -609,10 +609,12 @@ void TimeLineSlider::paintEvent(QPaintEvent * a_pEvent)
           labelString = QString::number(n);
         else
           labelString = vsedit::timeToString(((double)n) / m_fps);
-#if(QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
-        labelPos.setX(tickPos - labelsFontMetrics.horizontalAdvance(labelString) / 2 + 1);
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
+        labelPos.setX(tickPos - labelsFontMetrics.horizontalAdvance(
+          labelString) / 2 + 1);
 #else
-        labelPos.setX(tickPos - labelsFontMetrics.width(labelString) / 2 + 1);
+        labelPos.setX(tickPos - labelsFontMetrics.width(
+          labelString) / 2 + 1);
 #endif
         painter.drawText(labelPos, labelString);
       }
@@ -684,10 +686,12 @@ void TimeLineSlider::paintEvent(QPaintEvent * a_pEvent)
           labelString = QString::number(units);
         else
           labelString = vsedit::timeToString(units);
-#if(QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
-        labelPos.setX(tickPos - labelsFontMetrics.horizontalAdvance(labelString) / 2 + 1);
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
+        labelPos.setX(tickPos - labelsFontMetrics.horizontalAdvance(
+          labelString) / 2 + 1);
 #else
-        labelPos.setX(tickPos - labelsFontMetrics.width(labelString) / 2 + 1);
+        labelPos.setX(tickPos - labelsFontMetrics.width(
+          labelString) / 2 + 1);
 #endif
         painter.drawText(labelPos, labelString);
       }

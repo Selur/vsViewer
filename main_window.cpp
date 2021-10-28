@@ -782,6 +782,7 @@ bool MainWindow::loadScriptFromFile(const QString& a_filePath)
 {
   if(a_filePath.isEmpty())
     return false;
+
   QFile scriptFile(a_filePath);
   bool loadSuccess = scriptFile.open(QIODevice::ReadOnly | QIODevice::Text);
   if(!loadSuccess)
@@ -791,11 +792,13 @@ bool MainWindow::loadScriptFromFile(const QString& a_filePath)
       QString::fromUtf8("Failed to open the file %1.").arg(a_filePath));
     return false;
   }
+
   setCurrentScriptFilePath(a_filePath);
   QByteArray utf8Script = scriptFile.readAll();
   QString scriptText = QString::fromUtf8(utf8Script);
   m_lastSavedText = scriptText;
   m_ui.scriptEdit->setPlainText(scriptText);
+
   m_pBenchmarkDialog->resetSavedRange();
 
   return true;
@@ -975,57 +978,6 @@ void MainWindow::loadStartUpScript()
   }
 }
 
-// END OF void MainWindow::loadStartUpScript()
-//==============================================================================
-
-void MainWindow::loadFonts()
-{
-  QResource digitalMiniFontResource(":/fonts/DigitalMini.ttf");
-  QByteArray digitalMiniFontData((const char *)digitalMiniFontResource.data(),
-    digitalMiniFontResource.size());
-  QFontDatabase::addApplicationFontFromData(digitalMiniFontData);
-}
-
-// END OF void MainWindow::loadFonts()
-//==============================================================================
-
-void MainWindow::destroyOrphanQObjects()
-{
-  for(QObject ** ppObject : m_orphanQObjects)
-  {
-    if(!ppObject)
-      continue;
-    if(!*ppObject)
-      continue;
-    delete *ppObject;
-    *ppObject = nullptr;
-  }
-}
-
-// END OF void MainWindow::destroyOrphanQObjects()
-//==============================================================================
-
-void MainWindow::saveGeometryDelayed()
-{
-  QApplication::processEvents();
-  if(!isMaximized())
-  {
-    m_windowGeometry = saveGeometry();
-    m_pGeometrySaveTimer->start();
-  }
-}
-
-// END OF void MainWindow::saveGeometryDelayed()
-//==============================================================================
-
-void MainWindow::reloadTexts()
-{
-  if(!loadScriptFromFile(m_scriptFilePath))
-    m_ui.scriptEdit->setModified(true);
-}
-
-// END OF void MainWindow::reloadTexts()
-
 bool MainWindow::checkHybridScript()
 {
   VapourSynthScriptProcessor tempProcessor(m_pSettingsManager,
@@ -1087,4 +1039,54 @@ void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const Q
 }
 // END OF void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const QString &optionString)
 
+// END OF void MainWindow::loadStartUpScript()
+//==============================================================================
+
+void MainWindow::loadFonts()
+{
+  QResource digitalMiniFontResource(":/fonts/DigitalMini.ttf");
+  QByteArray digitalMiniFontData((const char *)digitalMiniFontResource.data(),
+    digitalMiniFontResource.size());
+  QFontDatabase::addApplicationFontFromData(digitalMiniFontData);
+}
+
+// END OF void MainWindow::loadFonts()
+//==============================================================================
+
+void MainWindow::destroyOrphanQObjects()
+{
+  for(QObject ** ppObject : m_orphanQObjects)
+  {
+    if(!ppObject)
+      continue;
+    if(!*ppObject)
+      continue;
+    delete *ppObject;
+    *ppObject = nullptr;
+  }
+}
+
+// END OF void MainWindow::destroyOrphanQObjects()
+//==============================================================================
+
+void MainWindow::saveGeometryDelayed()
+{
+  QApplication::processEvents();
+  if(!isMaximized())
+  {
+    m_windowGeometry = saveGeometry();
+    m_pGeometrySaveTimer->start();
+  }
+}
+
+// END OF void MainWindow::saveGeometryDelayed()
+//==============================================================================
+
+void MainWindow::reloadTexts()
+{
+  if(!loadScriptFromFile(m_scriptFilePath))
+    m_ui.scriptEdit->setModified(true);
+}
+
+// END OF void MainWindow::reloadTexts()
 //==============================================================================

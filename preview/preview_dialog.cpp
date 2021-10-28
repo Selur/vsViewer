@@ -1,12 +1,12 @@
 #include "preview_dialog.h"
 
-#include "../common-src/helpers.h"
-#include "../common-src/libp2p/p2p_api.h"
-#include "../common-src/vapoursynth/vapoursynth_script_processor.h"
-#include "../common-src/settings/settings_manager.h"
+#include "common-src/helpers.h"
+#include "common-src/libp2p/p2p_api.h"
+#include "common-src/vapoursynth/vapoursynth_script_processor.h"
+#include "common-src/settings/settings_manager.h"
 #include "../settings/settings_dialog.h"
 #include "scroll_navigator.h"
-#include "../common-src/timeline_slider/timeline_slider.h"
+#include "common-src/timeline_slider/timeline_slider.h"
 #include "preview_advanced_settings_dialog.h"
 
 #include <VapourSynth.h>
@@ -2047,16 +2047,14 @@ void PreviewDialog::previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[])
     return;
 
   const VSMap *props = m_cpVSAPI->getFramePropsRO(m_cpPreviewFrameRef);
-  enum p2p_packing packing_fmt =
-    static_cast<p2p_packing>(m_cpVSAPI->propGetInt(props, "_packingFormat",
-    0, nullptr));
+  enum p2p_packing packing_fmt = static_cast<p2p_packing>(m_cpVSAPI->propGetInt(props, "PackingFormat", 0, nullptr));
   bool is_10_bits = (packing_fmt == p2p_rgb30);
   if (!is_10_bits)
   {
     Q_ASSERT(packing_fmt == p2p_argb32);
   }
 
-    const uint8_t * cpPlane = m_cpVSAPI->getReadPtr(m_cpPreviewFrameRef, 0);
+  const uint8_t * cpPlane = m_cpVSAPI->getReadPtr(m_cpPreviewFrameRef, 0);
 
   size_t x = a_x;
   size_t y = a_y;
@@ -2117,16 +2115,14 @@ QPixmap PreviewDialog::pixmapFromRGB(
 
   if((cpFormat->id != pfGray8) || (wwidth % 4) )
   {
-    QString errorString = tr("Error forming pixmap from frame. "
-      "Expected format Gray8 with width divisible by 4. Instead got \'%1\'.")
-      .arg(cpFormat->name);
+    QString errorString = tr("Error forming pixmap from frame. Expected format Gray8 with width divisible by 4. Instead got \'%1\'.").arg(cpFormat->name);
     emit signalWriteLogMessage(mtCritical, errorString);
     return QPixmap();
   }
 
   const VSMap *props = m_cpVSAPI->getFramePropsRO(a_cpFrameRef);
-  enum p2p_packing packing_fmt = static_cast<p2p_packing>(m_cpVSAPI->propGetInt(props,
-    "_packingFormat", 0, nullptr));
+  enum p2p_packing packing_fmt = static_cast<p2p_packing>(
+    m_cpVSAPI->propGetInt(props, "PackingFormat", 0, nullptr));
   bool is_10_bits;
   if (packing_fmt == p2p_rgb30)
   {

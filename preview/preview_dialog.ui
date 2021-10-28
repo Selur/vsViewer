@@ -30,7 +30,7 @@
     <number>0</number>
    </property>
    <item>
-    <widget class="PreviewArea" name="previewArea" native="true"/>
+    <widget class="PreviewArea" name="previewArea"/>
    </item>
    <item>
     <widget class="QWidget" name="toolBar" native="true">

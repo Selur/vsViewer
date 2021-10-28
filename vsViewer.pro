@@ -103,7 +103,7 @@ macx {
 }
 
 win32 {
- #QT += winextras
+ QT += winextras
 
  #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
  INCLUDEPATH += 'I:/Hybrid/64bit/VapourSynth/sdk/include/'
@@ -203,7 +203,6 @@ HEADERS +=  \
   common-src/libp2p/p2p_api.h \
   common-src/libp2p/simd/cpuinfo_x86.h \
   common-src/libp2p/simd/p2p_simd.h \
-  common-src/vapoursynth/vs_pack_rgb.h \
   settings/actions_hotkey_edit_model.h \
   settings/clearable_key_sequence_editor.h \
   settings/item_delegate_for_hotkey.h \
@@ -227,9 +226,7 @@ HEADERS +=  \
   frame_consumers/encode_dialog.h \
   script_templates/drop_file_category_model.h \
   script_templates/templates_dialog.h \
-  main_window.h
-
-HEADERS += \
+  main_window.h \
   common-src/aligned_vector.h \
   common-src/chrono.h \
   common-src/frame_header_writers/frame_header_writer.h \
@@ -304,8 +301,9 @@ SOURCES +=  \
   common-src/settings/settings_manager.cpp \
   common-src/settings/settings_manager_core.cpp \
   common-src/timeline_slider/timeline_slider.cpp \
-  common-src/vapoursynth/vapoursynth_script_processor.cpp \
   common-src/vapoursynth/vs_pack_rgb.cpp \
+  common-src/vapoursynth/vs_gray_frame_prop.cpp \
+  common-src/vapoursynth/vapoursynth_script_processor.cpp \
   common-src/vapoursynth/vs_script_library.cpp \
   common-src/vapoursynth/vs_script_processor_structures.cpp \
   frame_consumers/benchmark_dialog.cpp \
@@ -334,7 +332,8 @@ SOURCES +=  \
   settings/theme_elements_model.cpp \
   vapoursynth/vapoursynth_plugins_manager.cpp \
   vapoursynth/vs_plugin_data.cpp \
-  vapoursynth/vs_script_processor_dialog.cpp
+  vapoursynth/vs_script_processor_dialog.cpp \
+  common-src/vapoursynth/vs_gray_frame_prop.h
 
 # libp2p
 # libp2p

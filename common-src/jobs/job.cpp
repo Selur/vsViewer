@@ -6,7 +6,7 @@
 #include "common-src/vapoursynth/vapoursynth_script_processor.h"
 #include "common-src/frame_header_writers/frame_header_writer_null.h"
 #include "common-src/frame_header_writers/frame_header_writer_y4m.h"
-#include "common-src/jobs/job_variables.h"
+#include "job_variables.h"
 
 #include <QFileInfo>
 #include <QFile>

@@ -3,8 +3,7 @@
 #include "script_completer_model.h"
 #include "script_completer.h"
 #include "syntax_highlighter.h"
-#include "../common-src/settings/settings_manager.h"
-#include "../settings/settings_dialog.h"
+#include "common-src/settings/settings_manager.h"
 
 #include <QTextBlock>
 #include <QCursor>
@@ -226,8 +225,10 @@ void ScriptEditor::slotLoadSettings()
   m_tabText = m_pSettingsManager->getTabText();
   m_spacesInTab = m_pSettingsManager->getSpacesInTab();
   QFontMetrics metrics(commonScriptTextFont);
-#if(QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
   setTabStopDistance(metrics.horizontalAdvance(' ') * m_spacesInTab);
+#elif (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
+  setTabStopDistance(metrics.width(' ') * m_spacesInTab);
 #else
   setTabStopWidth(metrics.width(' ') * m_spacesInTab);
 #endif
@@ -1043,7 +1044,7 @@ int ScriptEditor::sideBoxWidth() const
 
   QFont commonTextFont = m_commonScriptTextFormat.font();
   QFontMetrics metrics(commonTextFont);
-#if(QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
   int space = metrics.horizontalAdvance(controlString);
 #else
   int space = metrics.width(controlString);

@@ -4,7 +4,6 @@
 #include <ui_main_window.h>
 
 #include <vector>
-#include <QStringList>
 
 class SettingsManager;
 class VapourSynthPluginsManager;
@@ -105,18 +104,17 @@ private:
 
   void saveGeometryDelayed();
 
+  void reloadTexts();
+
   bool hybridCustom(const QStringList& arguments);
 
   bool checkHybridScript();
-
-    void reloadTexts();
 
   Ui::MainWindow m_ui;
 
   SettingsManager * m_pSettingsManager;
   VapourSynthPluginsManager * m_pVapourSynthPluginsManager;
   VSScriptLibrary * m_pVSScriptLibrary;
-
 
   QAction * m_pActionNewScript;
   QAction * m_pActionOpenScript;

@@ -14,7 +14,7 @@
    <string>Encode video</string>
   </property>
   <property name="windowIcon">
-   <iconset resource="resources/vsViewer.qrc">
+   <iconset resource="../../../resources/vsedit.qrc">
     <normaloff>:/film_save.png</normaloff>:/film_save.png</iconset>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -126,7 +126,7 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources/vsViewer.qrc">
+        <iconset resource="../../../resources/vsedit.qrc">
          <normaloff>:/folder.png</normaloff>:/folder.png</iconset>
        </property>
       </widget>
@@ -148,7 +148,7 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources/vsViewer.qrc">
+        <iconset resource="../../../resources/vsedit.qrc">
          <normaloff>:/information.png</normaloff>:/information.png</iconset>
        </property>
       </widget>
@@ -273,7 +273,7 @@
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="resources/vsViewer.qrc"/>
+  <include location="../../../resources/vsedit.qrc"/>
  </resources>
  <connections/>
 </ui>
