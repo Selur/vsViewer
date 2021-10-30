@@ -4,7 +4,7 @@
 #include "common-src/libp2p/p2p_api.h"
 #include "common-src/vapoursynth/vapoursynth_script_processor.h"
 #include "common-src/settings/settings_manager.h"
-#include "../settings/settings_dialog.h"
+#include "settings/settings_dialog.h"
 #include "scroll_navigator.h"
 #include "common-src/timeline_slider/timeline_slider.h"
 #include "preview_advanced_settings_dialog.h"
@@ -1343,7 +1343,7 @@ void PreviewDialog::slotLoadChapters()
   }
   const double fps = (double)cpVideoInfo->fpsNum /
     (double)cpVideoInfo->fpsDen;
-
+#if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   static const QRegExp regExp(R"((\d{2}):(\d{2}):(\d{2})[\.:](\d{3})?)");
   while(!chaptersFile.atEnd())
   {
@@ -1359,6 +1359,24 @@ void PreviewDialog::slotLoadChapters()
     const int frameIndex = round(timecode * fps);
     m_ui.frameNumberSlider->addBookmark(frameIndex);
   }
+#else
+  QRegularExpression regExp(R"((\d{2}):(\d{2}):(\d{2})[\.:](\d{3})?)");
+  while(!chaptersFile.atEnd())
+  {
+    const QByteArray line = chaptersFile.readLine();
+    QRegularExpressionMatch match = regExp.match(line);
+    if(!match.hasMatch())
+      continue;
+    const QStringList timecodes = match.capturedTexts();
+
+    const double timecode = timecodes.at(1).toDouble() * 3600.0 +
+      timecodes.at(2).toDouble() * 60.0 + timecodes.at(3).toDouble() +
+      timecodes.at(4).toDouble() / 1000;
+    const int frameIndex = round(timecode * fps);
+    m_ui.frameNumberSlider->addBookmark(frameIndex);
+  }
+
+#endif
 
   saveTimelineBookmarks();
 }
@@ -2047,14 +2065,16 @@ void PreviewDialog::previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[])
     return;
 
   const VSMap *props = m_cpVSAPI->getFramePropsRO(m_cpPreviewFrameRef);
-  enum p2p_packing packing_fmt = static_cast<p2p_packing>(m_cpVSAPI->propGetInt(props, "PackingFormat", 0, nullptr));
+  enum p2p_packing packing_fmt =
+    static_cast<p2p_packing>(m_cpVSAPI->propGetInt(props, "PackingFormat",
+    0, nullptr));
   bool is_10_bits = (packing_fmt == p2p_rgb30);
   if (!is_10_bits)
   {
     Q_ASSERT(packing_fmt == p2p_argb32);
   }
 
-  const uint8_t * cpPlane = m_cpVSAPI->getReadPtr(m_cpPreviewFrameRef, 0);
+    const uint8_t * cpPlane = m_cpVSAPI->getReadPtr(m_cpPreviewFrameRef, 0);
 
   size_t x = a_x;
   size_t y = a_y;
@@ -2115,7 +2135,9 @@ QPixmap PreviewDialog::pixmapFromRGB(
 
   if((cpFormat->id != pfGray8) || (wwidth % 4) )
   {
-    QString errorString = tr("Error forming pixmap from frame. Expected format Gray8 with width divisible by 4. Instead got \'%1\'.").arg(cpFormat->name);
+    QString errorString = tr("Error forming pixmap from frame. "
+      "Expected format Gray8 with width divisible by 4. Instead got \'%1\'.")
+      .arg(cpFormat->name);
     emit signalWriteLogMessage(mtCritical, errorString);
     return QPixmap();
   }
@@ -2244,6 +2266,7 @@ void PreviewDialog::saveGeometryDelayed()
 // END OF void PreviewDialog::saveGeometryDelayed()
 //==============================================================================
 
+
 void PreviewDialog::ipcAdjustCrop(const QString& cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom)
 {
   BEGIN_CROP_VALUES_CHANGE
@@ -2274,6 +2297,3 @@ void PreviewDialog::ipcAdjustCrop(const QString& cropping, const int cropLeft, c
   this->setPreviewPixmap();
   END_CROP_VALUES_CHANGE
 }
-
-// END OF void PreviewDialog::saveGeometryDelayed()
-//==============================================================================

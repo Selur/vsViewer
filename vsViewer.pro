@@ -103,8 +103,12 @@ macx {
 }
 
 win32 {
- QT += winextras
 
+lessThan(QT_MAJOR_VERSION, 6) {
+  QT += winextras
+} else {
+  QMAKE_LFLAGS += -ENTRY:mainCRTStartup
+}
  #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
  INCLUDEPATH += 'I:/Hybrid/64bit/VapourSynth/sdk/include/'
 

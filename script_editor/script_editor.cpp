@@ -4,6 +4,7 @@
 #include "script_completer.h"
 #include "syntax_highlighter.h"
 #include "common-src/settings/settings_manager.h"
+#include "settings/settings_dialog.h"
 
 #include <QTextBlock>
 #include <QCursor>
@@ -753,6 +754,7 @@ void ScriptEditor::dropEvent(QDropEvent * a_pEvent)
   if(urls.size() == 1)
   {
     QString filePath = urls[0].toLocalFile();
+#if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     QRegExp matcher;
     matcher.setPatternSyntax(QRegExp::Wildcard);
     matcher.setCaseSensitivity(Qt::CaseInsensitive);
@@ -767,6 +769,20 @@ void ScriptEditor::dropEvent(QDropEvent * a_pEvent)
         return;
       }
     }
+#else
+   QRegularExpression matcher = QRegularExpression(QRegularExpression::wildcardToRegularExpression("*.vpy"));
+   matcher.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+   if(matcher.match(filePath).hasMatch())
+   {
+     bool handled = false;
+     emit signalScriptFileDropped(filePath, &handled);
+     if(handled)
+     {
+       a_pEvent->acceptProposedAction();
+       return;
+     }
+   }
+#endif
   }
 
   QStringList textList;
