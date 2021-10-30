@@ -12,6 +12,7 @@
 #include <QDataStream>
 #include <algorithm>
 #include <functional>
+#include <QIODevice>
 
 namespace vsedit
 {

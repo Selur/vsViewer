@@ -572,8 +572,11 @@ void EncodeDialog::setUpEncodingPresets()
     this, SLOT(slotEncodingPresetSaveButtonPressed()));
   connect(m_ui.encodingPresetDeleteButton, SIGNAL(clicked()),
     this, SLOT(slotEncodingPresetDeleteButtonPressed()));
-  connect(m_ui.encodingPresetComboBox, SIGNAL(activated(const QString &)),
-    this, SLOT(slotEncodingPresetComboBoxActivated(const QString &)));
+#if(QT_VERSION < QT_VERSION_CHECK(5, 15, 6))
+  connect(m_ui.encodingPresetComboBox, SIGNAL(activated(const QString &)), this, SLOT(slotEncodingPresetComboBoxActivated(const QString &)));
+#else
+  connect(m_ui.encodingPresetComboBox, SIGNAL(textActivated(const QString &)), this, SLOT(slotEncodingPresetComboBoxActivated(const QString &)));
+#endif
 
   m_ui.encodingPresetComboBox->setCurrentIndex(0);
   slotEncodingPresetComboBoxActivated(

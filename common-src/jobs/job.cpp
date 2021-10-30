@@ -56,8 +56,11 @@ vsedit::Job::Job(const JobProperties & a_properties,
     this, SLOT(slotProcessStarted()));
   connect(&m_process, SIGNAL(finished(int, QProcess::ExitStatus)),
     this, SLOT(slotProcessFinished(int, QProcess::ExitStatus)));
-  connect(&m_process, SIGNAL(error(QProcess::ProcessError)),
-    this, SLOT(slotProcessError(QProcess::ProcessError)));
+#if(QT_VERSION < QT_VERSION_CHECK(5, 15, 6))
+  connect(&m_process, SIGNAL(error(QProcess::ProcessError)), this, SLOT(slotProcessError(QProcess::ProcessError)));
+#else
+ connect(&m_process, SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(slotProcessError(QProcess::ProcessError)));
+#endif
   connect(&m_process, SIGNAL(readChannelFinished()),
     this, SLOT(slotProcessReadChannelFinished()));
   connect(&m_process, SIGNAL(bytesWritten(qint64)),
