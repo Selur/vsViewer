@@ -2297,3 +2297,13 @@ void PreviewDialog::ipcAdjustCrop(const QString& cropping, const int cropLeft, c
   this->setPreviewPixmap();
   END_CROP_VALUES_CHANGE
 }
+
+int PreviewDialog::getScrollX() const
+{
+  return m_ui.previewArea->horizontalScrollBar()->value();
+}
+
+int PreviewDialog::getScrollY() const
+{
+  return m_ui.previewArea->verticalScrollBar()->value();
+}

@@ -41,6 +41,8 @@ public:
 
   void previewScript(const QString& a_script, const QString& a_scriptName);
   void ipcAdjustCrop(const QString& cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom);
+  int getScrollX() const;
+  int getScrollY() const;
 
 signals:
 

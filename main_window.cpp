@@ -1002,8 +1002,11 @@ void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const Q
   if (m_ipcClient == nullptr) {
     return;
   }
+
   m_ipcClient->send_MessageToServer(QString("%1 => %2").arg(typ).arg(value));
   if (typ == "changeTo") {
+    int x = m_pPreviewDialog->getScrollX();
+    int y = m_pPreviewDialog->getScrollY();
     if (!QFile::exists(value)) {
       m_ipcClient->send_MessageToServer(value + " doesn't exist!");
       return;
@@ -1021,7 +1024,7 @@ void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const Q
       return;
     }
     slotPreview();
-    if (!optionString.isEmpty()) {
+    if (!optionString.isEmpty() && x == 0 && y == 0) {
       QStringList options = optionString.split("#");
       m_pPreviewDialog->ipcAdjustCrop(options.at(0), options.at(1).toInt(), options.at(2).toInt(), options.at(3).toInt(), options.at(4).toInt());
     }

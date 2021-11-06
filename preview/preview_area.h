@@ -13,62 +13,62 @@ class QMouseEvent;
 
 class PreviewArea : public QScrollArea
 {
-	Q_OBJECT
+  Q_OBJECT
 
 public:
 
-	PreviewArea(QWidget * a_pParent = nullptr);
+  PreviewArea(QWidget * a_pParent = nullptr);
 
-	virtual ~PreviewArea();
+  virtual ~PreviewArea();
 
-	void setWidget(QWidget * a_pWidget) = delete;
+  void setWidget(QWidget * a_pWidget) = delete;
 
-	int pixmapWidth() const { return m_pixmapWidth; }
+  int pixmapWidth() const { return m_pixmapWidth; }
 
-	int pixmapHeight() const { return m_pixmapHeight; }
+  int pixmapHeight() const { return m_pixmapHeight; }
 
-	void setPixmap(const QPixmap & a_pixmap);
+  void setPixmap(const QPixmap & a_pixmap);
 
-	void checkMouseOverPreview(const QPoint & a_globalMousePos);
+  void checkMouseOverPreview(const QPoint & a_globalMousePos);
 
 public slots:
 
-	void slotScrollLeft();
-	void slotScrollRight();
-	void slotScrollTop();
-	void slotScrollBottom();
+  void slotScrollLeft();
+  void slotScrollRight();
+  void slotScrollTop();
+  void slotScrollBottom();
 
 protected:
 
-	void resizeEvent(QResizeEvent * a_pEvent) override;
-	void keyPressEvent(QKeyEvent * a_pEvent) override;
-	void wheelEvent(QWheelEvent * a_pEvent) override;
-	void mousePressEvent(QMouseEvent * a_pEvent) override;
-	void mouseMoveEvent(QMouseEvent * a_pEvent) override;
-	void mouseReleaseEvent(QMouseEvent * a_pEvent) override;
+  void resizeEvent(QResizeEvent * a_pEvent) override;
+  void keyPressEvent(QKeyEvent * a_pEvent) override;
+  void wheelEvent(QWheelEvent * a_pEvent) override;
+  void mousePressEvent(QMouseEvent * a_pEvent) override;
+  void mouseMoveEvent(QMouseEvent * a_pEvent) override;
+  void mouseReleaseEvent(QMouseEvent * a_pEvent) override;
 
 signals:
 
-	void signalSizeChanged();
-	void signalCtrlWheel(QPoint a_angleDelta);
-	void signalMouseMiddleButtonReleased();
-	void signalMouseRightButtonReleased();
-	void signalMouseOverPoint(float a_normX, float a_normY);
+  void signalSizeChanged();
+  void signalCtrlWheel(QPoint a_angleDelta);
+  void signalMouseMiddleButtonReleased();
+  void signalMouseRightButtonReleased();
+  void signalMouseOverPoint(float a_normX, float a_normY);
 
 private:
 
-	void drawScrollNavigator();
+  void drawScrollNavigator();
 
-	QLabel * m_pPreviewLabel;
+  QLabel * m_pPreviewLabel;
 
-	ScrollNavigator * m_pScrollNavigator;
+  ScrollNavigator * m_pScrollNavigator;
 
-	bool m_draggingPreview;
-	QPoint m_lastCursorPos;
-	QPoint m_lastPreviewLabelPos;
+  bool m_draggingPreview;
+  QPoint m_lastCursorPos;
+  QPoint m_lastPreviewLabelPos;
 
-	int m_pixmapWidth = 0;
-	int m_pixmapHeight = 0;
+  int m_pixmapWidth = 0;
+  int m_pixmapHeight = 0;
 };
 
 #endif // PREVIEWAREA_H
