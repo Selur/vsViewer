@@ -7,8 +7,10 @@
 #include "common-src/chrono.h"
 
 #ifdef Q_OS_WIN
+#if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   class QWinTaskbarButton;
   class QWinTaskbarProgress;
+#endif
 #endif
 
 class ScriptBenchmarkDialog : public VSScriptProcessorDialog

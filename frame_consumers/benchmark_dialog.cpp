@@ -6,8 +6,10 @@
 #include <VapourSynth.h>
 
 #if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+#ifdef Q_OS_WIN
 #include <QWinTaskbarButton>
 #include <QWinTaskbarProgress>
+#endif
 #endif
 //==============================================================================
 
