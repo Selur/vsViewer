@@ -254,6 +254,7 @@ protected:
   QByteArray m_windowGeometry;
 
   qreal m_devicePixelRatio;
+  bool m_devicePixelNeedsInit;
 };
 
 #endif // PREVIEWDIALOG_H_INCLUDED

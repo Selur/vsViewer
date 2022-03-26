@@ -105,6 +105,7 @@ PreviewDialog::PreviewDialog(SettingsManager * a_pSettingsManager,
   , m_alwaysKeepCurrentFrame(DEFAULT_ALWAYS_KEEP_CURRENT_FRAME)
   , m_pGeometrySaveTimer(nullptr)
   , m_devicePixelRatio(-1)
+  , m_devicePixelNeedsInit(false)
 {
   m_ui.setupUi(this);
   setWindowIcon(QIcon(":preview.png"));
@@ -1875,13 +1876,19 @@ bool PreviewDialog::requestShowFrame(int a_frameNumber)
 
 void PreviewDialog::setPreviewPixmap()
 {
-  if(m_devicePixelRatio < 0) {
 #if QT_VERSION_MAJOR < 6
-    m_devicePixelRatio = 1;
+  m_devicePixelRatio = 1;
 #else
-    m_devicePixelRatio = window()->windowHandle()->screen()->devicePixelRatio();
-#endif
+  if(m_devicePixelRatio < 0 || m_devicePixelNeedsInit) {
+    QWindow* win = window()->windowHandle();
+    if (win != nullptr) {
+      m_devicePixelRatio = win->screen()->devicePixelRatio();
+      m_devicePixelNeedsInit = false;
+    } else {
+      m_devicePixelNeedsInit = true;
+    }
   }
+#endif
 
   if(m_ui.cropPanel->isVisible())
   {
