@@ -65,6 +65,9 @@ void handleQtMessage(QtMsgType a_type, const QMessageLogContext & a_context,
 int main(int argc, char *argv[])
 {
   QApplication::setAttribute(Qt::AA_DontUseNativeMenuBar);
+#if (QT_VERSION_MAJOR < 6)
+  QApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
+#endif
   QApplication application(argc, argv);
 
   // Make text in message box selectable

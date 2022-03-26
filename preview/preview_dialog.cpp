@@ -11,6 +11,8 @@
 
 #include <VapourSynth.h>
 
+#include <QScreen>
+#include <QWindow>
 #include <QEvent>
 #include <QCloseEvent>
 #include <QMoveEvent>
@@ -102,6 +104,7 @@ PreviewDialog::PreviewDialog(SettingsManager * a_pSettingsManager,
   , m_pPlayTimer(nullptr)
   , m_alwaysKeepCurrentFrame(DEFAULT_ALWAYS_KEEP_CURRENT_FRAME)
   , m_pGeometrySaveTimer(nullptr)
+  , m_devicePixelRatio(-1)
 {
   m_ui.setupUi(this);
   setWindowIcon(QIcon(":preview.png"));
@@ -232,7 +235,7 @@ void PreviewDialog::previewScript(const QString& a_script,
   if(scriptChanged && (!m_alwaysKeepCurrentFrame))
   {
     m_frameExpected = 0;
-    m_ui.previewArea->setPixmap(QPixmap());
+    m_ui.previewArea->setPixmap(QPixmap(), 0);
   }
 
   if(m_frameExpected > lastFrameNumber)
@@ -281,7 +284,7 @@ void PreviewDialog::stopAndCleanUp()
   int pixmapHeight = m_ui.previewArea->pixmapHeight();
   QPixmap blackPixmap(pixmapWidth, pixmapHeight);
   blackPixmap.fill(Qt::black);
-  m_ui.previewArea->setPixmap(blackPixmap);
+  m_ui.previewArea->setPixmap(blackPixmap, m_devicePixelRatio);
 
   if(m_cpFrameRef)
   {
@@ -1872,33 +1875,45 @@ bool PreviewDialog::requestShowFrame(int a_frameNumber)
 
 void PreviewDialog::setPreviewPixmap()
 {
+  if(m_devicePixelRatio < 0) {
+#if QT_VERSION_MAJOR < 6
+    m_devicePixelRatio = 1;
+#else
+    m_devicePixelRatio = window()->windowHandle()->screen()->devicePixelRatio();
+#endif
+  }
+
   if(m_ui.cropPanel->isVisible())
   {
     int cropLeft = m_ui.cropLeftSpinBox->value();
     int cropTop = m_ui.cropTopSpinBox->value();
     int cropWidth = m_ui.cropWidthSpinBox->value();
     int cropHeight = m_ui.cropHeightSpinBox->value();
-    QPixmap croppedPixmap = m_framePixmap.copy(cropLeft, cropTop,
-      cropWidth, cropHeight);
+    QPixmap croppedPixmap = m_framePixmap.copy(cropLeft, cropTop, cropWidth, cropHeight);
     int ratio = m_ui.cropZoomRatioSpinBox->value();
 
     if(ratio == 1)
     {
-      m_ui.previewArea->setPixmap(croppedPixmap);
+      m_devicePixelRatio = window()->windowHandle()->screen()->devicePixelRatio();
+      m_ui.previewArea->setPixmap(croppedPixmap, m_devicePixelRatio);
       return;
     }
 
     QPixmap zoomedPixmap = croppedPixmap.scaled(
       croppedPixmap.width() * ratio, croppedPixmap.height() * ratio,
       Qt::KeepAspectRatio, Qt::FastTransformation);
-    m_ui.previewArea->setPixmap(zoomedPixmap);
+    zoomedPixmap.setDevicePixelRatio(m_devicePixelRatio);
+    m_ui.previewArea->setPixmap(zoomedPixmap, m_devicePixelRatio);
     return;
   }
 
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
   if(zoomMode == ZoomMode::NoZoom)
   {
-    m_ui.previewArea->setPixmap(m_framePixmap);
+    if(!m_framePixmap.isNull()) {
+      m_framePixmap.setDevicePixelRatio(m_devicePixelRatio);
+    }
+    m_ui.previewArea->setPixmap(m_framePixmap, m_devicePixelRatio);
     return;
   }
 
@@ -1918,13 +1933,13 @@ void PreviewDialog::setPreviewPixmap()
   {
     QRect previewRect = m_ui.previewArea->geometry();
     int cropSize = m_ui.previewArea->frameWidth() * 2;
-    frameWidth = previewRect.width() - cropSize;
-    frameHeight = previewRect.height() - cropSize;
+    frameWidth = previewRect.width() * m_devicePixelRatio - cropSize;
+    frameHeight = previewRect.height() * m_devicePixelRatio - cropSize;
   }
 
-  previewPixmap = m_framePixmap.scaled(frameWidth, frameHeight,
-    Qt::KeepAspectRatio, scaleMode);
-  m_ui.previewArea->setPixmap(previewPixmap);
+  previewPixmap = m_framePixmap.scaled(frameWidth, frameHeight, Qt::KeepAspectRatio, scaleMode);
+  previewPixmap.setDevicePixelRatio(m_devicePixelRatio);
+  m_ui.previewArea->setPixmap(previewPixmap, m_devicePixelRatio);
 }
 
 // END OF bool void PreviewDialog::setPreviewPixmap()

@@ -31,8 +31,10 @@ EncodeDialog::EncodeDialog(SettingsManager * a_pSettingsManager,
   , m_pJob(nullptr)
 
 #ifdef Q_OS_WIN
+#if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   , m_pWinTaskbarButton(nullptr)
   , m_pWinTaskbarProgress(nullptr)
+#endif
 #endif
 {
   m_ui.setupUi(this);

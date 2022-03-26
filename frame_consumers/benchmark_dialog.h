@@ -71,8 +71,10 @@ protected:
   int m_lastToFrame;
 
 #ifdef Q_OS_WIN
+#if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   QWinTaskbarButton * m_pWinTaskbarButton;
   QWinTaskbarProgress * m_pWinTaskbarProgress;
+#endif
 #endif
 };
 

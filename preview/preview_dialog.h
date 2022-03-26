@@ -252,6 +252,8 @@ protected:
 
   QTimer * m_pGeometrySaveTimer;
   QByteArray m_windowGeometry;
+
+  qreal m_devicePixelRatio;
 };
 
 #endif // PREVIEWDIALOG_H_INCLUDED

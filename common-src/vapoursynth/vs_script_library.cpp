@@ -1,7 +1,7 @@
 #include "vs_script_library.h"
 
-#include "common-src/settings/settings_manager_core.h"
-#include "common-src/helpers.h"
+#include "../settings/settings_manager_core.h"
+#include "../helpers.h"
 
 #include <QSettings>
 #include <QProcessEnvironment>
@@ -48,16 +48,13 @@ bool VSScriptLibrary::initialize()
 {
   if(m_initialized)
     return true;
-
   bool libraryInitialized = initLibrary();
   if(!libraryInitialized)
     return false;
-
   int opresult = vssInit();
   if(!opresult)
   {
-    QString errorString = tr("Failed to initialize "
-      "VapourSynth environment!");
+    QString errorString = tr("Failed to initialize VapourSynth environment!");
     emit signalWriteLogMessage(mtCritical, errorString);
     finalize();
     return false;
@@ -197,7 +194,6 @@ bool VSScriptLibrary::initLibrary()
     Q_ASSERT(vssFinalize);
     return true;
   }
-
   QString libraryName(
 #ifdef Q_OS_WIN
     "vsscript"
@@ -205,36 +201,28 @@ bool VSScriptLibrary::initLibrary()
     "vapoursynth-script"
 #endif // Q_OS_WIN
   );
-
   QString libraryFullPath;
   m_vsScriptLibrary.setFileName(libraryName);
   m_vsScriptLibrary.setLoadHints(QLibrary::ExportExternalSymbolsHint);
   bool loaded = m_vsScriptLibrary.load();
-
 #ifdef Q_OS_WIN
   if(!loaded)
   {
     QSettings settings("HKEY_LOCAL_MACHINE\\SOFTWARE",
       QSettings::NativeFormat);
-    libraryFullPath =
-      settings.value("VapourSynth/VSScriptDLL").toString();
-    if(libraryFullPath.isEmpty())
-    {
-      libraryFullPath = settings.value(
-        "Wow6432Node/VapourSynth/VSScriptDLL").toString();
+    libraryFullPath = settings.value("VapourSynth/VSScriptDLL").toString();
+    if(libraryFullPath.isEmpty()) {
+      libraryFullPath = settings.value("Wow6432Node/VapourSynth/VSScriptDLL").toString();
     }
-
-    if(!libraryFullPath.isEmpty())
-    {
+    if(!libraryFullPath.isEmpty()) {
+      m_vsScriptLibrary.unload();
       m_vsScriptLibrary.setFileName(libraryFullPath);
       loaded = m_vsScriptLibrary.load();
     }
   }
-
   if(!loaded)
   {
-    QProcessEnvironment environment =
-      QProcessEnvironment::systemEnvironment();
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     QString basePath;
 
 #ifdef Q_OS_WIN64
@@ -244,7 +232,7 @@ bool VSScriptLibrary::initLibrary()
     basePath = environment.value("ProgramFiles");
     libraryFullPath = basePath + "\\VapourSynth\\core32\\vsscript.dll";
 #endif // Q_OS_WIN64
-
+    m_vsScriptLibrary.unload();
     m_vsScriptLibrary.setFileName(libraryFullPath);
     loaded = m_vsScriptLibrary.load();
   }
@@ -252,13 +240,11 @@ bool VSScriptLibrary::initLibrary()
 
   if(!loaded)
   {
-    QStringList librarySearchPaths =
-      m_pSettingsManager->getVapourSynthLibraryPaths();
+    QStringList librarySearchPaths = m_pSettingsManager->getVapourSynthLibraryPaths();
     for(const QString & path : librarySearchPaths)
     {
-      libraryFullPath = vsedit::resolvePathFromApplication(path) +
-        QString("/") + libraryName;
-      m_vsScriptLibrary.setFileName(libraryFullPath);
+      libraryFullPath = vsedit::resolvePathFromApplication(path) + QString("/") + libraryName;
+      emit signalWriteLogMessage(0, "searchpath: "+ libraryFullPath);
       loaded = m_vsScriptLibrary.load();
       if(loaded)
         break;
@@ -267,8 +253,7 @@ bool VSScriptLibrary::initLibrary()
 
   if(!loaded)
   {
-    emit signalWriteLogMessage(mtCritical,
-      "Failed to load vapoursynth script library!\n"
+    emit signalWriteLogMessage(mtCritical, "Failed to load vapoursynth script library!\n"
       "Please set up the library search paths in settings.");
     return false;
   }
@@ -310,14 +295,12 @@ bool VSScriptLibrary::initLibrary()
     }
     if(!*entry.ppFunction)
     {
-      QString errorString = tr("Failed to get entry %1() "
-        "in vapoursynth script library!").arg(entry.name);
+      QString errorString = tr("Failed to get entry %1() in vapoursynth script library!").arg(entry.name);
       emit signalWriteLogMessage(mtCritical, errorString);
       freeLibrary();
       return false;
     }
   }
-
   return true;
 }
 
