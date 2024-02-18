@@ -3,6 +3,7 @@ CONFIG += qt
 QT += widgets
 QT += network
 
+
 QT_VERSION_WARNING = "WARNING: Linking against Qt version lower than 5.6.1 is likely to cause CLI tools video encoding to crash due to I/O but in Qt."
 
 win32 {
@@ -110,7 +111,7 @@ lessThan(QT_MAJOR_VERSION, 6) {
   QMAKE_LFLAGS += -ENTRY:mainCRTStartup
 }
  #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
- INCLUDEPATH += 'I:/Hybrid/64bit/VapourSynth/sdk/include/'
+ INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/'
 
  #DEPLOY_COMMAND = windeployqt
  #DEPLOY_TARGET = $$shell_quote($$shell_path($${D}/$${TARGET}.exe))

@@ -530,185 +530,152 @@ void VapourSynthScriptProcessor::sendFrameQueueChangeSignal()
 // END OF void VapourSynthScriptProcessor::sendFrameQueueChangeSignal()
 //==============================================================================
 
-bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
+bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair &a_nodePair)
 {
-  if(!a_nodePair.pOutputNode)
-    return false;
+  if (!a_nodePair.pOutputNode) return false;
 
-  if(!m_cpVSAPI)
-    return false;
+  if (!m_cpVSAPI) return false;
 
-  if(a_nodePair.pPreviewNode)
-  {
+  if (a_nodePair.pPreviewNode) {
     m_cpVSAPI->freeNode(a_nodePair.pPreviewNode);
     a_nodePair.pPreviewNode = nullptr;
   }
 
-  const VSVideoInfo * cpVideoInfo =
-    m_cpVSAPI->getVideoInfo(a_nodePair.pOutputNode);
-  if(!cpVideoInfo)
-    return false;
-  const VSFormat * cpFormat = cpVideoInfo->format;
+  const VSVideoInfo *cpVideoInfo = m_cpVSAPI->getVideoInfo(a_nodePair.pOutputNode);
+  if (!cpVideoInfo) return false;
+  const VSFormat *cpFormat = cpVideoInfo->format;
 
   bool is_10_bits = (QColormap::instance().depth() == 30);
 
-  VSMap * pResultMap = nullptr;
-  VSCore * pCore = m_pVSScriptLibrary->getCore(m_pVSScript);
+  VSMap *pResultMap = nullptr;
+  VSCore *pCore = m_pVSScriptLibrary->getCore(m_pVSScript);
 
-  if (cpFormat->id == pfRGB24)
-  {
+  if (cpFormat->id == pfRGB24) {
     is_10_bits = false;
     pResultMap = m_cpVSAPI->createMap();
-    m_cpVSAPI->propSetNode(pResultMap, "clip", a_nodePair.pOutputNode,
-      paReplace);
+    m_cpVSAPI->propSetNode(pResultMap, "clip", a_nodePair.pOutputNode, paReplace);
   }
-  else if (is_10_bits && cpFormat->id == pfRGB30)
-  {
+  else if (is_10_bits && cpFormat->id == pfRGB30) {
     pResultMap = m_cpVSAPI->createMap();
-    m_cpVSAPI->propSetNode(pResultMap, "clip", a_nodePair.pOutputNode,
-      paReplace);
+    m_cpVSAPI->propSetNode(pResultMap, "clip", a_nodePair.pOutputNode, paReplace);
   }
-  else
-  {
-    bool isYUV = ((cpFormat->colorFamily == cmYUV) ||
-      (cpFormat->id == pfCompatYUY2));
+  else {
+    bool isYUV = ((cpFormat->colorFamily == cmYUV) || (cpFormat->id == pfCompatYUY2));
     bool canSubsample = (isYUV || (cpFormat->colorFamily == cmYCoCg));
 
-    VSPlugin * pResizePlugin = m_cpVSAPI->getPluginById(
-      "com.vapoursynth.resize", pCore);
-    const char * resizeName = "Point";
+    VSPlugin *pResizePlugin = m_cpVSAPI->getPluginById("com.vapoursynth.resize", pCore);
+    const char *resizeName = "Point";
 
-    VSMap * pArgumentMap = m_cpVSAPI->createMap();
-    if (cpFormat->numPlanes == 1) // GRAY
+    VSMap *pArgumentMap = m_cpVSAPI->createMap();
+    if (cpFormat->numPlanes == 1)  // GRAY
     {
-      VSMap * pTempMap = m_cpVSAPI->createMap();
-      m_cpVSAPI->propSetNode(pTempMap, "clip",
-        a_nodePair.pOutputNode, paReplace);
+      VSMap *pTempMap = m_cpVSAPI->createMap();
+      m_cpVSAPI->propSetNode(pTempMap, "clip", a_nodePair.pOutputNode, paReplace);
       grayFramePropCreate(pTempMap, pArgumentMap, pCore, m_cpVSAPI);
       m_cpVSAPI->freeMap(pTempMap);
     }
-    else
-    {
-      m_cpVSAPI->propSetNode(pArgumentMap, "clip",
-        a_nodePair.pOutputNode, paReplace);
+    else {
+      m_cpVSAPI->propSetNode(pArgumentMap, "clip", a_nodePair.pOutputNode, paReplace);
     }
-    m_cpVSAPI->propSetInt(pArgumentMap, "format", (is_10_bits ?
-      pfRGB30 : pfRGB24), paReplace);
+    m_cpVSAPI->propSetInt(pArgumentMap, "format", (is_10_bits ? pfRGB30 : pfRGB24), paReplace);
 
-    const char * dither_type = "error_diffusion";
-    m_cpVSAPI->propSetData(pArgumentMap, "dither_type",
-        dither_type, (int)strlen(dither_type), paReplace);
+    const char *dither_type = "error_diffusion";
+    m_cpVSAPI->propSetData(pArgumentMap, "dither_type", dither_type, (int)strlen(dither_type), paReplace);
 
-    if(canSubsample)
-    {
-      switch(m_chromaResamplingFilter)
-      {
-      case ResamplingFilter::Point:
-        resizeName = "Point";
-        break;
-      case ResamplingFilter::Bilinear:
-        resizeName = "Bilinear";
-        break;
-      case ResamplingFilter::Bicubic:
-        resizeName = "Bicubic";
-        m_cpVSAPI->propSetFloat(pArgumentMap, "filter_param_a_uv",
-          m_resamplingFilterParameterA, paReplace);
-        m_cpVSAPI->propSetFloat(pArgumentMap, "filter_param_b_uv",
-          m_resamplingFilterParameterB, paReplace);
-        break;
-      case ResamplingFilter::Lanczos:
-        resizeName = "Lanczos";
-        m_cpVSAPI->propSetFloat(pArgumentMap, "filter_param_a_uv",
-          m_resamplingFilterParameterA, paReplace);
-        break;
-      case ResamplingFilter::Spline16:
-        resizeName = "Spline16";
-        break;
-      case ResamplingFilter::Spline36:
-        resizeName = "Spline36";
-        break;
-      case ResamplingFilter::Spline64:
-        resizeName = "Spline64";
-      default:
-        Q_ASSERT(false);
+    if (canSubsample) {
+      switch (m_chromaResamplingFilter) {
+        case ResamplingFilter::Point:
+          resizeName = "Point";
+          break;
+        case ResamplingFilter::Bilinear:
+          resizeName = "Bilinear";
+          break;
+        case ResamplingFilter::Bicubic:
+          resizeName = "Bicubic";
+          m_cpVSAPI->propSetFloat(pArgumentMap, "filter_param_a_uv", m_resamplingFilterParameterA, paReplace);
+          m_cpVSAPI->propSetFloat(pArgumentMap, "filter_param_b_uv", m_resamplingFilterParameterB, paReplace);
+          break;
+        case ResamplingFilter::Lanczos:
+          resizeName = "Lanczos";
+          m_cpVSAPI->propSetFloat(pArgumentMap, "filter_param_a_uv", m_resamplingFilterParameterA, paReplace);
+          break;
+        case ResamplingFilter::Spline16:
+          resizeName = "Spline16";
+          break;
+        case ResamplingFilter::Spline36:
+          resizeName = "Spline36";
+          break;
+        case ResamplingFilter::Spline64:
+          resizeName = "Spline64";
+        default:
+          Q_ASSERT(false);
       }
     }
 
-    if(m_cpCoreInfo.core < 58) {
+    if (m_cpCoreInfo.core < 58) {
       m_cpVSAPI->propSetInt(pArgumentMap, "prefer_props", 1, paReplace);
     }
 
-    if(isYUV)
-    {
-      const char * matrixInS = nullptr;
-      switch(m_yuvMatrix)
-      {
-      case YuvMatrixCoefficients::m709:
-        matrixInS = "709";
-        break;
-      case YuvMatrixCoefficients::m470BG:
-        matrixInS = "470bg";
-        break;
-      case YuvMatrixCoefficients::m170M:
-        matrixInS = "170m";
-        break;
-      case YuvMatrixCoefficients::m2020_NCL:
-        matrixInS = "2020ncl";
-        break;
-      case YuvMatrixCoefficients::m2020_CL:
-        matrixInS = "2020cl";
-        break;
-      default:
-        Q_ASSERT(false);
+    if (isYUV) {
+      const char *matrixInS = nullptr;
+      switch (m_yuvMatrix) {
+        case YuvMatrixCoefficients::m709:
+          matrixInS = "709";
+          break;
+        case YuvMatrixCoefficients::m470BG:
+          matrixInS = "470bg";
+          break;
+        case YuvMatrixCoefficients::m170M:
+          matrixInS = "170m";
+          break;
+        case YuvMatrixCoefficients::m2020_NCL:
+          matrixInS = "2020ncl";
+          break;
+        case YuvMatrixCoefficients::m2020_CL:
+          matrixInS = "2020cl";
+          break;
+        default:
+          Q_ASSERT(false);
       }
 
       int matrixStringLength = (int)strlen(matrixInS);
-      m_cpVSAPI->propSetData(pArgumentMap, "matrix_in_s",
-        matrixInS, matrixStringLength, paReplace);
+      m_cpVSAPI->propSetData(pArgumentMap, "matrix_in_s", matrixInS, matrixStringLength, paReplace);
 
-      if(m_yuvMatrix == YuvMatrixCoefficients::m2020_CL)
-      {
-        const char * transferIn = "709";
-        const char * transferOut = "2020_10";
+      if (m_yuvMatrix == YuvMatrixCoefficients::m2020_CL) {
+        const char *transferIn = "709";
+        const char *transferOut = "2020_10";
 
-        m_cpVSAPI->propSetData(pArgumentMap, "transfer_in_s",
-          transferIn, (int)strlen(transferIn), paReplace);
-        m_cpVSAPI->propSetData(pArgumentMap, "transfer_s",
-          transferOut, (int)strlen(transferOut), paReplace);
+        m_cpVSAPI->propSetData(pArgumentMap, "transfer_in_s", transferIn, (int)strlen(transferIn), paReplace);
+        m_cpVSAPI->propSetData(pArgumentMap, "transfer_s", transferOut, (int)strlen(transferOut), paReplace);
       }
     }
 
-    if(canSubsample)
-    {
+    if (canSubsample) {
       int64_t chromaLoc = 0;
-      switch(m_chromaPlacement)
-      {
-      case ChromaPlacement::LEFT:
-        chromaLoc = 0;
-        break;
-      case ChromaPlacement::CENTER:
-        chromaLoc = 1;
-        break;
-      case ChromaPlacement::TOP_LEFT:
-        chromaLoc = 2;
-        break;
-      default:
-        Q_ASSERT(false);
+      switch (m_chromaPlacement) {
+        case ChromaPlacement::LEFT:
+          chromaLoc = 0;
+          break;
+        case ChromaPlacement::CENTER:
+          chromaLoc = 1;
+          break;
+        case ChromaPlacement::TOP_LEFT:
+          chromaLoc = 2;
+          break;
+        default:
+          Q_ASSERT(false);
       }
-      m_cpVSAPI->propSetInt(pArgumentMap, "chromaloc",
-        chromaLoc, paReplace);
+      m_cpVSAPI->propSetInt(pArgumentMap, "chromaloc", chromaLoc, paReplace);
     }
 
     pResultMap = m_cpVSAPI->invoke(pResizePlugin, resizeName, pArgumentMap);
 
     m_cpVSAPI->freeMap(pArgumentMap);
-
   }
 
-  const char * cpResultError = m_cpVSAPI->getError(pResultMap);
+  const char *cpResultError = m_cpVSAPI->getError(pResultMap);
 
-  if(cpResultError)
-  {
+  if (cpResultError) {
     m_error = tr("Failed to convert to RGB:\n");
     m_error += cpResultError;
     emit signalWriteLogMessage(mtCritical, m_error);
@@ -716,15 +683,13 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
     return false;
   }
 
-  VSMap * pPackedMap = m_cpVSAPI->createMap();
+  VSMap *pPackedMap = m_cpVSAPI->createMap();
 
-  is_10_bits ?
-    packCreateRGB30(pResultMap, pPackedMap, pCore, m_cpVSAPI):
-    packCreateRGB24(pResultMap, pPackedMap, pCore, m_cpVSAPI);
+  is_10_bits ? packCreateRGB30(pResultMap, pPackedMap, pCore, m_cpVSAPI) : packCreateRGB24(pResultMap, pPackedMap, pCore, m_cpVSAPI);
 
   m_cpVSAPI->freeMap(pResultMap);
 
-  VSNodeRef * pPreviewNode = m_cpVSAPI->propGetNode(pPackedMap, "clip", 0, nullptr);
+  VSNodeRef *pPreviewNode = m_cpVSAPI->propGetNode(pPackedMap, "clip", 0, nullptr);
   Q_ASSERT(pPreviewNode);
   a_nodePair.pPreviewNode = pPreviewNode;
 
