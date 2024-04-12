@@ -182,6 +182,8 @@ protected:
 
   void saveGeometryDelayed();
 
+  std::array<double, 3> rgb_to_hsv(double r, double g, double b) const;
+
   Ui::PreviewDialog m_ui;
 
   PreviewAdvancedSettingsDialog * m_pAdvancedSettingsDialog;

@@ -1062,13 +1062,54 @@ void PreviewDialog::slotPreviewAreaMouseRightButtonReleased()
 // END OF void PreviewDialog::slotPreviewAreaMouseRightButtonReleased()
 //==============================================================================
 
+std::array<double, 3> PreviewDialog::rgb_to_hsv(double r, double g, double b) const
+{
+  // R, G, B values are divided by 255
+  // to change the range from 0..255 to 0..1
+  r = r / 255.0;
+  g = g / 255.0;
+  b = b / 255.0;
+
+  // h, s, v = hue, saturation, value
+  double cmax = qMax(r, qMax(g, b));  // maximum of r, g, b
+  double cmin = qMin(r, qMin(g, b));  // minimum of r, g, b
+  double diff = cmax - cmin;          // diff of cmax and cmin.
+  double h = -1, s = -1;
+
+  // if cmax and cmax are equal then h = 0
+  if (cmax == cmin) h = 0;
+
+  // if cmax equal r then compute h
+  else if (cmax == r)
+    h = fmod(60 * ((g - b) / diff) + 360, 360);
+
+  // if cmax equal g then compute h
+  else if (cmax == g)
+    h = fmod(60 * ((b - r) / diff) + 120, 360);
+
+  // if cmax equal b then compute h
+  else if (cmax == b)
+    h = fmod(60 * ((r - g) / diff) + 240, 360);
+
+  // if cmax equal zero
+  if (cmax == 0)
+    s = 0;
+  else
+    s = (diff / cmax) * 100;
+
+  // compute v
+  double v = cmax * 100;
+  std::array<double, 3> hsv;
+  hsv[0] = h;
+  hsv[1] = s;
+  hsv[2] = v;
+  return hsv;
+}
 void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
 {
-  if(!m_cpFrameRef)
-    return;
+  if (!m_cpFrameRef) return;
 
-  if(!m_pStatusBarWidget->colorPickerVisible())
-    return;
+  if (!m_pStatusBarWidget->colorPickerVisible()) return;
 
   double value1 = 0.0;
   double value2 = 0.0;
@@ -1083,44 +1124,38 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
 
   int width = m_cpVSAPI->getFrameWidth(m_cpFrameRef, 0);
   int height = m_cpVSAPI->getFrameHeight(m_cpFrameRef, 0);
-  const VSFormat * cpFormat = m_cpVSAPI->getFrameFormat(m_cpFrameRef);
+  const VSFormat *cpFormat = m_cpVSAPI->getFrameFormat(m_cpFrameRef);
 
-  if((frameX >= (size_t)width) || (frameY >= (size_t)height))
-    return;
+  if ((frameX >= (size_t)width) || (frameY >= (size_t)height)) return;
 
-  if(cpFormat->id == pfCompatBGR32)
-  {
-    const uint8_t * cpData = m_cpVSAPI->getReadPtr(m_cpFrameRef, 0);
+  if (cpFormat->id == pfCompatBGR32) {
+    const uint8_t *cpData = m_cpVSAPI->getReadPtr(m_cpFrameRef, 0);
     int stride = m_cpVSAPI->getStride(m_cpFrameRef, 0);
-    const uint32_t * cpLine = (const uint32_t *)(cpData + (height - 1 - frameY) * stride);
+    const uint32_t *cpLine = (const uint32_t *)(cpData + (height - 1 - frameY) * stride);
     uint32_t packedValue = cpLine[frameX];
     value3 = (double)(packedValue & 0xFF);
     value2 = (double)((packedValue >> 8) & 0xFF);
     value1 = (double)((packedValue >> 16) & 0xFF);
   }
-  else if(cpFormat->id == pfCompatYUY2)
-  {
+  else if (cpFormat->id == pfCompatYUY2) {
     size_t x = frameX >> 1;
     size_t rem = frameX & 0x1;
-    const uint8_t * cpData = m_cpVSAPI->getReadPtr(m_cpFrameRef, 0);
+    const uint8_t *cpData = m_cpVSAPI->getReadPtr(m_cpFrameRef, 0);
     int stride = m_cpVSAPI->getStride(m_cpFrameRef, 0);
-    const uint32_t * cpLine = (const uint32_t *)(cpData + frameY * stride);
+    const uint32_t *cpLine = (const uint32_t *)(cpData + frameY * stride);
     uint32_t packedValue = cpLine[x];
 
-    if(rem == 0)
+    if (rem == 0)
       value1 = (double)(packedValue & 0xFF);
     else
       value1 = (double)((packedValue >> 16) & 0xFF);
     value2 = (double)((packedValue >> 8) & 0xFF);
     value3 = (double)((packedValue >> 24) & 0xFF);
   }
-  else
-  {
+  else {
     value1 = valueAtPoint(frameX, frameY, 0);
-    if(cpFormat->numPlanes > 1)
-      value2 = valueAtPoint(frameX, frameY, 1);
-    if(cpFormat->numPlanes > 2)
-      value3 = valueAtPoint(frameX, frameY, 2);
+    if (cpFormat->numPlanes > 1) value2 = valueAtPoint(frameX, frameY, 1);
+    if (cpFormat->numPlanes > 2) value3 = valueAtPoint(frameX, frameY, 2);
   }
 
   previewValueAtPoint(frameX, frameY, preview_values);
@@ -1132,20 +1167,17 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
   int colorFamily = m_cpVideoInfo->format->colorFamily;
   int formatID = m_cpVideoInfo->format->id;
 
-  if((colorFamily == cmYUV) || (formatID == pfCompatYUY2))
-  {
+  if ((colorFamily == cmYUV) || (formatID == pfCompatYUY2)) {
     l1 = "Y";
     l2 = "U";
     l3 = "V";
   }
-  else if((colorFamily == cmRGB) || (formatID == pfCompatBGR32))
-  {
+  else if ((colorFamily == cmRGB) || (formatID == pfCompatBGR32)) {
     l1 = "R";
     l2 = "G";
     l3 = "B";
   }
-  else if(colorFamily == cmYCoCg)
-  {
+  else if (colorFamily == cmYCoCg) {
     l1 = "Y";
     l2 = "Co";
     l3 = "Cg";
@@ -1153,22 +1185,21 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
 
   QString colorString;
 
-  if(colorFamily == cmGray)
+  if (colorFamily == cmGray)
     colorString = QString("Video: G:%1").arg(value1);
-  else
-  {
-    colorString = QString("Video: %1:%2|%3:%4|%5:%6")
-      .arg(l1).arg(value1).arg(l2).arg(value2).arg(l3).arg(value3);
+  else {
+    colorString = QString("Video: %1:%2|%3:%4|%5:%6").arg(l1).arg(value1).arg(l2).arg(value2).arg(l3).arg(value3);
   }
 
-  QString coordString = QString("    Position: X:%1|Y:%2")
-    .arg(frameX).arg(frameY);
+  QString coordString = QString("    Position: X:%1|Y:%2").arg(frameX).arg(frameY);
 
-  QString dispString = QString("    Display: R:%1|G:%2|B:%3")
-    .arg(preview_values[0]).arg(preview_values[1]).arg(preview_values[2]);
+  QString dispString = QString("    Display: R:%1|G:%2|B:%3").arg(preview_values[0]).arg(preview_values[1]).arg(preview_values[2]);
+  std::array<double, 3> hsv;
+  hsv = this->rgb_to_hsv(preview_values[0] * 1.0, preview_values[1] * 1.0, preview_values[2] * 1.0);
+  qApp->processEvents();
+  QString hsvString = QString("    H:%1|S:%2|V:%3").arg(hsv[0]).arg(hsv[1]).arg(hsv[2]);
 
-  m_pStatusBarWidget->setColorPickerString(colorString + coordString +
-    dispString);
+  m_pStatusBarWidget->setColorPickerString(colorString + coordString + dispString + hsvString);
 }
 
 // END OF void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX,
@@ -1177,10 +1208,9 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
 
 void PreviewDialog::slotFrameToClipboard()
 {
-  if(m_framePixmap.isNull())
-    return;
+  if (m_framePixmap.isNull()) return;
 
-  QClipboard * pClipboard = QApplication::clipboard();
+  QClipboard *pClipboard = QApplication::clipboard();
   pClipboard->setPixmap(m_framePixmap);
 }
 
@@ -1190,8 +1220,7 @@ void PreviewDialog::slotFrameToClipboard()
 void PreviewDialog::slotAdvancedSettingsChanged()
 {
   m_pVapourSynthScriptProcessor->slotResetSettings();
-  if(!m_playing)
-    requestShowFrame(m_frameExpected);
+  if (!m_playing) requestShowFrame(m_frameExpected);
 }
 
 // END OF void PreviewDialog::slotAdvancedSettingsChanged()
@@ -1210,22 +1239,18 @@ void PreviewDialog::slotSetPlayFPSLimit()
 {
   double limit = m_ui.playFpsLimitSpinBox->value();
 
-  PlayFPSLimitMode mode =
-    (PlayFPSLimitMode)m_ui.playFpsLimitModeComboBox->currentData().toInt();
-  if(mode == PlayFPSLimitMode::NoLimit)
+  PlayFPSLimitMode mode = (PlayFPSLimitMode)m_ui.playFpsLimitModeComboBox->currentData().toInt();
+  if (mode == PlayFPSLimitMode::NoLimit)
     m_secondsBetweenFrames = 0.0;
-  else if(mode == PlayFPSLimitMode::Custom)
+  else if (mode == PlayFPSLimitMode::Custom)
     m_secondsBetweenFrames = 1.0 / limit;
-  else if(mode == PlayFPSLimitMode::FromVideo)
-  {
-    if(!m_cpVideoInfo)
+  else if (mode == PlayFPSLimitMode::FromVideo) {
+    if (!m_cpVideoInfo)
       m_secondsBetweenFrames = 0.0;
-    else if(m_cpVideoInfo->fpsNum == 0ll)
+    else if (m_cpVideoInfo->fpsNum == 0ll)
       m_secondsBetweenFrames = 0.0;
-    else
-    {
-      m_secondsBetweenFrames =
-        (double)m_cpVideoInfo->fpsDen / (double)m_cpVideoInfo->fpsNum;
+    else {
+      m_secondsBetweenFrames = (double)m_cpVideoInfo->fpsDen / (double)m_cpVideoInfo->fpsNum;
     }
   }
   else
@@ -1240,20 +1265,17 @@ void PreviewDialog::slotSetPlayFPSLimit()
 
 void PreviewDialog::slotPlay(bool a_play)
 {
-  if(m_playing == a_play)
-    return;
+  if (m_playing == a_play) return;
 
   m_playing = a_play;
   m_pActionPlay->setChecked(m_playing);
 
-  if(m_playing)
-  {
+  if (m_playing) {
     m_pActionPlay->setIcon(m_iconPause);
     m_lastFrameRequestedForPlay = m_frameShown;
     slotProcessPlayQueue();
   }
-  else
-  {
+  else {
     clearFramesCache();
     m_pVapourSynthScriptProcessor->flushFrameTicketsQueue();
     m_pActionPlay->setIcon(m_iconPlay);
@@ -1265,30 +1287,23 @@ void PreviewDialog::slotPlay(bool a_play)
 
 void PreviewDialog::slotProcessPlayQueue()
 {
-  if(!m_playing)
-    return;
+  if (!m_playing) return;
 
-  if(m_processingPlayQueue)
-    return;
+  if (m_processingPlayQueue) return;
   m_processingPlayQueue = true;
 
   int nextFrame = (m_frameShown + 1) % m_cpVideoInfo->numFrames;
   Frame referenceFrame(nextFrame, 0, nullptr);
 
-  while(!m_framesCache.empty())
-  {
-    std::list<Frame>::const_iterator it =
-      std::find(m_framesCache.begin(), m_framesCache.end(),
-      referenceFrame);
+  while (!m_framesCache.empty()) {
+    std::list<Frame>::const_iterator it = std::find(m_framesCache.begin(), m_framesCache.end(), referenceFrame);
 
-    if(it == m_framesCache.end())
-      break;
+    if (it == m_framesCache.end()) break;
 
     hr_time_point now = hr_clock::now();
     double passed = duration_to_double(now - m_lastFrameShowTime);
     double secondsToNextFrame = m_secondsBetweenFrames - passed;
-    if(secondsToNextFrame > 0)
-    {
+    if (secondsToNextFrame > 0) {
       int millisecondsToNextFrame = std::ceil(secondsToNextFrame * 1000);
       m_pPlayTimer->start(millisecondsToNextFrame);
       break;
@@ -1306,12 +1321,9 @@ void PreviewDialog::slotProcessPlayQueue()
     referenceFrame.number = nextFrame;
   }
 
-  nextFrame = (m_lastFrameRequestedForPlay + 1) %
-    m_cpVideoInfo->numFrames;
+  nextFrame = (m_lastFrameRequestedForPlay + 1) % m_cpVideoInfo->numFrames;
 
-  while(((m_framesInQueue + m_framesInProcess) < m_maxThreads) &&
-    (m_framesCache.size() <= m_cachedFramesLimit))
-  {
+  while (((m_framesInQueue + m_framesInProcess) < m_maxThreads) && (m_framesCache.size() <= m_cachedFramesLimit)) {
     m_pVapourSynthScriptProcessor->requestFrameAsync(nextFrame, 0, true);
     m_lastFrameRequestedForPlay = nextFrame;
     nextFrame = (nextFrame + 1) % m_cpVideoInfo->numFrames;
@@ -1325,28 +1337,21 @@ void PreviewDialog::slotProcessPlayQueue()
 
 void PreviewDialog::slotLoadChapters()
 {
-  if(m_playing)
-    return;
+  if (m_playing) return;
 
   const QString lastUsedPath = m_pSettingsManager->getLastUsedPath();
-  const QString filePath = QFileDialog::getOpenFileName(this,
-    tr("Load chapters"), lastUsedPath,
-    tr("Chapters file (*.txt;*.xml);;All files (*)"));
+  const QString filePath
+    = QFileDialog::getOpenFileName(this, tr("Load chapters"), lastUsedPath, tr("Chapters file (*.txt;*.xml);;All files (*)"));
   QFile chaptersFile(filePath);
-  if(!chaptersFile.open(QIODevice::ReadOnly | QIODevice::Text))
-    return;
+  if (!chaptersFile.open(QIODevice::ReadOnly | QIODevice::Text)) return;
 
-  const VSVideoInfo * cpVideoInfo =
-    m_pVapourSynthScriptProcessor->videoInfo();
-  if (cpVideoInfo->fpsDen == 0)
-  {
-    QString infoString = tr(
-      "Warning: Load chapters requires clip having constant frame rate. Skipped");
+  const VSVideoInfo *cpVideoInfo = m_pVapourSynthScriptProcessor->videoInfo();
+  if (cpVideoInfo->fpsDen == 0) {
+    QString infoString = tr("Warning: Load chapters requires clip having constant frame rate. Skipped");
     emit signalWriteLogMessage(mtWarning, infoString);
     return;
   }
-  const double fps = (double)cpVideoInfo->fpsNum /
-    (double)cpVideoInfo->fpsDen;
+  const double fps = (double)cpVideoInfo->fpsNum / (double)cpVideoInfo->fpsDen;
 #if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   static const QRegExp regExp(R"((\d{2}):(\d{2}):(\d{2})[\.:](\d{3})?)");
   while(!chaptersFile.atEnd())
