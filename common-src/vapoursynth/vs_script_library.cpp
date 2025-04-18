@@ -198,7 +198,7 @@ bool VSScriptLibrary::initLibrary()
 #ifdef Q_OS_WIN
     "vsscript"
 #else
-    "vapoursynth-script"
+    "libvapoursynth-script"
 #endif // Q_OS_WIN
   );
   QString libraryFullPath;
@@ -250,7 +250,13 @@ bool VSScriptLibrary::initLibrary()
         break;
     }
   }
-
+#ifdef Q_OS_MAC
+  if (!loaded) {
+    m_vsScriptLibrary.unload();
+    m_vsScriptLibrary.setFileName("/opt/homebrew/lib/libvapoursynth-script.dylib");
+    loaded = m_vsScriptLibrary.load();
+  }
+#endif
   if(!loaded)
   {
     emit signalWriteLogMessage(mtCritical, "Failed to load vapoursynth script library!\n"
