@@ -111,7 +111,7 @@ lessThan(QT_MAJOR_VERSION, 6) {
   QMAKE_LFLAGS += -ENTRY:mainCRTStartup
 }
  #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
- INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/'
+ INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/vapoursynth'
 
  #DEPLOY_COMMAND = windeployqt
  #DEPLOY_TARGET = $$shell_quote($$shell_path($${D}/$${TARGET}.exe))

@@ -48,7 +48,7 @@ void LocalSocketIpcClient::socket_connected()
   QByteArray block;
   QDataStream out(&block, QIODevice::WriteOnly);
   out.setVersion(QDataStream::Qt_5_5);
-  out << m_message;
+  out << m_message.toUtf8();
   out.device()->seek(0);
   m_message = QString();
   m_socket->write(block);

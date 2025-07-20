@@ -73,8 +73,8 @@ void LocalSocketIpcServer::socket_readReady()
     while (m_clientConnection != nullptr && m_clientConnection->bytesAvailable() >= int(sizeof(quint16))) {
       QByteArray message;
       in >> message;
-      emit signalWriteLogMessage(0, "[VSE Server] - Message received: " + message);
-      emit messageReceived(message);
+      emit signalWriteLogMessage(0, "[VSE Server] - Message received: " + QString::fromUtf8(message));
+      emit messageReceived(QString::fromUtf8(message));
     }
   } catch (...) {
     std::cout << "[VSE Server]: Problem with client connection,..." << std::endl;
