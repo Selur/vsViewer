@@ -131,6 +131,7 @@ lessThan(QT_MAJOR_VERSION, 6) {
 }
 
 contains(QMAKE_COMPILER, clang) {
+ INCLUDEPATH += /opt/homebrew/include/vapoursynth
  QMAKE_CXXFLAGS += -stdlib=libc++
 }
 
