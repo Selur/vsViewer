@@ -444,7 +444,8 @@ void ScriptEditor::slotHome(bool a_select)
   int blockLength = firstBlock.text().length();
   if(blockLength == 0)
     return;
-  int position = firstBlock.position();
+  int blockStart = firstBlock.position();
+  int position = blockStart;
   int endPosition = cursor.selectionEnd();
   for(int i = 0; i < blockLength; ++i)
   {
@@ -453,7 +454,10 @@ void ScriptEditor::slotHome(bool a_select)
       break;
     position++;
   }
-  cursor.setPosition(position);
+  if(position == cursor.position())
+    cursor.setPosition(blockStart);
+  else
+    cursor.setPosition(position);
   if(a_select)
     cursor.setPosition(endPosition, QTextCursor::KeepAnchor);
   setTextCursor(cursor);
