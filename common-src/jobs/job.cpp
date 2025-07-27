@@ -693,6 +693,12 @@ void vsedit::Job::abort()
   if(!isActive())
     return;
 
+  if(m_process.state() != QProcess::Running){
+    cleanUpEncoding();
+    changeStateAndNotify(JobState::Aborted);
+    return;
+  }
+
   changeStateAndNotify(JobState::Aborting);
   if(m_properties.type == JobType::EncodeScriptCLI)
   {
@@ -1260,7 +1266,7 @@ void vsedit::Job::fillVariables()
 
 void vsedit::Job::changeStateAndNotify(JobState a_state)
 {
-  if(m_properties.jobState == a_state)
+  if(m_properties.jobState == a_state && a_state != JobState::Aborted)
     return;
 
   JobState oldState = m_properties.jobState;

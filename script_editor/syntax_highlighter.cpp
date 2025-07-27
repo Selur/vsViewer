@@ -62,12 +62,12 @@ SyntaxHighlighter::SyntaxHighlighter(QTextDocument * a_pDocument,
 	, m_vsFunctionFormat()
 	, m_vsArgumentFormat()
 {
-	m_keywordsList << "False" << "None" << "True" << "and" << "as" <<
-		"assert" << "break" << "class" << "continue" << "def" << "del" <<
-		"elif" << "else" << "except" << "finally" << "for" << "from" <<
-		"global" << "if" << "import" << "in" << "is" << "lambda" <<
-		"nonlocal" << "not" << "or" << "pass" << "raise" << "return" <<
-		"try" << "while" << "with" << "yield";
+    m_keywordsList << "False" << "None" << "True" << "and" << "as" <<
+        "assert" << "break" << "case" << "class" << "continue" << "def" <<
+        "del" << "elif" << "else" << "except" << "finally" << "for" <<
+        "from" << "global" << "if" << "import" << "in" << "is" << "lambda" <<
+        "match" << "nonlocal" << "not" << "or" << "pass" << "raise" <<
+        "return" << "try" << "while" << "with" << "yield";
 
 	// MUST be sorted by length in descending order.
 	m_operatorsList << "//=" << ">>=" << "<<=" << "**=" << "**" << "//" <<
