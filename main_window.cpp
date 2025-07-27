@@ -211,9 +211,8 @@ void MainWindow::slotWriteLogMessage(const QString & a_message,
 {
   m_ui.logView->addEntry(a_message, a_style);
 
-  if (m_ipcClient != nullptr) {
-    m_ipcClient->send_MessageToServer(a_message);
-  }
+  if (m_ipcClient != nullptr) m_ipcClient->send_MessageToServer(a_message);
+
   QString fatalTypes[] = {LOG_STYLE_VS_FATAL, LOG_STYLE_QT_FATAL};
   if(!vsedit::contains(fatalTypes, a_style))
     return;
@@ -229,6 +228,8 @@ void MainWindow::slotWriteLogMessage(const QString & a_message,
     QStandardPaths::writableLocation(QStandardPaths::TempLocation);
   if(tempPath.isEmpty())
   {
+    if (m_ipcClient != nullptr) m_ipcClient->send_MessageToServer(fullMessage);
+
     QMessageBox::critical(nullptr, caption, fullMessage);
     return;
   }
@@ -240,6 +241,8 @@ void MainWindow::slotWriteLogMessage(const QString & a_message,
   bool saved = m_ui.logView->saveHtml(filePath);
   if(!saved)
   {
+    if (m_ipcClient != nullptr) m_ipcClient->send_MessageToServer(fullMessage);
+
     QMessageBox::critical(nullptr, caption, fullMessage);
     return;
   }
