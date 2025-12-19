@@ -9,10 +9,10 @@
 //==============================================================================
 
 void VS_CC vsMessageHandler(int a_msgType, const char * a_message,
-  void * a_pUserData)
+                            void * a_pUserData)
 {
   VSScriptLibrary * pVSScriptLibrary =
-    static_cast<VSScriptLibrary *>(a_pUserData);
+    reinterpret_cast<VSScriptLibrary *>(a_pUserData);
   pVSScriptLibrary->handleVSMessage(a_msgType, a_message);
 }
 
@@ -21,13 +21,17 @@ void VS_CC vsMessageHandler(int a_msgType, const char * a_message,
 //==============================================================================
 
 VSScriptLibrary::VSScriptLibrary(SettingsManagerCore * a_pSettingsManager,
-  QObject * a_pParent):
-  QObject(a_pParent)
-  , m_pSettingsManager(a_pSettingsManager)
-  , m_vsScriptLibrary(this)
-  , m_vsScriptInitialized(false)
-  , m_initialized(false)
-  , m_cpVSAPI(nullptr)
+                                 QObject * a_pParent):
+                                                       QObject(a_pParent)
+                                                       , m_pSettingsManager(a_pSettingsManager)
+                                                       , m_vsScriptLibrary(this)
+                                                       , m_initialized(false)
+                                                       , m_cpVSSAPI(nullptr)
+                                                       , m_cpVSAPI(nullptr)
+                                                       , m_VSAPIMajor(VSE_VS_API_VER_MAJOR)
+                                                       , m_VSAPIMinor(VSE_VS_API_VER_MINOR)
+                                                       , m_VSSAPIMajor(VSE_VSS_API_VER_MAJOR)
+                                                       , m_VSSAPIMinor(VSE_VSS_API_VER_MINOR)
 {
   Q_ASSERT(m_pSettingsManager);
 }
@@ -38,6 +42,7 @@ VSScriptLibrary::VSScriptLibrary(SettingsManagerCore * a_pSettingsManager,
 
 VSScriptLibrary::~VSScriptLibrary()
 {
+  m_VSCoreLogHandles.clear();
   finalize();
 }
 
@@ -48,20 +53,19 @@ bool VSScriptLibrary::initialize()
 {
   if(m_initialized)
     return true;
+
   bool libraryInitialized = initLibrary();
   if(!libraryInitialized)
     return false;
-  int opresult = vssInit();
-  if(!opresult)
-  {
-    QString errorString = tr("Failed to initialize VapourSynth environment!");
-    emit signalWriteLogMessage(mtCritical, errorString);
-    finalize();
-    return false;
-  }
-  m_vsScriptInitialized = true;
 
-  m_cpVSAPI = vssGetVSApi();
+  for(; m_VSAPIMinor >= 0; --m_VSAPIMinor)
+  {
+    int apiVer = VS_MAKE_VERSION(m_VSAPIMajor, m_VSAPIMinor);
+    m_cpVSAPI = m_cpVSSAPI->getVSAPI(apiVer);
+    if(m_cpVSAPI)
+      break;
+  }
+
   if(!m_cpVSAPI)
   {
     QString errorString = tr("Failed to get VapourSynth API!");
@@ -69,9 +73,6 @@ bool VSScriptLibrary::initialize()
     finalize();
     return false;
   }
-
-  m_cpVSAPI->addMessageHandler(::vsMessageHandler, nullptr,
-    static_cast<void *>(this));
 
   m_initialized = true;
 
@@ -84,12 +85,6 @@ bool VSScriptLibrary::initialize()
 bool VSScriptLibrary::finalize()
 {
   m_cpVSAPI = nullptr;
-
-  if(m_vsScriptInitialized)
-  {
-    vssFinalize();
-    m_vsScriptInitialized = false;
-  }
 
   freeLibrary();
   m_initialized = false;
@@ -119,18 +114,34 @@ const VSAPI * VSScriptLibrary::getVSAPI()
 // END OF const VSAPI * VSScriptLibrary::getVSAPI()
 //==============================================================================
 
-int VSScriptLibrary::evaluateScript(VSScript ** a_ppScript,
-  const char * a_scriptText, const char * a_scriptFilename, int a_flags)
+VSScript * VSScriptLibrary::createScript(VSCore * a_pCore)
 {
+  if(!initialize())
+    return nullptr;
+
+  VSScript * pScript = m_cpVSSAPI->createScript(a_pCore);
+  if(pScript)
+    m_cpVSSAPI->evalSetWorkingDir(pScript, 1);
+
+  return pScript;
+}
+
+// END OF VSScript * VSScriptLibrary::createScript()
+//==============================================================================
+
+int VSScriptLibrary::evaluateScript(VSScript * a_pScript,
+                                    const char * a_scriptText, const char * a_scriptFilename)
+{
+
   if(!initialize())
     return 1;
 
-  return vssEvaluateScript(a_ppScript, a_scriptText,
-    a_scriptFilename, a_flags);
+  return m_cpVSSAPI->evaluateBuffer(a_pScript, a_scriptText,
+                                    a_scriptFilename);
 }
 
-// END OF int VSScriptLibrary::evaluateScript(VSScript ** a_ppScript,
-//		const char * a_scriptText, const char * a_scriptFilename, int a_flags)
+// END OF int VSScriptLibrary::evaluateScript(VSScript * a_ppScript,
+//		const char * a_scriptText, const char * a_scriptFilename)
 //==============================================================================
 
 const char * VSScriptLibrary::getError(VSScript * a_pScript)
@@ -138,32 +149,61 @@ const char * VSScriptLibrary::getError(VSScript * a_pScript)
   if(!initialize())
     return nullptr;
 
-  return vssGetError(a_pScript);
+  return m_cpVSSAPI->getError(a_pScript);
 }
 
 // END OF const char * VSScriptLibrary::getError(VSScript * a_pScript)
 //==============================================================================
 
-VSCore * VSScriptLibrary::getCore(VSScript * a_pScript)
+VSCore *VSScriptLibrary::createCore(int a_flag)
 {
   if(!initialize())
     return nullptr;
 
-  return vssGetCore(a_pScript);
+  VSCore * pCore = m_cpVSAPI->createCore(a_flag);
+  if(!pCore)
+  {
+    QString errorString = tr("Failed to get VapourSynth Core!");
+    emit signalWriteLogMessage(mtCritical, errorString);
+    finalize();
+    return nullptr;
+  }
+
+  if(m_VSCoreLogHandles.find(pCore) == m_VSCoreLogHandles.end())
+    m_VSCoreLogHandles[pCore] = m_cpVSAPI->addLogHandler(
+      vsMessageHandler, nullptr, this, pCore);
+
+  return pCore;
 }
 
-// END OF VSCore * VSScriptLibrary::getCore(VSScript * a_pScript)
-//==============================================================================
+std::vector<int> VSScriptLibrary::getOutputIndices(VSScript *a_pScript) const
+{
+#if(VSSCRIPT_API_MAJOR == 4) && (VSSCRIPT_API_MINOR >= 2)
+  if(m_initialized && a_pScript && m_VSSAPIMajor == 4 && m_VSSAPIMinor >= 2)
+  {
+    int size = m_cpVSSAPI->getAvailableOutputNodes(a_pScript, 0, nullptr);
+    if(size <= 0)
+      return std::vector<int>();
+    std::vector<int> idx(size);
+    m_cpVSSAPI->getAvailableOutputNodes(a_pScript, size, idx.data());
+    return idx;
+  }
+  else
+    return std::vector<int>();
+#else
+  return std::vector<int>();
+#endif
+}
 
-VSNodeRef * VSScriptLibrary::getOutput(VSScript * a_pScript, int a_index)
+VSNode * VSScriptLibrary::getOutput(VSScript * a_pScript, int a_index)
 {
   if(!initialize())
     return nullptr;
 
-  return vssGetOutput(a_pScript, a_index);
+  return m_cpVSSAPI->getOutputNode(a_pScript, a_index);
 }
 
-// END OF VSNodeRef * VSScriptLibrary::getOutput(VSScript * a_pScript,
+// END OF VSNode * VSScriptLibrary::getOutput(VSScript * a_pScript,
 //		int a_index)
 //==============================================================================
 
@@ -172,9 +212,38 @@ bool VSScriptLibrary::freeScript(VSScript * a_pScript)
   if(!initialize())
     return false;
 
-  vssFreeScript(a_pScript);
+  m_cpVSSAPI->freeScript(a_pScript);
 
   return true;
+}
+
+bool VSScriptLibrary::clearCoreCaches(VSCore * a_pCore)
+{
+#if(VAPOURSYNTH_API_MAJOR == 4) && (VAPOURSYNTH_API_MINOR >= 1)
+  if(m_VSAPIMajor == 4 && m_VSAPIMinor >= 1)
+  {
+    if(!m_initialized)
+      return false;
+
+    m_cpVSAPI->clearCoreCaches(a_pCore);
+    return true;
+  }
+#endif
+  return false;
+}
+
+QString VSScriptLibrary::VSAPIInfo()
+{
+  if(!m_initialized)
+    return QString();
+  return QString("R%1.%2").arg(m_VSAPIMajor).arg(m_VSAPIMinor);
+}
+
+QString VSScriptLibrary::VSSAPIInfo()
+{
+  if(!m_initialized)
+    return QString();
+  return QString("R%1.%2").arg(m_VSSAPIMajor).arg(m_VSSAPIMinor);
 }
 
 // END OF bool VSScriptLibrary::freeScript(VSScript * a_pScript)
@@ -184,112 +253,117 @@ bool VSScriptLibrary::initLibrary()
 {
   if(m_vsScriptLibrary.isLoaded())
   {
-    Q_ASSERT(vssInit);
-    Q_ASSERT(vssGetVSApi);
-    Q_ASSERT(vssEvaluateScript);
-    Q_ASSERT(vssGetError);
-    Q_ASSERT(vssGetCore);
-    Q_ASSERT(vssGetOutput);
-    Q_ASSERT(vssFreeScript);
-    Q_ASSERT(vssFinalize);
+    Q_ASSERT(vssGetAPI);
     return true;
   }
+
   QString libraryName(
 #ifdef Q_OS_WIN
     "vsscript"
 #else
-    "libvapoursynth-script"
+    "vapoursynth-script"
 #endif // Q_OS_WIN
-  );
+    );
+
+  QString libraryDir;
   QString libraryFullPath;
-  m_vsScriptLibrary.setFileName(libraryName);
+  bool loaded = false;
   m_vsScriptLibrary.setLoadHints(QLibrary::ExportExternalSymbolsHint);
-  bool loaded = m_vsScriptLibrary.load();
-#ifdef Q_OS_WIN
-  if(!loaded)
+
+  QString path = QString::fromLocal8Bit(qgetenv("PATH"));
+  QString path_backup = path;
+
+  auto set_path = [&]()
   {
+#ifdef Q_OS_WIN
+    path = libraryDir + ";" + path;
+    qputenv("PATH", path.toLocal8Bit());
+#endif
+  };
+
+  auto reset_path = [&]()
+  {
+#ifdef Q_OS_WIN
+    path = path_backup;
+    qputenv("PATH", path.toLocal8Bit());
+#endif
+  };
+
+  auto load_from_registry = [&]()
+  {
+#ifdef Q_OS_WIN
     QSettings settings("HKEY_LOCAL_MACHINE\\SOFTWARE",
-      QSettings::NativeFormat);
-    libraryFullPath = settings.value("VapourSynth/VSScriptDLL").toString();
-    if(libraryFullPath.isEmpty()) {
-      libraryFullPath = settings.value("Wow6432Node/VapourSynth/VSScriptDLL").toString();
-    }
-    if(!libraryFullPath.isEmpty()) {
+                       QSettings::NativeFormat);
+    libraryFullPath =
+      settings.value("VapourSynth/VSScriptDLL").toString();
+
+    if(!libraryFullPath.isEmpty())
+    {
       m_vsScriptLibrary.unload();
       m_vsScriptLibrary.setFileName(libraryFullPath);
       loaded = m_vsScriptLibrary.load();
     }
-  }
-  if(!loaded)
-  {
-    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
-    QString basePath;
-
-#ifdef Q_OS_WIN64
-    basePath = environment.value("ProgramFiles(x86)");
-    libraryFullPath = basePath + "\\VapourSynth\\core64\\vsscript.dll";
-#else
-    basePath = environment.value("ProgramFiles");
-    libraryFullPath = basePath + "\\VapourSynth\\core32\\vsscript.dll";
-#endif // Q_OS_WIN64
-    m_vsScriptLibrary.unload();
-    m_vsScriptLibrary.setFileName(libraryFullPath);
-    loaded = m_vsScriptLibrary.load();
-  }
 #endif // Q_OS_WIN
+  };
 
-  if(!loaded)
+  auto load_from_path = [&]()
   {
-    QStringList librarySearchPaths = m_pSettingsManager->getVapourSynthLibraryPaths();
+    m_vsScriptLibrary.unload();
+    m_vsScriptLibrary.setFileName(libraryName);
+    loaded = m_vsScriptLibrary.load();
+  };
+
+  auto load_from_list = [&]()
+  {
+    QStringList librarySearchPaths =
+      m_pSettingsManager->getVapourSynthLibraryPaths();
     for(const QString & path : librarySearchPaths)
     {
-      libraryFullPath = vsedit::resolvePathFromApplication(path) + QString("/") + libraryName;
-      emit signalWriteLogMessage(0, "searchpath: "+ libraryFullPath);
+      m_vsScriptLibrary.unload();
+      libraryDir = vsedit::resolvePathFromApplication(path);
+      libraryFullPath = libraryDir + QString("/") + libraryName;
+      m_vsScriptLibrary.setFileName(libraryFullPath);
+      set_path();
       loaded = m_vsScriptLibrary.load();
+      reset_path();
       if(loaded)
         break;
     }
+  };
+
+  if(m_pSettingsManager->getPreferVSLibrariesFromList())
+  {
+    if(!loaded) load_from_list();
+    if(!loaded) load_from_registry();
+    if(!loaded) load_from_path();
   }
-#ifdef Q_OS_MAC
-  if (!loaded) {
-    m_vsScriptLibrary.unload();
-    m_vsScriptLibrary.setFileName("/opt/homebrew/lib/libvapoursynth-script.dylib");
-    loaded = m_vsScriptLibrary.load();
+  else
+  {
+    if(!loaded) load_from_registry();
+    if(!loaded) load_from_path();
+    if(!loaded) load_from_list();
   }
-#endif
+
   if(!loaded)
   {
-    emit signalWriteLogMessage(mtCritical, "Failed to load vapoursynth script library!\n"
-      "Please set up the library search paths in settings.");
+    emit signalWriteLogMessage(mtCritical,
+                               "Failed to load vapoursynth script library!\n"
+                               "Please set up the library search paths in settings.");
     return false;
   }
 
   struct Entry
   {
-    QFunctionPointer * ppFunction;
-    const char * name;
-    const char * fallbackName;
+      QFunctionPointer * ppFunction;
+      const char * name;
+      const char * fallbackName;
   };
 
   Entry vssEntries[] =
-  {
-      {(QFunctionPointer *)&vssInit, "vsscript_init",
-      "_vsscript_init@0"}
-    , {(QFunctionPointer *)&vssGetVSApi, "vsscript_getVSApi",
-      "_vsscript_getVSApi@0"}
-    , {(QFunctionPointer *)&vssEvaluateScript, "vsscript_evaluateScript",
-      "_vsscript_evaluateScript@16"}
-    , {(QFunctionPointer *)&vssGetError, "vsscript_getError",
-      "_vsscript_getError@4"}
-    , {(QFunctionPointer *)&vssGetCore, "vsscript_getCore",
-      "_vsscript_getCore@4"}
-    , {(QFunctionPointer *)&vssGetOutput, "vsscript_getOutput",
-      "_vsscript_getOutput@8"}
-    , {(QFunctionPointer *)&vssFreeScript, "vsscript_freeScript",
-      "_vsscript_freeScript@4"}
-    , {(QFunctionPointer *)&vssFinalize, "vsscript_finalize",
-      "_vsscript_finalize@0"}
-  };
+    {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           {(QFunctionPointer *)&vssGetAPI, "getVSScriptAPI",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            "getVSScriptAPI"}
+    };
 
   for(Entry & entry : vssEntries)
   {
@@ -301,12 +375,30 @@ bool VSScriptLibrary::initLibrary()
     }
     if(!*entry.ppFunction)
     {
-      QString errorString = tr("Failed to get entry %1() in vapoursynth script library!").arg(entry.name);
+      QString errorString = tr("Failed to get entry %1() "
+                              "in vapoursynth script library!").arg(entry.name);
       emit signalWriteLogMessage(mtCritical, errorString);
       freeLibrary();
       return false;
     }
   }
+
+  for(; m_VSSAPIMinor >= 1; --m_VSSAPIMinor)
+  {
+    int apiVer = VS_MAKE_VERSION(m_VSSAPIMajor, m_VSSAPIMinor);
+    m_cpVSSAPI = vssGetAPI(apiVer);
+    if(m_cpVSSAPI)
+      break;
+  }
+
+  if(!m_cpVSSAPI)
+  {
+    QString errorStr = tr("Failed to get VSScript API!");
+    emit signalWriteLogMessage(mtCritical, errorStr);
+    freeLibrary();
+    return false;
+  }
+
   return true;
 }
 
@@ -315,14 +407,7 @@ bool VSScriptLibrary::initLibrary()
 
 void VSScriptLibrary::freeLibrary()
 {
-  vssInit = nullptr;
-  vssGetVSApi = nullptr;
-  vssEvaluateScript = nullptr;
-  vssGetError = nullptr;
-  vssGetCore = nullptr;
-  vssGetOutput = nullptr;
-  vssFreeScript = nullptr;
-  vssFinalize = nullptr;
+  vssGetAPI = nullptr;
 
   if(m_vsScriptLibrary.isLoaded())
     m_vsScriptLibrary.unload();
@@ -332,7 +417,7 @@ void VSScriptLibrary::freeLibrary()
 //==============================================================================
 
 void VSScriptLibrary::handleVSMessage(int a_messageType,
-  const QString & a_message)
+                                      const QString & a_message)
 {
   emit signalWriteLogMessage(a_messageType, a_message);
 }

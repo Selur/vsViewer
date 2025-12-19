@@ -13,10 +13,11 @@
 #endif
 #endif
 
+#include <QKeyEvent>
+
 class ScriptBenchmarkDialog : public VSScriptProcessorDialog
 {
   Q_OBJECT
-
 public:
 
   ScriptBenchmarkDialog(SettingsManager * a_pSettingsManager,
@@ -25,7 +26,8 @@ public:
   virtual ~ScriptBenchmarkDialog();
 
   virtual bool initialize(const QString & a_script,
-    const QString & a_scriptName) override;
+                          const QString & a_scriptName,
+                          ProcessReason a_reason = ProcessReason::Benchmark) override;
 
   void resetSavedRange();
 
@@ -39,8 +41,8 @@ protected slots:
     const QString & a_message) override;
 
   virtual void slotReceiveFrame(int a_frameNumber, int a_outputIndex,
-    const VSFrameRef * a_cpOutputFrameRef,
-    const VSFrameRef * a_cpPreviewFrameRef) override;
+    const VSFrame * a_cpOutputFrameRef,
+    const VSFrame * a_cpPreviewFrameRef) override;
 
   virtual void slotFrameRequestDiscarded(int a_frameNumber,
   int a_outputIndex, const QString & a_reason) override;
@@ -56,6 +58,8 @@ protected:
   void stopProcessing();
 
   void updateMetrics();
+
+  void keyPressEvent(QKeyEvent * a_pEvent);
 
   Ui::ScriptBenchmarkDialog m_ui;
 

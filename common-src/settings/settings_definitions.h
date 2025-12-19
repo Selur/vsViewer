@@ -33,34 +33,41 @@ enum class PlayFPSLimitMode
   Custom,
 };
 
+enum class SyncOutputNodesMode
+{
+  Frame,
+  Time,
+  FromTimeLine,
+};
+
 struct StandardAction
 {
-  QString id;
-  QString title;
-  QIcon icon;
-  QKeySequence hotkey;
+    QString id;
+    QString title;
+    QIcon icon;
+    QKeySequence hotkey;
 
-  bool operator==(const StandardAction & a_other) const;
-  bool operator<(const StandardAction & a_other) const;
+    bool operator==(const StandardAction & a_other) const;
+    bool operator<(const StandardAction & a_other) const;
 };
 
 struct CodeSnippet
 {
-  QString name;
-  QString text;
+    QString name;
+    QString text;
 
-  CodeSnippet(const QString & a_name = QString(),
-    const QString & a_text = QString());
-  bool operator==(const CodeSnippet & a_other) const;
-  bool operator<(const CodeSnippet & a_other) const;
-  bool isEmpty() const;
+    CodeSnippet(const QString & a_name = QString(),
+                const QString & a_text = QString());
+    bool operator==(const CodeSnippet & a_other) const;
+    bool operator<(const CodeSnippet & a_other) const;
+    bool isEmpty() const;
 };
 
 struct DropFileCategory
 {
-  QString name;
-  QStringList maskList;
-  QString sourceTemplate;
+    QString name;
+    QStringList maskList;
+    QString sourceTemplate;
 };
 
 //==============================================================================
@@ -89,6 +96,8 @@ extern const bool DEFAULT_USE_SPACES_AS_TAB;
 extern const int DEFAULT_SPACES_IN_TAB;
 extern const bool DEFAULT_REMEMBER_LAST_PREVIEW_FRAME;
 extern const int DEFAULT_LAST_PREVIEW_FRAME;
+extern const qlonglong DEFAULT_LAST_PREVIEW_TIMESTAMP;
+extern const SyncOutputNodesMode DEFAULT_SYNC_OUTPUT_MODE;
 extern const bool DEFAULT_HIGHLIGHT_SELECTION_MATCHES;
 extern const int DEFAULT_HIGHLIGHT_SELECTION_MATCHES_MIN_LENGTH;
 extern const bool DEFAULT_TIMELINE_PANEL_VISIBLE;
@@ -99,7 +108,11 @@ extern const double DEFAULT_TIMELINE_LABELS_HEIGHT;
 extern const char DEFAULT_DROP_FILE_TEMPLATE[];
 extern const int DEFAULT_MAX_WATCHER_CONNECTION_ATTEMPTS;
 extern const int DEFAULT_PNG_COMPRESSION_LEVEL;
-extern const bool DEFAULT_RELOAD_BEFORE_EXECUTION;
+extern const bool DEFAULT_RELOAD_FROM_DISK;
+extern const bool DEFAULT_DEBUG_MESSAGES;
+extern const bool DEFAULT_DARK_MODE;
+extern const bool DEFAULT_SILENT_SNAPSHOT;
+extern const QString DEFAULT_SNAPSHOT_TEMPLATE;
 
 //==============================================================================
 
@@ -114,6 +127,7 @@ extern const char ACTION_ID_CHECK_SCRIPT[];
 extern const char ACTION_ID_BENCHMARK[];
 extern const char ACTION_ID_CLI_ENCODE[];
 extern const char ACTION_ID_ENQUEUE_ENCODE_JOB[];
+extern const char ACTION_ID_TOGGLE_CONSOLE[];
 extern const char ACTION_ID_JOBS[];
 extern const char ACTION_ID_EXIT[];
 extern const char ACTION_ID_ABOUT[];
@@ -152,6 +166,30 @@ extern const char ACTION_ID_MOVE_TEXT_BLOCK_DOWN[];
 extern const char ACTION_ID_TOGGLE_COMMENT[];
 extern const char ACTION_ID_SHUTDOWN_SERVER_AND_EXIT[];
 extern const char ACTION_ID_SET_TRUSTED_CLIENTS_ADDRESSES[];
+extern const char ACTION_ID_JUMP_TO_FRAME[];
+extern const char ACTION_ID_TOGGLE_FRAME_PROPS[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_0[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_1[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_2[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_3[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_4[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_5[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_6[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_7[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_8[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_9[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_10[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_11[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_12[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_13[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_14[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_15[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_16[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_17[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_18[];
+extern const char ACTION_ID_SET_OUTPUT_INDEX_19[];
+extern const char ACTION_ID_PREVIOUS_OUTPUT_INDEX[];
+extern const char ACTION_ID_NEXT_OUTPUT_INDEX[];
 
 //==============================================================================
 

@@ -11,141 +11,140 @@ class QWheelEvent;
 
 class TimeLineSlider : public QWidget
 {
-	Q_OBJECT
+    Q_OBJECT
 
-public:
+  public:
+    TimeLineSlider(QWidget *a_pParent = nullptr);
 
-	TimeLineSlider(QWidget * a_pParent = nullptr);
+    virtual ~TimeLineSlider();
 
-	virtual ~TimeLineSlider();
+    enum DisplayMode
+    {
+      Time,
+      Frames,
+    };
 
-	enum DisplayMode
-	{
-		Time,
-		Frames,
-	};
+    enum ColorRole
+    {
+      SlideLine,
+      ActiveFrame,
+      InactiveFrame,
+      CurrentFramePointer,
+      SlidingPointer,
+      Bookmark,
+    };
 
-	enum ColorRole
-	{
-		SlideLine,
-		ActiveFrame,
-		InactiveFrame,
-		CurrentFramePointer,
-		SlidingPointer,
-		Bookmark,
-	};
+    int frame() const;
 
-	int frame() const;
+    void setFrame(int a_frame, bool a_refreshCache);
 
-	void setFrame(int a_frame);
+    void setFramesNumber(int a_framesNumber, bool a_refreshCache);
 
-	void setFramesNumber(int a_framesNumber);
+    void setFPS(double a_fps);
 
-	void setFPS(double a_fps);
+    DisplayMode displayMode() const;
 
-	DisplayMode displayMode() const;
+    void setDisplayMode(DisplayMode a_displayMode);
 
-	void setDisplayMode(DisplayMode a_displayMode);
+    void setBigStep(int a_bigStep);
 
-	void setBigStep(int a_bigStep);
+    void setLabelsFont(const QFont &a_font);
+    void setColor(ColorRole a_role, const QColor &a_color);
 
-	void setLabelsFont(const QFont & a_font);
-	void setColor(ColorRole a_role, const QColor & a_color);
+    void addBookmark(int a_bookmark);
+    void removeBookmark(int a_bookmark);
+    std::set<int> bookmarks() const;
+    void setBookmarks(const std::set<int> &a_bookmarks);
+    void clearBookmarks();
+    int getClosestBookmark(int a_frame) const;
 
-	void addBookmark(int a_bookmark);
-	void removeBookmark(int a_bookmark);
-	std::set<int> bookmarks() const;
-	void setBookmarks(const std::set<int> & a_bookmarks);
-	void clearBookmarks();
-	int getClosestBookmark(int a_frame) const;
+  public slots:
 
-public slots:
+    void slotStepUp();
+    void slotStepDown();
+    void slotBigStepUp();
+    void slotBigStepDown();
+    void slotStepBy(int a_step);
+    void slotStepBySeconds(double a_seconds);
 
-	void slotStepUp();
-	void slotStepDown();
-	void slotBigStepUp();
-	void slotBigStepDown();
-	void slotStepBy(int a_step);
-	void slotStepBySeconds(double a_seconds);
+    void slotBookmarkCurrentFrame();
+    void slotUnbookmarkCurrentFrame();
+    void slotGoToPreviousBookmark();
+    void slotGoToNextBookmark();
 
-	void slotBookmarkCurrentFrame();
-	void slotUnbookmarkCurrentFrame();
-	void slotGoToPreviousBookmark();
-	void slotGoToNextBookmark();
+  signals:
 
-signals:
+    void signalSliderMoved(int a_frame);
 
-	void signalSliderMoved(int a_frame);
+    void signalFrameChanged(int a_frame, bool a_refreshCache);
 
-	void signalFrameChanged(int a_frame);
+    void signalSliderPressed();
+    void signalSliderReleased();
 
-	void signalSliderPressed();
-	void signalSliderReleased();
+  protected:
+    void keyPressEvent(QKeyEvent *a_pEvent);
 
-protected:
+    void mouseMoveEvent(QMouseEvent *a_pEvent);
 
-	void keyPressEvent(QKeyEvent * a_pEvent);
+    void mousePressEvent(QMouseEvent *a_pEvent);
 
-	void mouseMoveEvent(QMouseEvent * a_pEvent);
+    void mouseReleaseEvent(QMouseEvent *a_pEvent);
 
-	void mousePressEvent(QMouseEvent * a_pEvent);
+    void paintEvent(QPaintEvent *a_pEvent);
 
-	void mouseReleaseEvent(QMouseEvent * a_pEvent);
+    void wheelEvent(QWheelEvent *a_pEvent);
 
-	void paintEvent(QPaintEvent * a_pEvent);
+  private:
+    int slideLineInnerWidth() const;
 
-	void wheelEvent(QWheelEvent * a_pEvent);
+    int frameToPos(int a_frame) const;
 
-private:
+    int posToFrame(int a_pos) const;
 
-	int slideLineInnerWidth() const;
+    QRect slideLineRect() const;
 
-	int frameToPos(int a_frame) const;
+    QRect slideLineActiveRect() const;
 
-	int posToFrame(int a_pos) const;
+    void recalculateMinimumSize();
 
-	QRect slideLineRect() const;
+    void setPointerAtFrame(const QMouseEvent *a_pEvent);
 
-	QRect slideLineActiveRect() const;
+    int m_maxFrame;
+    double m_fps;
 
-	void recalculateMinimumSize();
+    int m_currentFrame;
+    int m_pointerAtFrame;
 
-	void setPointerAtFrame(const QMouseEvent * a_pEvent);
+    DisplayMode m_displayMode;
 
-	int m_maxFrame;
-	double m_fps;
+    int m_bigStep;
 
-	int m_currentFrame;
-	int m_pointerAtFrame;
+    int m_sideMargin;
+    int m_bottomMargin;
+    int m_slideLineHeight;
+    int m_slideLineFrameWidth;
+    int m_slideLineTicksSpacing;
+    int m_shortTickHeight;
+    int m_mediumTickHeight;
+    int m_longTickHeight;
+    int m_tickTextSpacing;
+    int m_textHeight;
+    int m_topMargin;
+    int m_minimumTicksSpacing;
 
-	DisplayMode m_displayMode;
+    bool m_sliderPressed;
 
-	int m_bigStep;
+    QFont m_labelsFont;
+    QColor m_slideLineColor;
+    QColor m_activeFrameColor;
+    QColor m_inactiveFrameColor;
+    QColor m_currentFramePointerColor;
+    QColor m_slidingPointerColor;
+    QColor m_bookmarkColor;
 
-	int m_sideMargin;
-	int m_bottomMargin;
-	int m_slideLineHeight;
-	int m_slideLineFrameWidth;
-	int m_slideLineTicksSpacing;
-	int m_shortTickHeight;
-	int m_mediumTickHeight;
-	int m_longTickHeight;
-	int m_tickTextSpacing;
-	int m_textHeight;
-	int m_topMargin;
-	int m_minimumTicksSpacing;
+    std::map<ColorRole, QColor *> m_colorRoleMap;
 
-	bool m_sliderPressed;
-
-	QFont m_labelsFont;
-	QColor m_slideLineColor;
-	QColor m_activeFrameColor;
-	QColor m_inactiveFrameColor;
-	QColor m_currentFramePointerColor;
-	QColor m_slidingPointerColor;
-	QColor m_bookmarkColor;
-
-	std::set<int> m_bookmarks;
+    std::set<int> m_bookmarks;
 };
 
-#endif // TIMELINESLIDER_H
+#endif  // TIMELINESLIDER_H

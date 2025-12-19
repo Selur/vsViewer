@@ -7,66 +7,64 @@
 #include "common-src/frame_header_writers/frame_header_writer_null.h"
 #include "common-src/frame_header_writers/frame_header_writer_y4m.h"
 #include "job_variables.h"
+#include "job.h"
 
 #include <QFileInfo>
 #include <QFile>
 #include <algorithm>
-#include <VSHelper.h>
+#include <VSHelper4.h>
 
 #ifdef Q_OS_WIN
-  #ifndef NOMINMAX
-    #define NOMINMAX
-  #endif
-  #include <windows.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #else
-  #include <signal.h>
+#include <signal.h>
 #endif
 
 //==============================================================================
 
 vsedit::Job::Job(const JobProperties & a_properties,
-  SettingsManagerCore * a_pSettingsManager,
-  VSScriptLibrary * a_pVSScriptLibrary,
-  QObject * a_pParent) :
-    QObject(a_pParent)
-  , JobVariables()
-  , m_properties(a_properties)
-  , m_lastFrameProcessed(-1)
-  , m_lastFrameRequested(-1)
-  , m_encodingState(EncodingState::Idle)
-  , m_bytesToWrite(0u)
-  , m_bytesWritten(0u)
-  , m_pSettingsManager(a_pSettingsManager)
-  , m_pVSScriptLibrary(a_pVSScriptLibrary)
-  , m_pVapourSynthScriptProcessor(nullptr)
-  , m_cpVSAPI(nullptr)
-  , m_cpVideoInfo(nullptr)
-  , m_pFrameHeaderWriter(nullptr)
-  , m_cachedFramesLimit(100)
-  , m_framesInQueue(0)
-  , m_framesInProcess(0)
-  , m_maxThreads(0)
-  , m_memorizedEncodingTime(0.0)
+                 SettingsManagerCore * a_pSettingsManager,
+                 VSScriptLibrary * a_pVSScriptLibrary,
+                 QObject * a_pParent) :
+                                       QObject(a_pParent)
+                                       , JobVariables()
+                                       , m_properties(a_properties)
+                                       , m_lastFrameProcessed(-1)
+                                       , m_lastFrameRequested(-1)
+                                       , m_encodingState(EncodingState::Idle)
+                                       , m_bytesToWrite(0u)
+                                       , m_bytesWritten(0u)
+                                       , m_pSettingsManager(a_pSettingsManager)
+                                       , m_pVSScriptLibrary(a_pVSScriptLibrary)
+                                       , m_pVapourSynthScriptProcessor(nullptr)
+                                       , m_cpVSAPI(nullptr)
+                                       , m_cpVideoInfo(nullptr)
+                                       , m_pFrameHeaderWriter(nullptr)
+                                       , m_cachedFramesLimit(100)
+                                       , m_framesInQueue(0)
+                                       , m_framesInProcess(0)
+                                       , m_maxThreads(0)
+                                       , m_memorizedEncodingTime(0.0)
 {
   fillVariables();
   if(a_pVSScriptLibrary)
     m_cpVSAPI = m_pVSScriptLibrary->getVSAPI();
 
   connect(&m_process, SIGNAL(started()),
-    this, SLOT(slotProcessStarted()));
+          this, SLOT(slotProcessStarted()));
   connect(&m_process, SIGNAL(finished(int, QProcess::ExitStatus)),
-    this, SLOT(slotProcessFinished(int, QProcess::ExitStatus)));
-#if(QT_VERSION < QT_VERSION_CHECK(5, 15, 6))
-  connect(&m_process, SIGNAL(error(QProcess::ProcessError)), this, SLOT(slotProcessError(QProcess::ProcessError)));
-#else
- connect(&m_process, SIGNAL(errorOccurred(QProcess::ProcessError)), this, SLOT(slotProcessError(QProcess::ProcessError)));
-#endif
+          this, SLOT(slotProcessFinished(int, QProcess::ExitStatus)));
+  connect(&m_process, SIGNAL(errorOccurred(QProcess::ProcessError)),
+          this, SLOT(slotProcessError(QProcess::ProcessError)));
   connect(&m_process, SIGNAL(readChannelFinished()),
-    this, SLOT(slotProcessReadChannelFinished()));
+          this, SLOT(slotProcessReadChannelFinished()));
   connect(&m_process, SIGNAL(bytesWritten(qint64)),
-    this, SLOT(slotProcessBytesWritten(qint64)));
+          this, SLOT(slotProcessBytesWritten(qint64)));
   connect(&m_process, SIGNAL(readyReadStandardError()),
-    this, SLOT(slotProcessReadyReadStandardError()));
+          this, SLOT(slotProcessReadyReadStandardError()));
 }
 
 // END OF vsedit::Job::Job(const JobProperties & a_properties,
@@ -284,19 +282,19 @@ QString vsedit::Job::subject() const
   {
     subjectString = QString("%sn%:\n\"%ep%\" %arg%");
     subjectString = subjectString.replace("%sn%",
-      resolvePathFromApplication(m_properties.scriptName));
+                                          resolvePathFromApplication(m_properties.scriptName));
     subjectString = subjectString.replace("%ep%",
-      resolvePathFromApplication(m_properties.executablePath));
+                                          resolvePathFromApplication(m_properties.executablePath));
     subjectString = subjectString.replace("%arg%",
-      decodeArguments(m_properties.arguments));
+                                          decodeArguments(m_properties.arguments));
   }
   else if(m_properties.type == JobType::RunProcess)
   {
     subjectString = QString("\"%ep%\" %arg%");
     subjectString = subjectString.replace("%ep%",
-      resolvePathFromApplication(m_properties.executablePath));
+                                          resolvePathFromApplication(m_properties.executablePath));
     subjectString = subjectString.replace("%arg%",
-      m_properties.arguments.simplified());
+                                          m_properties.arguments.simplified());
   }
   else if(m_properties.type == JobType::RunShellCommand)
     subjectString = m_properties.shellCommand.simplified();
@@ -337,7 +335,7 @@ bool vsedit::Job::setFirstFrame(int a_frame)
   {
     Q_ASSERT(m_cpVideoInfo);
     m_properties.firstFrameReal = std::min(m_properties.firstFrame,
-      m_cpVideoInfo->numFrames - 1);
+                                           m_cpVideoInfo->numFrames - 1);
   }
   else
     m_properties.firstFrameReal = -1;
@@ -378,7 +376,7 @@ bool vsedit::Job::setLastFrame(int a_frame)
   {
     Q_ASSERT(m_cpVideoInfo);
     m_properties.lastFrameReal = std::min(m_properties.lastFrame,
-      m_cpVideoInfo->numFrames - 1);
+                                          m_cpVideoInfo->numFrames - 1);
   }
   else
     m_properties.lastFrameReal = -1;
@@ -476,7 +474,7 @@ const VSVideoInfo * vsedit::Job::videoInfo() const
     return nullptr;
   if(!m_pVapourSynthScriptProcessor)
     return nullptr;
-  return m_pVapourSynthScriptProcessor->videoInfo();
+  return m_pVapourSynthScriptProcessor->nodeInfo().getAsVideo();
 }
 
 // END OF const VSVideoInfo * vsedit::Job::videoInfo() const
@@ -490,7 +488,7 @@ bool vsedit::Job::initialize()
   if(isActive() && (m_encodingState != EncodingState::Idle))
   {
     emit signalLogMessage(tr("Can not initialize an active job"),
-      LOG_STYLE_ERROR);
+                          LOG_STYLE_ERROR);
     return false;
   }
 
@@ -503,7 +501,7 @@ bool vsedit::Job::initialize()
     if(!opened)
     {
       emit signalLogMessage(tr("Could not open script file \"%1\".")
-        .arg(m_properties.scriptName), LOG_STYLE_ERROR);
+                              .arg(m_properties.scriptName), LOG_STYLE_ERROR);
       changeStateAndNotify(JobState::Failed);
       return false;
     }
@@ -515,7 +513,7 @@ bool vsedit::Job::initialize()
   if((!m_pVSScriptLibrary) || (!m_pSettingsManager))
   {
     emit signalLogMessage(tr("Job is not created properly."),
-      LOG_STYLE_ERROR);
+                          LOG_STYLE_ERROR);
     changeStateAndNotify(JobState::Failed);
     return false;
   }
@@ -528,52 +526,60 @@ bool vsedit::Job::initialize()
     m_pVapourSynthScriptProcessor = new VapourSynthScriptProcessor(
       m_pSettingsManager, m_pVSScriptLibrary, this);
     connect(m_pVapourSynthScriptProcessor,
-      SIGNAL(signalWriteLogMessage(int, const QString &)),
-      this, SLOT(slotWriteLogMessage(int, const QString &)));
+            SIGNAL(signalWriteLogMessage(int, const QString &)),
+            this, SLOT(slotWriteLogMessage(int, const QString &)));
     connect(m_pVapourSynthScriptProcessor,
-      SIGNAL(signalFrameQueueStateChanged(size_t, size_t, size_t)),
-      this, SLOT(slotFrameQueueStateChanged(size_t, size_t, size_t)));
+            SIGNAL(signalFrameQueueStateChanged(size_t, size_t, size_t, double)),
+            this, SLOT(slotFrameQueueStateChanged(size_t, size_t, size_t, double)));
     connect(m_pVapourSynthScriptProcessor, SIGNAL(signalFinalized()),
-      this, SLOT(slotScriptProcessorFinalized()));
+            this, SLOT(slotScriptProcessorFinalized()));
     connect(m_pVapourSynthScriptProcessor,
-      SIGNAL(signalDistributeFrame(int, int, const VSFrameRef *,
-        const VSFrameRef *)),
-      this, SLOT(slotReceiveFrame(int, int, const VSFrameRef *,
-        const VSFrameRef *)));
+            SIGNAL(signalDistributeFrame(int, int, const VSFrame *,
+                                         const VSFrame *)),
+            this, SLOT(slotReceiveFrame(int, int, const VSFrame *,
+                                        const VSFrame *)));
     connect(m_pVapourSynthScriptProcessor,
-      SIGNAL(signalFrameRequestDiscarded(int, int, const QString &)),
-      this, SLOT(slotFrameRequestDiscarded(int, int, const QString &)));
+            SIGNAL(signalFrameRequestDiscarded(int, int, const QString &)),
+            this, SLOT(slotFrameRequestDiscarded(int, int, const QString &)));
     connect(m_pVapourSynthScriptProcessor,
-      SIGNAL(signalFrameQueueStateChanged(size_t, size_t, size_t)),
-      this, SLOT(slotFrameQueueStateChanged(size_t, size_t, size_t)));
+            SIGNAL(signalFrameQueueStateChanged(size_t, size_t, size_t, double)),
+            this, SLOT(slotFrameQueueStateChanged(size_t, size_t, size_t, double)));
   }
 
   if((!m_pVapourSynthScriptProcessor->isInitialized()) ||
-    (m_pVapourSynthScriptProcessor->scriptName() !=
-    m_properties.scriptName) || (m_pVapourSynthScriptProcessor->script() !=
-    m_properties.scriptText))
+      (m_pVapourSynthScriptProcessor->scriptName() !=
+       m_properties.scriptName) || (m_pVapourSynthScriptProcessor->script() !=
+          m_properties.scriptText))
   {
     bool scriptProcessorInitialized =
       m_pVapourSynthScriptProcessor->initialize(
-      m_properties.scriptText, m_properties.scriptName);
+        m_properties.scriptText, m_properties.scriptName, 0,
+        ProcessReason::Encode);
     if(!scriptProcessorInitialized)
     {
       emit signalLogMessage(tr("Failed to initialize script.\n%1")
-        .arg(m_pVapourSynthScriptProcessor->error()), LOG_STYLE_ERROR);
+                              .arg(m_pVapourSynthScriptProcessor->error()), LOG_STYLE_ERROR);
       changeStateAndNotify(JobState::Failed);
       return false;
     }
   }
 
-  m_cpVideoInfo = m_pVapourSynthScriptProcessor->videoInfo();
-  Q_ASSERT(m_cpVideoInfo);
+  VSNodeInfo info = m_pVapourSynthScriptProcessor->nodeInfo();
+  Q_ASSERT(!info.isInvalid());
+  if(info.isAudio())
+  {
+    emit signalLogMessage(tr("Audio encoding is not supported."));
+    changeStateAndNotify(JobState::Failed);
+    return false;
+  }
+  m_cpVideoInfo = info.getAsVideo();
 
   m_properties.framesProcessed = 0;
   m_properties.firstFrameReal = m_properties.firstFrame;
   vsedit::clamp(m_properties.firstFrameReal, 0, m_cpVideoInfo->numFrames - 1);
   m_properties.lastFrameReal = m_properties.lastFrame;
   if((m_properties.lastFrameReal < m_properties.firstFrameReal) ||
-    (m_properties.lastFrameReal >= m_cpVideoInfo->numFrames))
+      (m_properties.lastFrameReal >= m_cpVideoInfo->numFrames))
     m_properties.lastFrameReal = m_cpVideoInfo->numFrames - 1;
   m_lastFrameRequested = m_properties.firstFrameReal - 1;
   m_lastFrameProcessed = m_lastFrameRequested;
@@ -622,14 +628,14 @@ void vsedit::Job::start()
         changeStateAndNotify(JobState::Running);
       else
         emit signalLogMessage(tr("Failed to resume process. "
-          "Error %1.").arg(GetLastError()), LOG_STYLE_ERROR);
+                                 "Error %1.").arg(GetLastError()), LOG_STYLE_ERROR);
 #else
       int error = kill((pid_t)m_process.processId(), SIGCONT);
       if(!error)
         changeStateAndNotify(JobState::Running);
       else
         emit signalLogMessage(tr("Failed to resume process. "
-          "Error %1.").arg(error), LOG_STYLE_ERROR);
+                                 "Error %1.").arg(error), LOG_STYLE_ERROR);
 #endif
     }
   }
@@ -658,8 +664,8 @@ void vsedit::Job::pause()
   if(m_properties.type == JobType::EncodeScriptCLI)
   {
     EncodingState invalidEncodingStates[] = {EncodingState::Idle,
-      EncodingState::EncoderCrashed, EncodingState::Finishing,
-      EncodingState::Aborting};
+                                             EncodingState::EncoderCrashed, EncodingState::Finishing,
+                                             EncodingState::Aborting};
     if(vsedit::contains(invalidEncodingStates, m_encodingState))
       return;
 
@@ -673,14 +679,14 @@ void vsedit::Job::pause()
       changeStateAndNotify(JobState::Paused);
     else
       emit signalLogMessage(tr("Failed to pause process. Error %1.")
-        .arg(GetLastError()), LOG_STYLE_ERROR);
+                              .arg(GetLastError()), LOG_STYLE_ERROR);
 #else
     int error = kill((pid_t)m_process.processId(), SIGSTOP);
     if(!error)
       changeStateAndNotify(JobState::Paused);
     else
       emit signalLogMessage(tr("Failed to pause process. Error %1.")
-        .arg(error), LOG_STYLE_ERROR);
+                              .arg(error), LOG_STYLE_ERROR);
 #endif
   }
 }
@@ -735,7 +741,7 @@ void vsedit::Job::slotProcessStarted()
       m_encodingState = EncodingState::Aborting;
       m_properties.jobState = JobState::Aborting;
       emit signalLogMessage(tr("Can not write to encoder. Aborting."),
-        LOG_STYLE_ERROR);
+                            LOG_STYLE_ERROR);
       cleanUpEncoding();
       return;
     }
@@ -748,7 +754,7 @@ void vsedit::Job::slotProcessStarted()
 
       if(m_properties.encodingHeaderType == EncodingHeaderType::Y4M)
         emit signalLogMessage(tr("Y4M header: ") +
-          QString::fromLatin1(videoHeader), LOG_STYLE_DEBUG);
+                                QString::fromLatin1(videoHeader), LOG_STYLE_DEBUG);
 
       m_bytesToWrite = videoHeader.size();
       if(m_bytesToWrite > 0)
@@ -783,12 +789,12 @@ void vsedit::Job::slotProcessStarted()
 //==============================================================================
 
 void vsedit::Job::slotProcessFinished(int a_exitCode,
-  QProcess::ExitStatus a_exitStatus)
+                                      QProcess::ExitStatus a_exitStatus)
 {
   if(m_properties.type == JobType::EncodeScriptCLI)
   {
     EncodingState workingStates[] = {EncodingState::WaitingForFrames,
-      EncodingState::WritingFrame, EncodingState::WritingHeader};
+                                     EncodingState::WritingFrame, EncodingState::WritingHeader};
 
     if(m_encodingState == EncodingState::CheckingEncoderSanity)
       return;
@@ -799,10 +805,10 @@ void vsedit::Job::slotProcessFinished(int a_exitCode,
     else if(vsedit::contains(workingStates, m_encodingState))
     {
       QString exitStatusString = (a_exitStatus == QProcess::CrashExit) ?
-        tr("crash") : tr("normal exit");
+                                   tr("crash") : tr("normal exit");
       emit signalLogMessage(tr("Encoder has finished "
-        "unexpectedly.\nReason: %1; exit code: %2")
-        .arg(exitStatusString).arg(a_exitCode), LOG_STYLE_ERROR);
+                               "unexpectedly.\nReason: %1; exit code: %2")
+                              .arg(exitStatusString).arg(a_exitCode), LOG_STYLE_ERROR);
       changeStateAndNotify(JobState::FailedCleanUp);
     }
 
@@ -825,7 +831,7 @@ void vsedit::Job::slotProcessFinished(int a_exitCode,
       logStyle = LOG_STYLE_WARNING;
 
     emit signalLogMessage(tr("%1 Exit code: %2")
-      .arg(message).arg(a_exitCode), logStyle);
+                            .arg(message).arg(a_exitCode), logStyle);
     changeStateAndNotify(nextState);
   }
 }
@@ -844,81 +850,81 @@ void vsedit::Job::slotProcessError(QProcess::ProcessError a_error)
     if(m_encodingState == EncodingState::Idle)
     {
       emit signalLogMessage(tr("Encoder has reported "
-        "an error while it shouldn't be running at all. Ignoring."),
-        LOG_STYLE_WARNING);
+                               "an error while it shouldn't be running at all. Ignoring."),
+                            LOG_STYLE_WARNING);
       return;
     }
 
     switch(a_error)
     {
-    case QProcess::FailedToStart:
-      emit signalLogMessage(tr("Encoder has failed to start. "
-        "Aborting."), LOG_STYLE_ERROR);
-      m_encodingState = EncodingState::Aborting;
-      changeStateAndNotify(JobState::FailedCleanUp);
-      cleanUpEncoding();
-      break;
-
-    case QProcess::Crashed:
-      emit signalLogMessage(tr("Encoder has crashed. "
-        "Aborting."), LOG_STYLE_ERROR);
-      m_encodingState = EncodingState::EncoderCrashed;
-      changeStateAndNotify(JobState::FailedCleanUp);
-      cleanUpEncoding();
-      break;
-
-    case QProcess::Timedout:
-      break;
-
-    case QProcess::WriteError:
-      if(m_encodingState == EncodingState::WritingFrame)
-      {
-        emit signalLogMessage(tr("Writing to encoder "
-          "failed. Aborting."), LOG_STYLE_ERROR);
+      case QProcess::FailedToStart:
+        emit signalLogMessage(tr("Encoder has failed to start. "
+                                 "Aborting."), LOG_STYLE_ERROR);
         m_encodingState = EncodingState::Aborting;
         changeStateAndNotify(JobState::FailedCleanUp);
         cleanUpEncoding();
-      }
-      else
-      {
-        emit signalLogMessage(tr("Encoder has returned a "
-          "writing error, but we were not writing. Ignoring."),
-          LOG_STYLE_WARNING);
-      }
-      break;
+        break;
 
-    case QProcess::ReadError:
-      emit signalLogMessage(tr("Error on reading the "
-        "encoder feedback."), LOG_STYLE_WARNING);
-      break;
+      case QProcess::Crashed:
+        emit signalLogMessage(tr("Encoder has crashed. "
+                                 "Aborting."), LOG_STYLE_ERROR);
+        m_encodingState = EncodingState::EncoderCrashed;
+        changeStateAndNotify(JobState::FailedCleanUp);
+        cleanUpEncoding();
+        break;
 
-    case QProcess::UnknownError:
-      emit signalLogMessage(tr("Unknown error in encoder."),
-        LOG_STYLE_WARNING);
-      break;
+      case QProcess::Timedout:
+        break;
 
-    default:
-      Q_ASSERT(false);
+      case QProcess::WriteError:
+        if(m_encodingState == EncodingState::WritingFrame)
+        {
+          emit signalLogMessage(tr("Writing to encoder "
+                                   "failed. Aborting."), LOG_STYLE_ERROR);
+          m_encodingState = EncodingState::Aborting;
+          changeStateAndNotify(JobState::FailedCleanUp);
+          cleanUpEncoding();
+        }
+        else
+        {
+          emit signalLogMessage(tr("Encoder has returned a "
+                                   "writing error, but we were not writing. Ignoring."),
+                                LOG_STYLE_WARNING);
+        }
+        break;
+
+      case QProcess::ReadError:
+        emit signalLogMessage(tr("Error on reading the "
+                                 "encoder feedback."), LOG_STYLE_WARNING);
+        break;
+
+      case QProcess::UnknownError:
+        emit signalLogMessage(tr("Unknown error in encoder."),
+                              LOG_STYLE_WARNING);
+        break;
+
+      default:
+        Q_ASSERT(false);
     }
   }
   else if(m_properties.type == JobType::RunProcess)
   {
     switch(a_error)
     {
-    case QProcess::FailedToStart:
-      emit signalLogMessage(tr("Process has failed to start."),
-        LOG_STYLE_ERROR);
-      changeStateAndNotify(JobState::Failed);
-      break;
+      case QProcess::FailedToStart:
+        emit signalLogMessage(tr("Process has failed to start."),
+                              LOG_STYLE_ERROR);
+        changeStateAndNotify(JobState::Failed);
+        break;
 
-    case QProcess::Crashed:
-      emit signalLogMessage(tr("Process has crashed."),
-        LOG_STYLE_ERROR);
-      changeStateAndNotify(JobState::Failed);
-      break;
+      case QProcess::Crashed:
+        emit signalLogMessage(tr("Process has crashed."),
+                              LOG_STYLE_ERROR);
+        changeStateAndNotify(JobState::Failed);
+        break;
 
-    default:
-      break;
+      default:
+        break;
     }
   }
 }
@@ -937,16 +943,16 @@ void vsedit::Job::slotProcessReadChannelFinished()
   if(m_encodingState == EncodingState::Idle)
   {
     emit signalLogMessage(tr("Encoder has suddenly stopped "
-      "accepting data while it shouldn't be running at all. Ignoring."),
-      LOG_STYLE_WARNING);
+                             "accepting data while it shouldn't be running at all. Ignoring."),
+                          LOG_STYLE_WARNING);
     return;
   }
 
   if((m_encodingState != EncodingState::Finishing) &&
-    (m_encodingState != EncodingState::Aborting))
+      (m_encodingState != EncodingState::Aborting))
   {
     emit signalLogMessage(tr("Encoder has suddenly stopped "
-      "accepting data. Aborting."), LOG_STYLE_ERROR);
+                             "accepting data. Aborting."), LOG_STYLE_ERROR);
     m_encodingState = EncodingState::Aborting;
     changeStateAndNotify(JobState::FailedCleanUp);
     cleanUpEncoding();
@@ -967,30 +973,30 @@ void vsedit::Job::slotProcessBytesWritten(qint64 a_bytes)
   if(m_encodingState == EncodingState::Idle)
   {
     emit signalLogMessage(tr("Encoder has reported written "
-      "data while it shouldn't be running at all. Ignoring."),
-      LOG_STYLE_WARNING);
+                             "data while it shouldn't be running at all. Ignoring."),
+                          LOG_STYLE_WARNING);
     return;
   }
 
   if((m_encodingState == EncodingState::Aborting) ||
-    (m_encodingState == EncodingState::Finishing))
+      (m_encodingState == EncodingState::Finishing))
     return;
 
   if((m_encodingState != EncodingState::WritingFrame) &&
-    (m_encodingState != EncodingState::WritingHeader))
+      (m_encodingState != EncodingState::WritingHeader))
   {
     emit signalLogMessage(tr("Encoder reports successful "
-      "write, but we were not writing anything.\nData written: "
-      "%1 bytes.").arg(a_bytes), LOG_STYLE_WARNING);
+                             "write, but we were not writing anything.\nData written: "
+                             "%1 bytes.").arg(a_bytes), LOG_STYLE_WARNING);
     return;
   }
 
   if(a_bytes <= 0)
   {
     emit signalLogMessage(tr("Error on writing data to "
-      "encoder.\nExpected to write: %1 bytes. Data written: %2 bytes.\n"
-      "Aborting.").arg(m_bytesToWrite).arg(m_bytesWritten),
-      LOG_STYLE_ERROR);
+                             "encoder.\nExpected to write: %1 bytes. Data written: %2 bytes.\n"
+                             "Aborting.").arg(m_bytesToWrite).arg(m_bytesWritten),
+                          LOG_STYLE_ERROR);
     m_encodingState = EncodingState::Aborting;
     changeStateAndNotify(JobState::FailedCleanUp);
     cleanUpEncoding();
@@ -1002,7 +1008,7 @@ void vsedit::Job::slotProcessBytesWritten(qint64 a_bytes)
   if((m_bytesWritten + m_process.bytesToWrite()) < m_bytesToWrite)
   {
     emit signalLogMessage(tr("Encoder has lost written "
-      "data. Aborting."), LOG_STYLE_ERROR);
+                             "data. Aborting."), LOG_STYLE_ERROR);
     m_encodingState = EncodingState::Aborting;
     changeStateAndNotify(JobState::FailedCleanUp);
     cleanUpEncoding();
@@ -1023,10 +1029,10 @@ void vsedit::Job::slotProcessBytesWritten(qint64 a_bytes)
     Frame referenceFrame(m_lastFrameProcessed + 1, 0, nullptr);
     std::list<Frame>::iterator it =
       std::find(m_framesCache.begin(), m_framesCache.end(),
-      referenceFrame);
+                referenceFrame);
     Q_ASSERT(it != m_framesCache.end());
 
-    m_cpVSAPI->freeFrame(it->cpOutputFrameRef);
+    m_cpVSAPI->freeFrame(it->cpOutputFrame);
     m_framesCache.erase(it);
     m_lastFrameProcessed++;
     m_properties.framesProcessed++;
@@ -1062,7 +1068,7 @@ void vsedit::Job::slotProcessReadyReadStandardError()
 //==============================================================================
 
 void vsedit::Job::slotWriteLogMessage(int a_messageType,
-  const QString & a_message)
+                                      const QString & a_message)
 {
   QString style = vsMessageTypeToStyleName(a_messageType);
   emit signalLogMessage(a_message, style);
@@ -1073,7 +1079,7 @@ void vsedit::Job::slotWriteLogMessage(int a_messageType,
 //==============================================================================
 
 void vsedit::Job::slotFrameQueueStateChanged(size_t a_inQueue,
-  size_t a_inProcess, size_t a_maxThreads)
+                                             size_t a_inProcess, size_t a_maxThreads, double a_usedCacheRatio)
 {
   m_framesInQueue = a_inQueue;
   m_framesInProcess = a_inProcess;
@@ -1081,7 +1087,7 @@ void vsedit::Job::slotFrameQueueStateChanged(size_t a_inQueue,
 }
 
 // END OF void vsedit::Job::slotFrameQueueStateChanged(size_t a_inQueue,
-//		size_t a_inProcess, size_t a_maxThreads)
+//		size_t a_inProcess, size_t a_maxThreads, double a_usedCacheRatio)
 //==============================================================================
 
 void vsedit::Job::slotScriptProcessorFinalized()
@@ -1094,23 +1100,23 @@ void vsedit::Job::slotScriptProcessorFinalized()
 //==============================================================================
 
 void vsedit::Job::slotReceiveFrame(int a_frameNumber, int a_outputIndex,
-  const VSFrameRef * a_cpOutputFrameRef,
-  const VSFrameRef * a_cpPreviewFrameRef)
+                                   const VSFrame * a_cpOutputFrame,
+                                   const VSFrame * a_cpPreviewFrameRef)
 {
   (void)a_cpPreviewFrameRef;
 
   EncodingState validStates[] = {EncodingState::WaitingForFrames,
-    EncodingState::WritingHeader, EncodingState::WritingFrame};
+                                 EncodingState::WritingHeader, EncodingState::WritingFrame};
   if(!vsedit::contains(validStates, m_encodingState))
     return;
 
   if((a_frameNumber < m_properties.firstFrameReal) ||
-    (a_frameNumber > m_properties.lastFrameReal))
+      (a_frameNumber > m_properties.lastFrameReal))
     return;
 
   Q_ASSERT(m_cpVSAPI);
-  const VSFrameRef * cpFrameRef =
-    m_cpVSAPI->cloneFrameRef(a_cpOutputFrameRef);
+  const VSFrame * cpFrameRef =
+    m_cpVSAPI->addFrameRef(a_cpOutputFrame);
   Frame newFrame(a_frameNumber, a_outputIndex, cpFrameRef);
   m_framesCache.push_back(newFrame);
 
@@ -1119,19 +1125,19 @@ void vsedit::Job::slotReceiveFrame(int a_frameNumber, int a_outputIndex,
 }
 
 // END OF void vsedit::Job::slotReceiveFrame(int a_frameNumber,
-//		int a_outputIndex, const VSFrameRef * a_cpOutputFrameRef,
-//		const VSFrameRef * a_cpPreviewFrameRef)
+//		int a_outputIndex, const VSFrame * a_cpOutputFrame,
+//		const VSFrame * a_cpPreviewFrameRef)
 //==============================================================================
 
 void vsedit::Job::slotFrameRequestDiscarded(int a_frameNumber,
-  int a_outputIndex, const QString & a_reason)
+                                            int a_outputIndex, const QString & a_reason)
 {
   (void)a_frameNumber;
   (void)a_outputIndex;
   (void)a_reason;
 
   EncodingState validStates[] = {EncodingState::WaitingForFrames,
-    EncodingState::WritingHeader, EncodingState::WritingFrame};
+                                 EncodingState::WritingHeader, EncodingState::WritingFrame};
   if(!vsedit::contains(validStates, m_encodingState))
     return;
 
@@ -1150,113 +1156,111 @@ void vsedit::Job::fillVariables()
 
   struct JobVariableEvaluator
   {
-    QString token;
-    std::function<QString()> evaluate;
+      QString token;
+      std::function<QString()> evaluate;
   };
 
   JobVariableEvaluator evaluators[] =
-  {
-    {TOKEN_WIDTH,
-      [&]() -> QString
-      {
-        if(!m_cpVideoInfo)
-          return TOKEN_WIDTH;
-        return QString::number(m_cpVideoInfo->width);
-      }
-    },
+    {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_WIDTH,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if(!m_cpVideoInfo)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return TOKEN_WIDTH;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return QString::number(m_cpVideoInfo->width);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_HEIGHT,
-      [&]() -> QString
-      {
-        if(!m_cpVideoInfo)
-          return TOKEN_HEIGHT;
-        return QString::number(m_cpVideoInfo->height);
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_HEIGHT,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if(!m_cpVideoInfo)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return TOKEN_HEIGHT;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return QString::number(m_cpVideoInfo->height);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_FPS_NUMERATOR,
-      [&]() -> QString
-      {
-        if(!m_cpVideoInfo)
-          return TOKEN_FPS_NUMERATOR;
-        return QString::number(m_cpVideoInfo->fpsNum);
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_FPS_NUMERATOR,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if(!m_cpVideoInfo)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return TOKEN_FPS_NUMERATOR;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return QString::number(m_cpVideoInfo->fpsNum);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_FPS_DENOMINATOR,
-      [&]() -> QString
-      {
-        if(!m_cpVideoInfo)
-          return TOKEN_FPS_DENOMINATOR;
-        return QString::number(m_cpVideoInfo->fpsDen);
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_FPS_DENOMINATOR,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if(!m_cpVideoInfo)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return TOKEN_FPS_DENOMINATOR;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return QString::number(m_cpVideoInfo->fpsDen);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_FPS,
-      [&]() -> QString
-      {
-        if(!m_cpVideoInfo)
-          return TOKEN_FPS;
-        double fps = (double)m_cpVideoInfo->fpsNum /
-          (double)m_cpVideoInfo->fpsDen;
-        return QString::number(fps, 'f', 10);
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_FPS,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if(!m_cpVideoInfo)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return TOKEN_FPS;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              double fps = (double)m_cpVideoInfo->fpsNum /
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           (double)m_cpVideoInfo->fpsDen;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return QString::number(fps, 'f', 10);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_BITDEPTH,
-      [&]() -> QString
-      {
-        if(!m_cpVideoInfo)
-          return TOKEN_BITDEPTH;
-        return QString::number(m_cpVideoInfo->format->bitsPerSample);
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_BITDEPTH,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if(!m_cpVideoInfo)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return TOKEN_BITDEPTH;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return QString::number(m_cpVideoInfo->format.bitsPerSample);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_SCRIPT_DIRECTORY,
-      [&]() -> QString
-      {
-        QFileInfo scriptFile(m_properties.scriptName);
-        return scriptFile.canonicalPath();
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_SCRIPT_DIRECTORY,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              QFileInfo scriptFile(m_properties.scriptName);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return scriptFile.canonicalPath();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_SCRIPT_NAME,
-      [&]() -> QString
-      {
-        QFileInfo scriptFile(m_properties.scriptName);
-        return scriptFile.completeBaseName();
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_SCRIPT_NAME,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              QFileInfo scriptFile(m_properties.scriptName);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return scriptFile.completeBaseName();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_FRAMES_NUMBER,
-      [&]() -> QString
-      {
-        return QString::number(framesTotal());
-      }
-    },
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_FRAMES_NUMBER,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return QString::number(framesTotal());
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
 
-    {TOKEN_SUBSAMPLING,
-      [&]() -> QString
-      {
-        if(!m_cpVideoInfo)
-          return TOKEN_SUBSAMPLING;
-        const VSFormat * cpFormat = m_cpVideoInfo->format;
-        if(!cpFormat)
-          return QString();
-        return vsedit::subsamplingString(cpFormat->subSamplingW,
-          cpFormat->subSamplingH);
-      }
-    },
-  };
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                {TOKEN_SUBSAMPLING,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            [&]() -> QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if(!m_cpVideoInfo)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                return TOKEN_SUBSAMPLING;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              const VSVideoFormat * cpFormat = &m_cpVideoInfo->format;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              return vsedit::subsamplingString(cpFormat->subSamplingW,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               cpFormat->subSamplingH);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                },
+    };
 
   for(JobVariableEvaluator & evaluator : evaluators)
   {
     std::vector<vsedit::VariableToken>::iterator it =
       std::find_if(m_variables.begin(), m_variables.end(),
-        [&](const vsedit::VariableToken & a_variable) -> bool
-        {
-          return (a_variable.token == evaluator.token);
-        });
+                   [&](const vsedit::VariableToken & a_variable) -> bool
+                   {
+                     return (a_variable.token == evaluator.token);
+                   });
     it->evaluate = evaluator.evaluate;
   }
 }
@@ -1276,7 +1280,7 @@ void vsedit::Job::changeStateAndNotify(JobState a_state)
     m_properties.timeStarted = QDateTime::currentDateTimeUtc();
 
   const JobState finishStates[] = {JobState::Aborted, JobState::Failed,
-    JobState::DependencyNotMet, JobState::Completed};
+                                   JobState::DependencyNotMet, JobState::Completed};
   if(vsedit::contains(finishStates, a_state))
   {
     m_properties.timeEnded = QDateTime::currentDateTimeUtc();
@@ -1326,7 +1330,7 @@ void vsedit::Job::startEncodeScriptCLI()
   if(!compatibleHeader)
   {
     emit signalLogMessage(tr("Video is not compatible "
-      "with the chosen header."), LOG_STYLE_ERROR);
+                             "with the chosen header."), LOG_STYLE_ERROR);
     changeStateAndNotify(JobState::FailedCleanUp);
     cleanUpEncoding();
     return;
@@ -1337,7 +1341,7 @@ void vsedit::Job::startEncodeScriptCLI()
   QString decodedArguments =
     decodeArguments(m_properties.arguments);
   QString commandLine = QString("\"%1\" %2").arg(executable)
-    .arg(decodedArguments);
+                          .arg(decodedArguments);
 
   emit signalLogMessage(tr("Command line:"));
   emit signalLogMessage(commandLine);
@@ -1345,11 +1349,11 @@ void vsedit::Job::startEncodeScriptCLI()
   emit signalLogMessage(tr("Checking the encoder sanity."));
   m_encodingState = EncodingState::CheckingEncoderSanity;
 
-  m_process.start(commandLine, QStringList());
+  m_process.startCommand(commandLine);
   if(!m_process.waitForStarted(3000))
   {
     emit signalLogMessage(tr("Encoder wouldn't start."),
-      LOG_STYLE_ERROR);
+                          LOG_STYLE_ERROR);
     changeStateAndNotify(JobState::FailedCleanUp);
     cleanUpEncoding();
     return;
@@ -1359,7 +1363,7 @@ void vsedit::Job::startEncodeScriptCLI()
   if(!m_process.waitForFinished(3000))
   {
     emit signalLogMessage(tr("Program is not behaving "
-      "like a CLI encoder. Terminating."), LOG_STYLE_ERROR);
+                             "like a CLI encoder. Terminating."), LOG_STYLE_ERROR);
     m_process.kill();
     m_process.waitForFinished(-1);
     changeStateAndNotify(JobState::FailedCleanUp);
@@ -1369,7 +1373,7 @@ void vsedit::Job::startEncodeScriptCLI()
 
   emit signalLogMessage(tr("Encoder seems sane. Starting."));
   m_encodingState = EncodingState::StartingEncoder;
-  m_process.start(commandLine, QStringList());
+  m_process.startCommand(commandLine);
 }
 
 // END OF void vsedit::Job::startEncodeScriptCLI()
@@ -1382,12 +1386,12 @@ void vsedit::Job::startRunProcess()
   QString executable = vsedit::resolvePathFromApplication(
     m_properties.executablePath);
   QString commandLine = QString("\"%1\" %2").arg(executable)
-    .arg(m_properties.arguments);
+                          .arg(m_properties.arguments);
 
   emit signalLogMessage(tr("Command line:"));
   emit signalLogMessage(commandLine);
 
-  m_process.start(commandLine, QStringList());
+  m_process.startCommand(commandLine);
 }
 
 // END OF void vsedit::Job::startRunProcess()
@@ -1412,7 +1416,7 @@ QString vsedit::Job::decodeArguments(const QString & a_arguments) const
   for(const vsedit::VariableToken & variable : m_variables)
   {
     decodedString = decodedString.replace(variable.token,
-      variable.evaluate());
+                                          variable.evaluate());
   }
 
   return decodedString;
@@ -1430,8 +1434,8 @@ void vsedit::Job::clearFramesCache()
   Q_ASSERT(m_cpVSAPI);
   for(Frame & frame : m_framesCache)
   {
-    m_cpVSAPI->freeFrame(frame.cpOutputFrameRef);
-    m_cpVSAPI->freeFrame(frame.cpPreviewFrameRef);
+    m_cpVSAPI->freeFrame(frame.cpOutputFrame);
+    m_cpVSAPI->freeFrame(frame.cpPreviewFrame);
   }
   m_framesCache.clear();
 }
@@ -1456,9 +1460,9 @@ void vsedit::Job::processFramesQueue()
   }
 
   while((m_lastFrameRequested < m_properties.lastFrameReal) &&
-    (m_framesInProcess < m_maxThreads) &&
-    (m_framesCache.size() < m_cachedFramesLimit) &&
-    (m_properties.jobState == JobState::Running))
+         (m_framesInProcess < m_maxThreads) &&
+         (m_framesCache.size() < m_cachedFramesLimit) &&
+         (m_properties.jobState == JobState::Running))
   {
     m_pVapourSynthScriptProcessor->requestFrameAsync(
       m_lastFrameRequested + 1);
@@ -1467,27 +1471,26 @@ void vsedit::Job::processFramesQueue()
 
   Frame frame(m_lastFrameProcessed + 1, 0, nullptr);
   std::list<Frame>::iterator it = std::find(m_framesCache.begin(),
-    m_framesCache.end(), frame);
+                                            m_framesCache.end(), frame);
   if(it == m_framesCache.end())
     return;
 
-  frame.cpOutputFrameRef = it->cpOutputFrameRef;
+  frame.cpOutputFrame = it->cpOutputFrame;
 
-  // VapourSynth frames are padded so every line has aligned address.
-  // But encoder expects frames tightly packed. We pack frame lines
-  // into an intermediate buffer, because writing whole frame at once
-  // is faster than feeding it to encoder line by line.
+          // VapourSynth frames are padded so every line has aligned address.
+          // But encoder expects frames tightly packed. We pack frame lines
+          // into an intermediate buffer, because writing whole frame at once
+          // is faster than feeding it to encoder line by line.
 
   size_t currentDataSize = 0;
 
   Q_ASSERT(m_cpVideoInfo);
-  const VSFormat * cpFormat = m_cpVideoInfo->format;
-  Q_ASSERT(cpFormat);
+  const VSVideoFormat * cpFormat = &m_cpVideoInfo->format;
 
   if(m_pFrameHeaderWriter->needFramePrefix())
   {
     QByteArray framePrefix =
-      m_pFrameHeaderWriter->framePrefix(frame.cpOutputFrameRef);
+      m_pFrameHeaderWriter->framePrefix(frame.cpOutputFrame);
     int prefixSize = framePrefix.size();
     if(prefixSize > 0)
     {
@@ -1501,10 +1504,10 @@ void vsedit::Job::processFramesQueue()
   for(int i = 0; i < cpFormat->numPlanes; ++i)
   {
     const uint8_t * cpPlane =
-      m_cpVSAPI->getReadPtr(frame.cpOutputFrameRef, i);
-    int stride = m_cpVSAPI->getStride(frame.cpOutputFrameRef, i);
-    int width = m_cpVSAPI->getFrameWidth(frame.cpOutputFrameRef, i);
-    int height = m_cpVSAPI->getFrameHeight(frame.cpOutputFrameRef, i);
+      m_cpVSAPI->getReadPtr(frame.cpOutputFrame, i);
+    int stride = m_cpVSAPI->getStride(frame.cpOutputFrame, i);
+    int width = m_cpVSAPI->getFrameWidth(frame.cpOutputFrame, i);
+    int height = m_cpVSAPI->getFrameHeight(frame.cpOutputFrame, i);
     int bytes = cpFormat->bytesPerSample;
 
     size_t planeSize = width * bytes * height;
@@ -1513,8 +1516,8 @@ void vsedit::Job::processFramesQueue()
       m_framebuffer.resize(neededFramebufferSize);
     int framebufferStride = width * bytes;
 
-    vs_bitblt(m_framebuffer.data() + currentDataSize, framebufferStride,
-      cpPlane, stride, framebufferStride, height);
+    vsh::bitblt(m_framebuffer.data() + currentDataSize, framebufferStride,
+                cpPlane, stride, framebufferStride, height);
 
     currentDataSize += planeSize;
   }
@@ -1522,7 +1525,7 @@ void vsedit::Job::processFramesQueue()
   if(m_pFrameHeaderWriter->needFramePostfix())
   {
     QByteArray framePostfix =
-      m_pFrameHeaderWriter->framePostfix(frame.cpOutputFrameRef);
+      m_pFrameHeaderWriter->framePostfix(frame.cpOutputFrame);
     int postfixSize = framePostfix.size();
     if(postfixSize > 0)
     {
@@ -1530,7 +1533,7 @@ void vsedit::Job::processFramesQueue()
       if(neededFramebufferSize > m_framebuffer.size())
         m_framebuffer.resize(neededFramebufferSize);
       memcpy(m_framebuffer.data() + currentDataSize,
-        framePostfix.data(), postfixSize);
+             framePostfix.data(), postfixSize);
       currentDataSize += postfixSize;
     }
   }
@@ -1545,13 +1548,13 @@ void vsedit::Job::processFramesQueue()
     m_encodingState = EncodingState::Aborting;
     changeStateAndNotify(JobState::FailedCleanUp);
     emit signalLogMessage(tr("Error on writing data to encoder. "
-      "Aborting."), LOG_STYLE_ERROR);
+                             "Aborting."), LOG_STYLE_ERROR);
     cleanUpEncoding();
     return;
   }
 
-  // Wait until encoder reads the frame.
-  // Then this function will be called again.
+          // Wait until encoder reads the frame.
+          // Then this function will be called again.
 }
 
 // END OF void vsedit::Job::processFramesQueue()
@@ -1560,7 +1563,7 @@ void vsedit::Job::processFramesQueue()
 void vsedit::Job::finishEncodingCLI()
 {
   if((m_process.state() == QProcess::Running) ||
-    m_pVapourSynthScriptProcessor->isInitialized())
+      m_pVapourSynthScriptProcessor->isInitialized())
     return;
 
   if(m_encodingState == EncodingState::Finishing)
@@ -1576,11 +1579,11 @@ void vsedit::Job::finishEncodingCLI()
   m_encodingState = EncodingState::Idle;
 
   const std::map<JobState, JobState> stateToSwitch =
-  {
-    {JobState::Aborting, JobState::Aborted},
-    {JobState::FailedCleanUp, JobState::Failed},
-    {JobState::CompletedCleanUp, JobState::Completed},
-  };
+    {
+     {JobState::Aborting, JobState::Aborted},
+     {JobState::FailedCleanUp, JobState::Failed},
+     {JobState::CompletedCleanUp, JobState::Completed},
+     };
 
   std::map<JobState, JobState>::const_iterator it =
     stateToSwitch.find(m_properties.jobState);

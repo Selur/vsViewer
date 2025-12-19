@@ -2,8 +2,10 @@
 
 #include "common-src/helpers.h"
 #include "common-src/vapoursynth/vapoursynth_script_processor.h"
+#include "common-src/settings/settings_manager.h"
 
-#include <VapourSynth.h>
+#include <VSScript4.h>
+#include <VapourSynth4.h>
 
 #if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
 #ifdef Q_OS_WIN
@@ -64,13 +66,13 @@ ScriptBenchmarkDialog::~ScriptBenchmarkDialog()
 //==============================================================================
 
 bool ScriptBenchmarkDialog::initialize(const QString & a_script,
-  const QString & a_scriptName)
+                                       const QString & a_scriptName, ProcessReason a_reason)
 {
-  bool initialized =
-    VSScriptProcessorDialog::initialize(a_script, a_scriptName);
+  bool initialized = VSScriptProcessorDialog::initialize(a_script,
+                                                         a_scriptName, a_reason);
   if(!initialized)
     emit signalWriteLogMessage(mtCritical,
-      m_pVapourSynthScriptProcessor->error());
+                               m_pVapourSynthScriptProcessor->error());
   return initialized;
 }
 
@@ -98,7 +100,7 @@ void ScriptBenchmarkDialog::call()
   if((!m_pVapourSynthScriptProcessor->isInitialized()) || m_wantToFinalize)
     return;
 
-  Q_ASSERT(m_cpVideoInfo);
+  Q_ASSERT(!m_nodeInfo[0].isInvalid());
 
   m_ui.feedbackTextEdit->clear();
   setWindowTitle(tr("Benchmark: %1").arg(scriptName()));
@@ -106,10 +108,10 @@ void ScriptBenchmarkDialog::call()
   m_ui.feedbackTextEdit->addEntry(text);
   m_ui.metricsEdit->clear();
   int firstFrame = 0;
-  int lastFrame = m_cpVideoInfo->numFrames - 1;
+  int lastFrame = m_nodeInfo[0].numFrames() - 1;
   m_ui.fromFrameSpinBox->setMaximum(lastFrame);
   m_ui.toFrameSpinBox->setMaximum(lastFrame);
-  m_ui.processingProgressBar->setMaximum(m_cpVideoInfo->numFrames);
+  m_ui.processingProgressBar->setMaximum(m_nodeInfo[0].numFrames());
   m_ui.processingProgressBar->setValue(0);
 
   if(m_lastFromFrame >= 0)
@@ -150,24 +152,34 @@ void ScriptBenchmarkDialog::stopAndCleanUp()
 //==============================================================================
 
 void ScriptBenchmarkDialog::slotWriteLogMessage(int a_messageType,
-  const QString & a_message)
+                                                const QString & a_message)
 {
   QString style = vsMessageTypeToStyleName(a_messageType);
-  m_ui.feedbackTextEdit->addEntry(a_message, style);
+
+  QString debugTypes[] = {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              LOG_STYLE_DEBUG,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              LOG_STYLE_QT_DEBUG,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              LOG_STYLE_VS_DEBUG,
+  };
+  if(m_pSettingsManager->getShowDebugMessages() ||
+      !vsedit::contains(debugTypes, style))
+  {
+    m_ui.feedbackTextEdit->addEntry(a_message, style);
+  }
 }
 
 // END OF void ScriptBenchmarkDialog::slotWriteLogMessage(int a_messageType,
 //		const QString & a_message)
 //==============================================================================
 
+
 void ScriptBenchmarkDialog::slotWholeVideoButtonPressed()
 {
-  Q_ASSERT(m_cpVideoInfo);
-  int lastFrame = m_cpVideoInfo->numFrames - 1;
+  Q_ASSERT(!m_nodeInfo[0].isInvalid());
+  int lastFrame = m_nodeInfo[0].numFrames() - 1;
   m_ui.fromFrameSpinBox->setValue(0);
   m_ui.toFrameSpinBox->setValue(lastFrame);
 }
-
 // END OF void ScriptBenchmarkDialog::slotWholeVideoButtonPressed()
 //==============================================================================
 
@@ -220,9 +232,8 @@ void ScriptBenchmarkDialog::slotStartStopBenchmarkButtonPressed()
 // END OF void ScriptBenchmarkDialog::slotStartStopBenchmarkButtonPressed()
 //==============================================================================
 
-void ScriptBenchmarkDialog::slotReceiveFrame(int a_frameNumber,
-  int a_outputIndex, const VSFrameRef * a_cpOutputFrameRef,
-  const VSFrameRef * a_cpPreviewFrameRef)
+void ScriptBenchmarkDialog::slotReceiveFrame(int a_frameNumber, int a_outputIndex, const VSFrame* a_cpOutputFrameRef,
+                                             const VSFrame* a_cpPreviewFrameRef)
 {
   (void)a_frameNumber;
   (void)a_outputIndex;
@@ -237,8 +248,8 @@ void ScriptBenchmarkDialog::slotReceiveFrame(int a_frameNumber,
 }
 
 // END OF void ScriptBenchmarkDialog::slotReceiveFrame(int a_frameNumber,
-//		int a_outputIndex, const VSFrameRef * a_cpOutputFrameRef,
-//		const VSFrameRef * a_cpPreviewFrameRef)
+//		int a_outputIndex, const VSFrame * a_cpOutputFrameRef,
+//		const VSFrame * a_cpPreviewFrameRef)
 //==============================================================================
 
 void ScriptBenchmarkDialog::slotFrameRequestDiscarded(int a_frameNumber,
@@ -322,4 +333,23 @@ void ScriptBenchmarkDialog::updateMetrics()
 }
 
 // END OF void ScriptBenchmarkDialog::updateMetrics()
+//==============================================================================
+
+void ScriptBenchmarkDialog::keyPressEvent(QKeyEvent * a_pEvent)
+{
+  Qt::KeyboardModifiers modifiers = a_pEvent->modifiers();
+
+  if(modifiers != Qt::NoModifier)
+  {
+    QDialog::keyPressEvent(a_pEvent);
+    return;
+  }
+
+  if(a_pEvent->key() == Qt::Key_Escape)
+    close();
+  else
+    QDialog::keyPressEvent(a_pEvent);
+}
+
+// END OF void ScriptBenchmarkDialog::keyPressEvent(QKeyEvent * a_pEvent)
 //==============================================================================

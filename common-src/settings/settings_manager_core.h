@@ -10,87 +10,91 @@
 /// Base class that manages non-GUI related settings
 class SettingsManagerCore : public QObject
 {
-public:
+  public:
 
-	SettingsManagerCore(QObject * a_pParent);
-	virtual ~SettingsManagerCore();
+    SettingsManagerCore(QObject * a_pParent);
+    virtual ~SettingsManagerCore();
 
-	//----------------------------------------------------------------------
+            //----------------------------------------------------------------------
 
-	bool getPortableMode() const;
+    bool getPortableMode() const;
 
-	bool setPortableMode(bool a_portableMod);
+    bool setPortableMode(bool a_portableMod);
 
-	//----------------------------------------------------------------------
+            //----------------------------------------------------------------------
 
-	QStringList getVapourSynthLibraryPaths() const;
+    QStringList getVapourSynthLibraryPaths() const;
 
-	bool setVapourSynthLibraryPaths(const QStringList & a_pathsList);
+    bool setVapourSynthLibraryPaths(const QStringList & a_pathsList);
 
-	QStringList getVapourSynthPluginsPaths() const;
+    bool getPreferVSLibrariesFromList() const;
 
-	bool setVapourSynthPluginsPaths(const QStringList & a_pathsList);
+    bool setPreferVSLibrariesFromList(bool a_prior);
 
-	ResamplingFilter getChromaResamplingFilter() const;
+    ResamplingFilter getChromaResamplingFilter() const;
 
-	bool setChromaResamplingFilter(ResamplingFilter a_filter);
+    bool setChromaResamplingFilter(ResamplingFilter a_filter);
 
-	YuvMatrixCoefficients getYuvMatrixCoefficients() const;
+    YuvMatrixCoefficients getYuvMatrixCoefficients() const;
 
-	bool setYuvMatrixCoefficients(YuvMatrixCoefficients a_matrix);
+    bool setYuvMatrixCoefficients(YuvMatrixCoefficients a_matrix);
 
-	ChromaPlacement getChromaPlacement() const;
+    ChromaPlacement getChromaPlacement() const;
 
-	bool setChromaPlacement(ChromaPlacement a_placement);
+    bool setChromaPlacement(ChromaPlacement a_placement);
 
-	double getBicubicFilterParameterB() const;
+    double getBicubicFilterParameterB() const;
 
-	bool setBicubicFilterParameterB(double a_parameterB);
+    bool setBicubicFilterParameterB(double a_parameterB);
 
-	double getBicubicFilterParameterC() const;
+    double getBicubicFilterParameterC() const;
 
-	bool setBicubicFilterParameterC(double a_parameterC);
+    bool setBicubicFilterParameterC(double a_parameterC);
 
-	int getLanczosFilterTaps() const;
+    int getLanczosFilterTaps() const;
 
-	bool setLanczosFilterTaps(int a_taps);
+    bool setLanczosFilterTaps(int a_taps);
 
-	std::vector<EncodingPreset> getAllEncodingPresets() const;
+    DitherType getDitherType() const;
 
-	EncodingPreset getEncodingPreset(const QString & a_name) const;
+    bool setDitherType(DitherType a_dither);
 
-	bool saveEncodingPreset(const EncodingPreset & a_preset);
+    std::vector<EncodingPreset> getAllEncodingPresets() const;
 
-	bool deleteEncodingPreset(const QString & a_name);
+    EncodingPreset getEncodingPreset(const QString & a_name) const;
 
-	std::vector<JobProperties> getJobs() const;
+    bool saveEncodingPreset(const EncodingPreset & a_preset);
 
-	bool setJobs(const std::vector<JobProperties> & a_jobs);
+    bool deleteEncodingPreset(const QString & a_name);
 
-	QStringList getRecentJobServers() const;
+    std::vector<JobProperties> getJobs() const;
 
-	bool setRecentJobServers(const QStringList & a_servers);
+    bool setJobs(const std::vector<JobProperties> & a_jobs);
 
-	QStringList getTrustedClientsAddresses() const;
+    QStringList getRecentJobServers() const;
 
-	bool setTrustedClientsAddresses(const QStringList & a_addresses);
+    bool setRecentJobServers(const QStringList & a_servers);
 
-protected:
+    QStringList getTrustedClientsAddresses() const;
 
-	QVariant valueInGroup(const QString & a_group, const QString & a_key,
-		const QVariant & a_defaultValue = QVariant()) const;
+    bool setTrustedClientsAddresses(const QStringList & a_addresses);
 
-	bool setValueInGroup(const QString & a_group, const QString & a_key,
-		const QVariant & a_value);
+  protected:
 
-	bool deleteValueInGroup(const QString & a_group, const QString & a_key);
+    QVariant valueInGroup(const QString & a_group, const QString & a_key,
+                          const QVariant & a_defaultValue = QVariant()) const;
 
-	QVariant value(const QString & a_key, const QVariant & a_defaultValue =
-		QVariant()) const;
+    bool setValueInGroup(const QString & a_group, const QString & a_key,
+                         const QVariant & a_value);
 
-	bool setValue(const QString & a_key, const QVariant & a_value);
+    bool deleteValueInGroup(const QString & a_group, const QString & a_key);
 
-	QString m_settingsFilePath;
+    QVariant value(const QString & a_key, const QVariant & a_defaultValue =
+                                         QVariant()) const;
+
+    bool setValue(const QString & a_key, const QVariant & a_value);
+
+    QString m_settingsFilePath;
 };
 
 #endif // SETTINGS_MANAGER_CORE_H_INCLUDED

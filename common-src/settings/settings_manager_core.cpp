@@ -15,13 +15,14 @@ const char SETTINGS_FILE_NAME[] = "/vsviewer.config";
 const char COMMON_GROUP[] = "common";
 
 const char VAPOURSYNTH_LIBRARY_PATHS_KEY[] = "vapoursynth_library_paths";
-const char VAPOURSYNTH_PLUGINS_PATHS_KEY[] = "vapoursynth_plugins_paths";
+const char PREFER_VS_LIBRARIES_FROM_LIST_KEY[] = "prefer_vs_libs_from_list";
 const char CHROMA_RESAMPLING_FILTER_KEY[] = "chroma_resampling_filter";
 const char YUV_MATRIX_COEFFICIENTS_KEY[] = "yuv_matrix_coefficients";
 const char CHROMA_PLACEMENT_KEY[] = "chroma_placement";
 const char BICUBIC_FILTER_PARAMETER_B_KEY[] = "bicubic_filter_parameter_b";
 const char BICUBIC_FILTER_PARAMETER_C_KEY[] = "bicubic_filter_parameter_c";
 const char LANCZOS_FILTER_TAPS_KEY[] = "lanczos_filter_taps";
+const char DITHER_TYPE_KEY[] = "dither_type";
 const char RECENT_JOB_SERVERS_KEY[] = "recent_job_servers";
 const char TRUSTED_CLIENTS_ADDRESSES_KEY[] = "trusted_clients_addresses";
 
@@ -61,7 +62,7 @@ const char JOB_FPS_KEY[] = "fps";
 //==============================================================================
 
 SettingsManagerCore::SettingsManagerCore(QObject * a_pParent) :
-  QObject(a_pParent)
+                                                               QObject(a_pParent)
 {
   QString applicationDir = QCoreApplication::applicationDirPath();
 
@@ -71,7 +72,7 @@ SettingsManagerCore::SettingsManagerCore(QObject * a_pParent) :
   else
   {
     m_settingsFilePath = QStandardPaths::writableLocation(
-      QStandardPaths::GenericConfigLocation) + SETTINGS_FILE_NAME;
+                           QStandardPaths::GenericConfigLocation) + SETTINGS_FILE_NAME;
   }
 }
 
@@ -89,7 +90,7 @@ bool SettingsManagerCore::getPortableMode() const
   QFileInfo settingsFileInfo(settingsFilePath);
 
   bool portableMode = (settingsFileInfo.exists() &&
-    settingsFileInfo.isWritable());
+                       settingsFileInfo.isWritable());
   return portableMode;
 }
 
@@ -102,10 +103,13 @@ bool SettingsManagerCore::setPortableMode(bool a_portableMod)
   bool portableExists = settingsFileInfo.exists();
   bool currentModePortable = portableExists && settingsFileInfo.isWritable();
 
-  // In Windows, even if a dir is not writable, a file in it may still be
-  // writable. Therefore, we should take a test by writing a file.
+  if(a_portableMod == currentModePortable)
+    return true;
+
+          // In Windows, even if a dir is not writable, a file in it may still be
+          // writable. Therefore, we should take a test by writing a file.
   bool portableWritable = false;
-  if(!portableExists)
+  if(a_portableMod && !portableExists)
   {
     QFile portableFile(applicationDir + SETTINGS_FILE_NAME);
     if((portableWritable = portableFile.open(QIODevice::WriteOnly)))
@@ -114,11 +118,8 @@ bool SettingsManagerCore::setPortableMode(bool a_portableMod)
   else
     portableWritable = currentModePortable;
 
-  if (a_portableMod && !portableWritable)
+  if(a_portableMod && !portableWritable)
     return false;
-
-  if(a_portableMod == currentModePortable)
-    return true;
 
   QString genericConfigDir = QStandardPaths::writableLocation(
     QStandardPaths::GenericConfigLocation);
@@ -129,8 +130,8 @@ bool SettingsManagerCore::setPortableMode(bool a_portableMod)
   else
     newSettingsFilePath = genericConfigDir + SETTINGS_FILE_NAME;
 
-  // When copying portable settings to common folder - another settings
-  // file may already exist there. Need to delete it first.
+          // When copying portable settings to common folder - another settings
+          // file may already exist there. Need to delete it first.
   if(QFile::exists(newSettingsFilePath))
   {
     bool settingsFileDeleted = QFile::remove(newSettingsFilePath);
@@ -154,10 +155,22 @@ bool SettingsManagerCore::setPortableMode(bool a_portableMod)
   return false;
 }
 
+bool SettingsManagerCore::getPreferVSLibrariesFromList() const
+{
+  return value(PREFER_VS_LIBRARIES_FROM_LIST_KEY,
+               DEFAULT_PREFER_VS_LIBRARIES_FROM_LIST).toBool();
+}
+
+bool SettingsManagerCore::setPreferVSLibrariesFromList(bool a_prior)
+{
+  return setValue(PREFER_VS_LIBRARIES_FROM_LIST_KEY, a_prior);
+}
+
+
 //==============================================================================
 
 QVariant SettingsManagerCore::valueInGroup(const QString & a_group,
-  const QString & a_key, const QVariant & a_defaultValue) const
+                                           const QString & a_key, const QVariant & a_defaultValue) const
 {
   QSettings settings(m_settingsFilePath, QSettings::IniFormat);
   settings.beginGroup(a_group);
@@ -165,7 +178,7 @@ QVariant SettingsManagerCore::valueInGroup(const QString & a_group,
 }
 
 bool SettingsManagerCore::setValueInGroup(const QString & a_group,
-  const QString & a_key, const QVariant & a_value)
+                                          const QString & a_key, const QVariant & a_value)
 {
   QSettings settings(m_settingsFilePath, QSettings::IniFormat);
   settings.beginGroup(a_group);
@@ -176,7 +189,7 @@ bool SettingsManagerCore::setValueInGroup(const QString & a_group,
 }
 
 bool SettingsManagerCore::deleteValueInGroup(const QString & a_group,
-  const QString & a_key)
+                                             const QString & a_key)
 {
   QSettings settings(m_settingsFilePath, QSettings::IniFormat);
   settings.beginGroup(a_group);
@@ -189,13 +202,13 @@ bool SettingsManagerCore::deleteValueInGroup(const QString & a_group,
 //==============================================================================
 
 QVariant SettingsManagerCore::value(const QString & a_key,
-  const QVariant & a_defaultValue) const
+                                    const QVariant & a_defaultValue) const
 {
   return valueInGroup(COMMON_GROUP, a_key, a_defaultValue);
 }
 
 bool SettingsManagerCore::setValue(const QString & a_key,
-  const QVariant & a_value)
+                                   const QVariant & a_value)
 {
   return setValueInGroup(COMMON_GROUP, a_key, a_value);
 }
@@ -217,25 +230,10 @@ bool SettingsManagerCore::setVapourSynthLibraryPaths(
 
 //==============================================================================
 
-QStringList SettingsManagerCore::getVapourSynthPluginsPaths() const
-{
-  QStringList paths = value(VAPOURSYNTH_PLUGINS_PATHS_KEY).toStringList();
-  paths.removeDuplicates();
-  return paths;
-}
-
-bool SettingsManagerCore::setVapourSynthPluginsPaths(
-  const QStringList & a_pathsList)
-{
-  return setValue(VAPOURSYNTH_PLUGINS_PATHS_KEY, a_pathsList);
-}
-
-//==============================================================================
-
 ResamplingFilter SettingsManagerCore::getChromaResamplingFilter() const
 {
   return (ResamplingFilter)value(CHROMA_RESAMPLING_FILTER_KEY,
-    (int)DEFAULT_CHROMA_RESAMPLING_FILTER).toInt();
+                                 (int)DEFAULT_CHROMA_RESAMPLING_FILTER).toInt();
 }
 
 bool SettingsManagerCore::setChromaResamplingFilter(ResamplingFilter a_filter)
@@ -248,7 +246,7 @@ bool SettingsManagerCore::setChromaResamplingFilter(ResamplingFilter a_filter)
 YuvMatrixCoefficients SettingsManagerCore::getYuvMatrixCoefficients() const
 {
   return (YuvMatrixCoefficients)value(YUV_MATRIX_COEFFICIENTS_KEY,
-    (int)DEFAULT_YUV_MATRIX_COEFFICIENTS).toInt();
+                                      (int)DEFAULT_YUV_MATRIX_COEFFICIENTS).toInt();
 }
 
 bool SettingsManagerCore::setYuvMatrixCoefficients(
@@ -262,7 +260,7 @@ bool SettingsManagerCore::setYuvMatrixCoefficients(
 ChromaPlacement SettingsManagerCore::getChromaPlacement() const
 {
   return (ChromaPlacement)value(CHROMA_PLACEMENT_KEY,
-    (int)DEFAULT_CHROMA_PLACEMENT).toInt();
+                                (int)DEFAULT_CHROMA_PLACEMENT).toInt();
 }
 
 bool SettingsManagerCore::setChromaPlacement(ChromaPlacement a_placement)
@@ -275,7 +273,7 @@ bool SettingsManagerCore::setChromaPlacement(ChromaPlacement a_placement)
 double SettingsManagerCore::getBicubicFilterParameterB() const
 {
   return value(BICUBIC_FILTER_PARAMETER_B_KEY,
-    DEFAULT_BICUBIC_FILTER_PARAMETER_B).toDouble();
+               DEFAULT_BICUBIC_FILTER_PARAMETER_B).toDouble();
 }
 
 bool SettingsManagerCore::setBicubicFilterParameterB(double a_parameterB)
@@ -288,7 +286,7 @@ bool SettingsManagerCore::setBicubicFilterParameterB(double a_parameterB)
 double SettingsManagerCore::getBicubicFilterParameterC() const
 {
   return value(BICUBIC_FILTER_PARAMETER_C_KEY,
-    DEFAULT_BICUBIC_FILTER_PARAMETER_C).toDouble();
+               DEFAULT_BICUBIC_FILTER_PARAMETER_C).toDouble();
 }
 
 bool SettingsManagerCore::setBicubicFilterParameterC(double a_parameterC)
@@ -308,6 +306,17 @@ bool SettingsManagerCore::setLanczosFilterTaps(int a_taps)
   return setValue(LANCZOS_FILTER_TAPS_KEY, a_taps);
 }
 
+DitherType SettingsManagerCore::getDitherType() const
+{
+  return (DitherType)value(DITHER_TYPE_KEY,
+                           (int)DEFAULT_DITHER_TYPE).toInt();
+}
+
+bool SettingsManagerCore::setDitherType(DitherType a_dither)
+{
+  return setValue(DITHER_TYPE_KEY, (int)a_dither);
+}
+
 //==============================================================================
 
 std::vector<EncodingPreset> SettingsManagerCore::getAllEncodingPresets() const
@@ -325,15 +334,15 @@ std::vector<EncodingPreset> SettingsManagerCore::getAllEncodingPresets() const
     EncodingPreset preset;
     preset.name = presetName;
     preset.type = (EncodingType)settings.value(
-      ENCODING_PRESET_ENCODING_TYPE_KEY, (int)DEFAULT_ENCODING_TYPE)
-      .toInt();
+                                          ENCODING_PRESET_ENCODING_TYPE_KEY, (int)DEFAULT_ENCODING_TYPE)
+                    .toInt();
     preset.headerType = (EncodingHeaderType)settings.value(
-      ENCODING_PRESET_HEADER_TYPE_KEY, (int)DEFAULT_ENCODING_HEADER_TYPE)
-      .toInt();
+                                                      ENCODING_PRESET_HEADER_TYPE_KEY, (int)DEFAULT_ENCODING_HEADER_TYPE)
+                          .toInt();
     preset.executablePath = settings.value(
-      ENCODING_PRESET_EXECUTABLE_PATH_KEY).toString();
+                                      ENCODING_PRESET_EXECUTABLE_PATH_KEY).toString();
     preset.arguments = settings.value(
-      ENCODING_PRESET_ARGUMENTS_KEY).toString();
+                                 ENCODING_PRESET_ARGUMENTS_KEY).toString();
     presets.push_back(preset);
 
     settings.endGroup();
@@ -357,15 +366,15 @@ EncodingPreset SettingsManagerCore::getEncodingPreset(const QString & a_name) co
   settings.beginGroup(a_name);
 
   preset.type = (EncodingType)settings.value(
-    ENCODING_PRESET_ENCODING_TYPE_KEY, (int)DEFAULT_ENCODING_TYPE)
-    .toInt();
+                                        ENCODING_PRESET_ENCODING_TYPE_KEY, (int)DEFAULT_ENCODING_TYPE)
+                  .toInt();
   preset.headerType = (EncodingHeaderType)settings.value(
-    ENCODING_PRESET_HEADER_TYPE_KEY, (int)DEFAULT_ENCODING_HEADER_TYPE)
-    .toInt();
+                                                    ENCODING_PRESET_HEADER_TYPE_KEY, (int)DEFAULT_ENCODING_HEADER_TYPE)
+                        .toInt();
   preset.executablePath = settings.value(
-    ENCODING_PRESET_EXECUTABLE_PATH_KEY).toString();
+                                    ENCODING_PRESET_EXECUTABLE_PATH_KEY).toString();
   preset.arguments = settings.value(
-    ENCODING_PRESET_ARGUMENTS_KEY).toString();
+                               ENCODING_PRESET_ARGUMENTS_KEY).toString();
 
   return preset;
 }
@@ -378,9 +387,9 @@ bool SettingsManagerCore::saveEncodingPreset(const EncodingPreset & a_preset)
 
   settings.setValue(ENCODING_PRESET_ENCODING_TYPE_KEY, (int)a_preset.type);
   settings.setValue(ENCODING_PRESET_HEADER_TYPE_KEY,
-    (int)a_preset.headerType);
+                    (int)a_preset.headerType);
   settings.setValue(ENCODING_PRESET_EXECUTABLE_PATH_KEY,
-    a_preset.executablePath);
+                    a_preset.executablePath);
   settings.setValue(ENCODING_PRESET_ARGUMENTS_KEY, a_preset.arguments);
 
   settings.sync();
@@ -426,9 +435,9 @@ std::vector<JobProperties> SettingsManagerCore::getJobs() const
       job.id = QUuid(idString);
 
     job.type = (JobType)settings.value(JOB_TYPE_KEY,
-      (int)DEFAULT_JOB_TYPE).toInt();
+                                       (int)DEFAULT_JOB_TYPE).toInt();
     job.jobState = (JobState)settings.value(JOB_STATE_KEY,
-      (int)DEFAULT_JOB_STATE).toInt();
+                                            (int)DEFAULT_JOB_STATE).toInt();
 
     QStringList dependencyIdStrings =
       settings.value(JOB_DEPENDS_ON_JOBS_KEY).toStringList();
@@ -444,25 +453,25 @@ std::vector<JobProperties> SettingsManagerCore::getJobs() const
     job.scriptText = settings.value(JOB_SCRIPT_TEXT_KEY).toString();
 
     job.encodingType = (EncodingType)settings.value(JOB_ENCODING_TYPE_KEY,
-      (int)DEFAULT_ENCODING_TYPE).toInt();
+                                                    (int)DEFAULT_ENCODING_TYPE).toInt();
     job.encodingHeaderType = (EncodingHeaderType)settings.value(
-      JOB_ENCODING_HEADER_TYPE_KEY,
-      (int)DEFAULT_ENCODING_HEADER_TYPE).toInt();
+                                                           JOB_ENCODING_HEADER_TYPE_KEY,
+                                                           (int)DEFAULT_ENCODING_HEADER_TYPE).toInt();
 
     job.executablePath = settings.value(JOB_EXECUTABLE_PATH_KEY).toString();
     job.arguments = settings.value(JOB_ARGUMENTS_KEY).toString();
     job.shellCommand = settings.value(JOB_SHELL_COMMAND_KEY).toString();
 
     job.firstFrame = settings.value(JOB_FIRST_FRAME_KEY,
-      DEFAULT_JOB_FIRST_FRAME).toInt();
+                                    DEFAULT_JOB_FIRST_FRAME).toInt();
     job.firstFrameReal = settings.value(JOB_FIRST_FRAME_REAL_KEY,
-      job.firstFrame).toInt();
+                                        job.firstFrame).toInt();
     job.lastFrame = settings.value(JOB_LAST_FRAME_KEY,
-      DEFAULT_JOB_LAST_FRAME).toInt();
+                                   DEFAULT_JOB_LAST_FRAME).toInt();
     job.lastFrameReal = settings.value(JOB_LAST_FRAME_REAL_KEY,
-      job.lastFrame).toInt();
+                                       job.lastFrame).toInt();
     job.framesProcessed = settings.value(JOB_FRAME_PROCESSED_KEY,
-      DEFAULT_JOB_FRAMES_PROCESSED).toInt();
+                                         DEFAULT_JOB_FRAMES_PROCESSED).toInt();
     job.fps = settings.value(JOB_FPS_KEY, DEFAULT_JOB_FPS).toDouble();
 
     jobs.push_back(job);
@@ -500,7 +509,7 @@ bool SettingsManagerCore::setJobs(const std::vector<JobProperties> & a_jobs)
     settings.setValue(JOB_SCRIPT_TEXT_KEY, job.scriptText);
     settings.setValue(JOB_ENCODING_TYPE_KEY, (int)job.encodingType);
     settings.setValue(JOB_ENCODING_HEADER_TYPE_KEY,
-      (int)job.encodingHeaderType);
+                      (int)job.encodingHeaderType);
     settings.setValue(JOB_EXECUTABLE_PATH_KEY, job.executablePath);
     settings.setValue(JOB_ARGUMENTS_KEY, job.arguments);
     settings.setValue(JOB_SHELL_COMMAND_KEY, job.shellCommand);

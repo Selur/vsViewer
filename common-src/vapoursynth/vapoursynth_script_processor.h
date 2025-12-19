@@ -3,6 +3,9 @@
 
 #include "vs_script_processor_structures.h"
 #include "common-src/settings/settings_manager_core.h"
+#include "../helpers_vs.h"
+
+#include <VSScript4.h>
 
 #include <QObject>
 #include <deque>
@@ -15,111 +18,118 @@ class VSScriptLibrary;
 
 class VapourSynthScriptProcessor : public QObject
 {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
+  public:
 
-  VapourSynthScriptProcessor(SettingsManagerCore * a_pSettingsManager,
-    VSScriptLibrary * a_pVSScriptLibrary, QObject * a_pParent = nullptr);
+    VapourSynthScriptProcessor(SettingsManagerCore * a_pSettingsManager,
+                               VSScriptLibrary * a_pVSScriptLibrary, QObject * a_pParent = nullptr);
 
-  virtual ~VapourSynthScriptProcessor();
+    virtual ~VapourSynthScriptProcessor();
 
-  bool initialize(const QString& a_script, const QString& a_scriptName);
+    bool initialize(const QString& a_script, const QString& a_scriptName,
+                    int a_outputIndex, ProcessReason a_reason);
 
-  bool finalize();
+    bool finalize();
 
-  bool isInitialized() const;
+    bool isInitialized() const;
 
-  QString error() const;
+    QString error() const;
 
-  const VSVideoInfo * videoInfo(int a_outputIndex = 0);
+    std::vector<int> getOutputIndices() const;
 
-  bool requestFrameAsync(int a_frameNumber, int a_outputIndex = 0,
-    bool a_needPreview = false);
+    VSNodeInfo nodeInfo(int a_outputIndex = 0);
 
-  bool flushFrameTicketsQueue();
+    bool requestFrameAsync(int a_frameNumber, int a_outputIndex = 0,
+                           bool a_needPreview = false);
 
-  const QString & script() const;
+    bool flushFrameTicketsQueue();
 
-  const QString & scriptName() const;
+    const QString & script() const;
 
-  void setScriptName(const QString & a_scriptName);
+    const QString & scriptName() const;
 
-public slots:
+    void setScriptName(const QString & a_scriptName);
 
-  void slotResetSettings();
+    QString framePropsString(const VSFrame * a_cpFrame) const;
 
-signals:
+    bool clearCoreCaches();
 
-  void signalWriteLogMessage(int a_messageType, const QString & a_message);
+  public slots:
 
-  void signalDistributeFrame(int a_frameNumber, int a_outputIndex,
-    const VSFrameRef * a_cpOutputFrameRef,
-    const VSFrameRef * a_cpPreviewFrameRef);
+    void slotResetSettings();
 
-  void signalFrameRequestDiscarded(int a_frameNumber, int a_outputIndex,
-    const QString & a_reason);
+  signals:
 
-  void signalFrameQueueStateChanged(size_t a_inQueue, size_t a_inProcess,
-    size_t a_maxThreads);
+    void signalWriteLogMessage(int a_messageType, const QString & a_message);
 
-  void signalFinalized();
+    void signalDistributeFrame(int a_frameNumber, int a_outputIndex,
+                               const VSFrame * a_cpOutputFrame,
+                               const VSFrame * a_cpPreviewFrame);
 
-private slots:
+    void signalFrameRequestDiscarded(int a_frameNumber, int a_outputIndex,
+                                     const QString & a_reason);
 
-  void slotReceiveFrameAndProcessQueue(
-    const VSFrameRef * a_cpFrameRef, int a_frameNumber,
-    VSNodeRef * a_pNodeRef, QString a_errorMessage);
+    void signalFrameQueueStateChanged(size_t a_inQueue, size_t a_inProcess,
+                                      size_t a_maxThreads, double a_usedCacheRatio);
 
-private:
+    void signalFinalized();
 
-  void receiveFrame(const VSFrameRef * a_cpFrameRef, int a_frameNumber,
-    VSNodeRef * a_pNodeRef, const QString & a_errorMessage);
+  private slots:
 
-  void processFrameTicketsQueue();
+    void slotReceiveFrameAndProcessQueue(
+      const VSFrame * a_cpFrame, int a_frameNumber,
+      VSNode * a_pNode, QString a_errorMessage);
 
-  void sendFrameQueueChangeSignal();
+  private:
 
-  bool recreatePreviewNode(NodePair & a_nodePair);
+    void receiveFrame(const VSFrame * a_cpFrame, int a_frameNumber,
+                      VSNode * a_pNode, const QString & a_errorMessage);
 
-  void freeFrameTicket(FrameTicket & a_ticket);
+    void processFrameTicketsQueue();
 
-  NodePair & getNodePair(int a_outputIndex, bool a_needPreview);
+    void sendFrameQueueChangeSignal();
 
-  QString framePropsString(const VSFrameRef * a_cpFrame) const;
+    bool recreatePreviewNode(NodePair & a_nodePair);
 
-  void printFrameProps(const VSFrameRef * a_cpFrame);
+    bool recreateAudioPreviewNode(NodePair & a_nodePair);
 
-  SettingsManagerCore * m_pSettingsManager;
+    void freeFrameTicket(FrameTicket & a_ticket);
 
-  VSScriptLibrary * m_pVSScriptLibrary;
+    NodePair & getNodePair(int a_outputIndex, bool a_needPreview);
 
-  QString m_script;
+    SettingsManagerCore * m_pSettingsManager;
 
-  QString m_scriptName;
+    VSScriptLibrary * m_pVSScriptLibrary;
 
-  QString m_error;
+    QString m_script;
 
-  bool m_initialized;
+    QString m_scriptName;
 
-  const VSAPI * m_cpVSAPI;
+    QString m_error;
 
-  VSScript * m_pVSScript;
+    bool m_initialized;
 
-  const VSVideoInfo * m_cpVideoInfo;
-  VSCoreInfo m_cpCoreInfo;
+    const VSAPI * m_cpVSAPI;
 
-  std::deque<FrameTicket> m_frameTicketsQueue;
-  std::vector<FrameTicket> m_frameTicketsInProcess;
-  std::map<int, NodePair> m_nodePairForOutputIndex;
+    VSScript * m_pVSScript;
+    VSCore * m_pCore;
 
-  ResamplingFilter m_chromaResamplingFilter;
-  ChromaPlacement m_chromaPlacement;
-  double m_resamplingFilterParameterA;
-  double m_resamplingFilterParameterB;
-  YuvMatrixCoefficients m_yuvMatrix;
+    VSNodeInfo m_nodeInfo;
+    VSCoreInfo m_cpCoreInfo;
 
-  bool m_finalizing;
+    std::deque<FrameTicket> m_frameTicketsQueue;
+    std::vector<FrameTicket> m_frameTicketsInProcess;
+    std::map<int, NodePair> m_nodePairForOutputIndex;
+
+    ResamplingFilter m_chromaResamplingFilter;
+    ChromaPlacement m_chromaPlacement;
+    double m_resamplingFilterParameterA;
+    double m_resamplingFilterParameterB;
+    YuvMatrixCoefficients m_yuvMatrix;
+    DitherType m_ditherType;
+
+    bool m_finalizing;
 };
 
 //==============================================================================

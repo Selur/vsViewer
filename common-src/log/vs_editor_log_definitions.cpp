@@ -2,9 +2,10 @@
 
 #include "styled_log_view_core.h"
 
-#include <VapourSynth.h>
-#include <map>
+#include <VSScript4.h>
+#include <VapourSynth4.h>
 #include <algorithm>
+#include <map>
 
 //==============================================================================
 

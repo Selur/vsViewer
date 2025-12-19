@@ -1,15 +1,14 @@
 #include "frame_header_writer_y4m.h"
 
 #include "common-src/helpers.h"
-
 #include <string>
 #include <map>
 
 //==============================================================================
 
 FrameHeaderWriterY4M::FrameHeaderWriterY4M(const VSAPI * a_cpVSAPI,
-  const VSVideoInfo * a_cpVideoInfo, QObject * a_pParent) :
-  FrameHeaderWriter(a_cpVSAPI, a_cpVideoInfo, a_pParent)
+                                           const VSVideoInfo * a_cpVideoInfo, QObject * a_pParent) :
+                                                                                                   FrameHeaderWriter(a_cpVSAPI, a_cpVideoInfo, a_pParent)
 {
 }
 
@@ -19,15 +18,13 @@ FrameHeaderWriterY4M::FrameHeaderWriterY4M(const VSAPI * a_cpVSAPI,
 
 bool FrameHeaderWriterY4M::isCompatible()
 {
-    Q_ASSERT(m_cpVideoInfo);
-    if(!m_cpVideoInfo)
+  Q_ASSERT(m_cpVideoInfo);
+  if(!m_cpVideoInfo)
     return false;
 
-  const VSFormat * cpFormat = m_cpVideoInfo->format;
-  if(!cpFormat)
-    return false;
+  const VSVideoFormat * cpFormat = &m_cpVideoInfo->format;
 
-  int compatibleColorFamily[] = {cmGray, cmYUV};
+  int compatibleColorFamily[] = {cfGray, cfYUV};
   if(!vsedit::contains(compatibleColorFamily, cpFormat->colorFamily))
     return false;
 
@@ -41,7 +38,7 @@ bool FrameHeaderWriterY4M::isCompatible()
   std::pair<int, int> compatibleSubsampling[] =
     {{0, 0}, {0, 1}, {1, 0}, {1, 1}, {2, 0}, {2, 2}};
   std::pair<int, int> subsampling(cpFormat->subSamplingW,
-    cpFormat->subSamplingH);
+                                  cpFormat->subSamplingH);
   if(!vsedit::contains(compatibleSubsampling, subsampling))
     return false;
 
@@ -63,32 +60,31 @@ QByteArray FrameHeaderWriterY4M::videoHeader(int a_totalFrames)
 {
   Q_ASSERT(m_cpVideoInfo);
   Q_ASSERT(isCompatible());
-  const VSFormat * cpFormat = m_cpVideoInfo->format;
-  Q_ASSERT(cpFormat);
+  const VSVideoFormat * cpFormat = &m_cpVideoInfo->format;
 
   std::string header;
 
   header += "YUV4MPEG2 C";
 
-  if(cpFormat->colorFamily == cmGray)
+  if(cpFormat->colorFamily == cfGray)
   {
     header += "mono";
     if(cpFormat->bitsPerSample > 8)
       header += std::to_string(cpFormat->bitsPerSample);
   }
-  else if(cpFormat->colorFamily == cmYUV)
+  else if(cpFormat->colorFamily == cfYUV)
   {
     std::map<std::pair<int, int>, std::string> subsamplingStringMap =
-    {
-      {{0, 0}, "444"},
-      {{0, 1}, "440"},
-      {{1, 0}, "422"},
-      {{1, 1}, "420"},
-      {{2, 0}, "411"},
-      {{2, 2}, "410"},
-    };
+      {
+       {{0, 0}, "444"},
+       {{0, 1}, "440"},
+       {{1, 0}, "422"},
+       {{1, 1}, "420"},
+       {{2, 0}, "411"},
+       {{2, 2}, "410"},
+       };
     std::pair<int, int> subsampling(cpFormat->subSamplingW,
-      cpFormat->subSamplingH);
+                                    cpFormat->subSamplingH);
     header += subsamplingStringMap[subsampling];
 
     if((cpFormat->bitsPerSample > 8) && (cpFormat->sampleType == stInteger))
@@ -115,16 +111,16 @@ QByteArray FrameHeaderWriterY4M::videoHeader(int a_totalFrames)
   }
 
   int totalFrames = (a_totalFrames < 0) ? m_cpVideoInfo->numFrames :
-    a_totalFrames;
+                      a_totalFrames;
 
   header = header
-    + " W" + std::to_string(m_cpVideoInfo->width)
-    + " H" + std::to_string(m_cpVideoInfo->height)
-    + " F" + std::to_string(m_cpVideoInfo->fpsNum)
-    + ":" + std::to_string(m_cpVideoInfo->fpsDen)
-        + " Ip A0:0"
-        + " XLENGTH=" + std::to_string(totalFrames)
-        + "\n";
+           + " W" + std::to_string(m_cpVideoInfo->width)
+           + " H" + std::to_string(m_cpVideoInfo->height)
+           + " F" + std::to_string(m_cpVideoInfo->fpsNum)
+           + ":" + std::to_string(m_cpVideoInfo->fpsDen)
+           + " Ip A0:0"
+           + " XLENGTH=" + std::to_string(totalFrames)
+           + "\n";
 
   QByteArray headerData(header.c_str());
   return headerData;
@@ -141,16 +137,16 @@ bool FrameHeaderWriterY4M::needFramePrefix()
 // END OF bool FrameHeaderWriterY4M::needFramePrefix()
 //==============================================================================
 
-QByteArray FrameHeaderWriterY4M::framePrefix(const VSFrameRef * a_cpFrameRef)
+QByteArray FrameHeaderWriterY4M::framePrefix(const VSFrame * a_cpFrame)
 {
-  (void)a_cpFrameRef;
+  (void)a_cpFrame;
   std::string prefix = "FRAME\n";
   QByteArray prefixData(prefix.c_str());
   return prefixData;
 }
 
 // END OF QByteArray FrameHeaderWriterY4M::framePrefix(
-//		const VSFrameRef * a_cpFrameRef)
+//		const VSFrame * a_cpFrame)
 //==============================================================================
 
 bool FrameHeaderWriterY4M::needFramePostfix()
@@ -161,12 +157,12 @@ bool FrameHeaderWriterY4M::needFramePostfix()
 // END OF bool FrameHeaderWriterY4M::needFramePostfix()
 //==============================================================================
 
-QByteArray FrameHeaderWriterY4M::framePostfix(const VSFrameRef * a_cpFrameRef)
+QByteArray FrameHeaderWriterY4M::framePostfix(const VSFrame * a_cpFrame)
 {
-  (void)a_cpFrameRef;
+  (void)a_cpFrame;
   return QByteArray();
 }
 
 // END OF QByteArray FrameHeaderWriterY4M::framePostfix(
-//		const VSFrameRef * a_cpFrameRef)
+//		const VSFrame * a_cpFrame)
 //==============================================================================

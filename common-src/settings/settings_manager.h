@@ -1,236 +1,258 @@
 #ifndef SETTINGSMANAGER_H
 #define SETTINGSMANAGER_H
 
-#include "settings_manager_core.h"
 #include "settings_definitions.h"
+#include "settings_manager_core.h"
 
-#include <QByteArray>
-#include <QTextCharFormat>
-#include <QColor>
 #include <QAction>
+#include <QByteArray>
+#include <QColor>
+#include <QTextCharFormat>
 
 //==============================================================================
 
 class SettingsManager : public SettingsManagerCore
 {
-public:
+  public:
+    SettingsManager(QObject* a_pParent);
+    virtual ~SettingsManager();
 
-	SettingsManager(QObject * a_pParent);
-	virtual ~SettingsManager();
+    //----------------------------------------------------------------------
 
-	//----------------------------------------------------------------------
+    QAction* createStandardAction(const QString& a_actionID, QObject* a_pParent);
 
-	QAction * createStandardAction(const QString & a_actionID,
-		QObject * a_pParent);
+    std::vector<StandardAction> getStandardActions() const;
 
-	std::vector<StandardAction> getStandardActions() const;
+    QKeySequence getDefaultHotkey(const QString& a_actionID) const;
 
-	QKeySequence getDefaultHotkey(const QString & a_actionID) const;
+    QKeySequence getHotkey(const QString& a_actionID) const;
 
-	QKeySequence getHotkey(const QString & a_actionID) const;
+    bool setHotkey(const QString& a_actionID, const QKeySequence& a_hotkey);
 
-	bool setHotkey(const QString & a_actionID,
-		const QKeySequence & a_hotkey);
+    //----------------------------------------------------------------------
 
-	//----------------------------------------------------------------------
+    QTextCharFormat getDefaultTextFormat(const QString& a_textFormatID) const;
 
-	QTextCharFormat getDefaultTextFormat(const QString & a_textFormatID)
-		const;
+    QTextCharFormat getTextFormat(const QString& a_textFormatID) const;
 
-	QTextCharFormat getTextFormat(const QString & a_textFormatID) const;
+    bool setTextFormat(const QString& a_textFormatID, const QTextCharFormat& a_format);
 
-	bool setTextFormat(const QString & a_textFormatID,
-		const QTextCharFormat & a_format);
+    //----------------------------------------------------------------------
 
-	//----------------------------------------------------------------------
+    QColor getDefaultColor(const QString& a_colorID) const;
 
-	QColor getDefaultColor(const QString & a_colorID) const;
+    QColor getColor(const QString& a_colorID) const;
 
-	QColor getColor(const QString & a_colorID) const;
+    bool setColor(const QString& a_colorID, const QColor& a_color);
 
-	bool setColor(const QString & a_colorID, const QColor & a_color);
+    //----------------------------------------------------------------------
 
-	//----------------------------------------------------------------------
+    QString getLastUsedPath() const;
 
-	QString getLastUsedPath() const;
+    bool setLastUsedPath(const QString& a_lastUsedPath);
 
-	bool setLastUsedPath(const QString& a_lastUsedPath);
+    QByteArray getMainWindowGeometry() const;
 
-	QByteArray getMainWindowGeometry() const;
+    bool setMainWindowGeometry(const QByteArray& a_mainWindowGeometry);
 
-	bool setMainWindowGeometry(const QByteArray & a_mainWindowGeometry);
+    bool getMainWindowMaximized() const;
 
-	bool getMainWindowMaximized() const;
+    bool setMainWindowMaximized(bool a_mainWindowMaximized);
 
-	bool setMainWindowMaximized(bool a_mainWindowMaximized);
+    QByteArray getPreviewDialogGeometry() const;
 
-	QByteArray getPreviewDialogGeometry() const;
+    bool setPreviewDialogGeometry(const QByteArray& a_previewDialogGeometry);
 
-	bool setPreviewDialogGeometry(const QByteArray & a_previewDialogGeometry);
+    bool getPreviewDialogMaximized() const;
 
-	bool getPreviewDialogMaximized() const;
+    bool setPreviewDialogMaximized(bool a_previewDialogMaximized);
 
-	bool setPreviewDialogMaximized(bool a_previewDialogMaximized);
+    QPoint getLastPreviewScrollBarPositions() const;
 
-	QByteArray getJobServerWatcherGeometry() const;
+    bool setLastPreviewScrollBarPositions(const QPoint& pos);
 
-	bool setJobServerWatcherGeometry(const QByteArray & a_geometry);
+    QByteArray getJobServerWatcherGeometry() const;
 
-	bool getJobServerWatcherMaximized() const;
+    bool setJobServerWatcherGeometry(const QByteArray& a_geometry);
 
-	bool setJobServerWatcherMaximized(bool a_maximized);
+    bool getJobServerWatcherMaximized() const;
 
-	QByteArray getJobsHeaderState() const;
+    bool setJobServerWatcherMaximized(bool a_maximized);
 
-	bool setJobsHeaderState(const QByteArray & a_headerState);
+    QByteArray getJobsHeaderState() const;
 
-	bool getAutoLoadLastScript() const;
+    bool setJobsHeaderState(const QByteArray& a_headerState);
 
-	bool setAutoLoadLastScript(bool a_autoLoadLastScript);
+    bool getAutoLoadLastScript() const;
 
-	bool getZoomPanelVisible() const;
+    bool setAutoLoadLastScript(bool a_autoLoadLastScript);
 
-	bool setZoomPanelVisible(bool a_zoomPanelVisible);
+    bool getZoomPanelVisible() const;
 
-	ZoomMode getZoomMode() const;
+    bool setZoomPanelVisible(bool a_zoomPanelVisible);
 
-	bool setZoomMode(ZoomMode a_zoomMode);
+    ZoomMode getZoomMode() const;
 
-	double getZoomRatio() const;
+    bool setZoomMode(ZoomMode a_zoomMode);
 
-	bool setZoomRatio(double a_zoomRatio);
+    double getZoomRatio() const;
 
-	Qt::TransformationMode getScaleMode() const;
+    bool setZoomRatio(double a_zoomRatio);
 
-	bool setScaleMode(Qt::TransformationMode a_scaleMode);
+    Qt::TransformationMode getScaleMode() const;
 
-	CropMode getCropMode() const;
+    bool setScaleMode(Qt::TransformationMode a_scaleMode);
 
-	bool setCropMode(CropMode a_cropMode);
+    CropMode getCropMode() const;
 
-	int getCropZoomRatio() const;
+    bool setCropMode(CropMode a_cropMode);
 
-	bool setCropZoomRatio(int a_cropZoomRatio);
+    int getCropZoomRatio() const;
 
-	bool getPromptToSaveChanges() const;
+    bool setCropZoomRatio(int a_cropZoomRatio);
 
-	bool setPromptToSaveChanges(bool a_prompt);
+    bool getPromptToSaveChanges() const;
 
-	QStringList getRecentFilesList() const;
+    bool setPromptToSaveChanges(bool a_prompt);
 
-	bool addToRecentFilesList(const QString & a_filePath);
+    QStringList getRecentFilesList() const;
 
-	unsigned int getMaxRecentFilesNumber() const;
+    bool addToRecentFilesList(const QString& a_filePath);
 
-	bool setMaxRecentFilesNumber(unsigned int a_maxRecentFilesNumber);
+    unsigned int getMaxRecentFilesNumber() const;
 
-	QStringList getVapourSynthDocumentationPaths() const;
+    bool setMaxRecentFilesNumber(unsigned int a_maxRecentFilesNumber);
 
-	bool setVapourSynthDocumentationPaths(const QStringList & a_pathsList);
+    bool getReloadScriptFromDisk() const;
 
-	int getCharactersTypedToStartCompletion() const;
+    bool setReloadScriptFromDisk(bool a_reload);
 
-	bool setCharactersTypedToStartCompletion(int a_charactersNumber);
+    int getCharactersTypedToStartCompletion() const;
 
-	TimeLineSlider::DisplayMode getTimeLineMode() const;
+    bool setCharactersTypedToStartCompletion(int a_charactersNumber);
 
-	bool setTimeLineMode(TimeLineSlider::DisplayMode a_timeLineMode);
+    TimeLineSlider::DisplayMode getTimeLineMode() const;
 
-	double getTimeStep() const;
+    bool setTimeLineMode(TimeLineSlider::DisplayMode a_timeLineMode);
 
-	bool setTimeStep(double a_timeStep);
+    double getTimeStep() const;
 
-	bool getColorPickerVisible() const;
+    bool setTimeStep(double a_timeStep);
 
-	bool setColorPickerVisible(bool a_colorPickerVisible);
+    bool getColorPickerVisible() const;
 
-	PlayFPSLimitMode getPlayFPSLimitMode() const;
+    bool setColorPickerVisible(bool a_colorPickerVisible);
 
-	bool setPlayFPSLimitMode(PlayFPSLimitMode a_mode);
+    PlayFPSLimitMode getPlayFPSLimitMode() const;
 
-	double getPlayFPSLimit() const;
+    bool setPlayFPSLimitMode(PlayFPSLimitMode a_mode);
 
-	bool setPlayFPSLimit(double a_limit);
+    double getPlayFPSLimit() const;
 
-	bool getUseSpacesAsTab() const;
+    bool setPlayFPSLimit(double a_limit);
 
-	bool setUseSpacesAsTab(bool a_value);
+    bool getUseSpacesAsTab() const;
 
-	int getSpacesInTab() const;
+    bool setUseSpacesAsTab(bool a_value);
 
-	bool setSpacesInTab(int a_spacesNumber);
+    int getSpacesInTab() const;
 
-	QString getTabText() const;
+    bool setSpacesInTab(int a_spacesNumber);
 
-	bool getRememberLastPreviewFrame() const;
+    QString getTabText() const;
 
-	bool setRememberLastPreviewFrame(bool a_remember);
+    bool getRememberLastPreviewFrame() const;
 
-	int getLastPreviewFrame() const;
+    bool setRememberLastPreviewFrame(bool a_remember);
 
-	bool setLastPreviewFrame(int a_frameNumber);
+    int getLastPreviewFrame(bool a_inPreviewer = false) const;
 
-	QString getDefaultNewScriptTemplate();
+    bool setLastPreviewFrame(int a_frameNumber, bool a_inPreviewer = false);
 
-	QString getNewScriptTemplate();
+    // timestamp in ms
+    qlonglong getLastPreviewTimestamp(bool a_inPreviewer = false) const;
 
-	bool setNewScriptTemplate(const QString & a_text);
+    bool setLastPreviewTimestamp(qlonglong a_ms, bool a_inPreviewer = false);
 
-	std::vector<CodeSnippet> getAllCodeSnippets() const;
+    SyncOutputNodesMode getSyncOutputMode() const;
 
-	CodeSnippet getCodeSnippet(const QString & a_name) const;
+    bool setSyncOutputMode(SyncOutputNodesMode a_mode);
 
-	bool saveCodeSnippet(const CodeSnippet & a_snippet);
+    QString getDefaultNewScriptTemplate();
 
-	bool deleteCodeSnippet(const QString & a_name);
+    QString getNewScriptTemplate();
 
-	std::vector<DropFileCategory> getAllDropFileTemplates() const;
+    bool setNewScriptTemplate(const QString& a_text);
 
-	bool setDropFileTemplates(
-		const std::vector<DropFileCategory> & a_categories);
+    std::vector<CodeSnippet> getAllCodeSnippets() const;
 
-	QString getDropFileTemplate(const QString & a_filePath) const;
+    CodeSnippet getCodeSnippet(const QString& a_name) const;
 
-	bool getHighlightSelectionMatches() const;
+    bool saveCodeSnippet(const CodeSnippet& a_snippet);
 
-	bool setHighlightSelectionMatches(bool a_highlight);
+    bool deleteCodeSnippet(const QString& a_name);
 
-	int getHighlightSelectionMatchesMinLength() const;
+    std::vector<DropFileCategory> getAllDropFileTemplates() const;
 
-	bool setHighlightSelectionMatchesMinLength(int a_length);
+    bool setDropFileTemplates(const std::vector<DropFileCategory>& a_categories);
 
-	bool getTimeLinePanelVisible() const;
+    QString getDropFileTemplate(const QString& a_filePath) const;
 
-	bool setTimeLinePanelVisible(bool a_visible);
+    bool getHighlightSelectionMatches() const;
 
-	bool getAlwaysKeepCurrentFrame() const;
+    bool setHighlightSelectionMatches(bool a_highlight);
 
-	bool setAlwaysKeepCurrentFrame(bool a_keep);
+    int getHighlightSelectionMatchesMinLength() const;
 
-	std::vector<TextBlockStyle> getLogStyles(const QString & a_logName) const;
+    bool setHighlightSelectionMatchesMinLength(int a_length);
 
-	bool setLogStyles(const QString & a_logName,
-		const std::vector<TextBlockStyle> a_styles);
+    bool getTimeLinePanelVisible() const;
 
-	QString getLastSnapshotExtension() const;
+    bool setTimeLinePanelVisible(bool a_visible);
 
-	bool setLastSnapshotExtension(const QString & a_extension);
+    bool getAlwaysKeepCurrentFrame() const;
 
-	int getPNGSnapshotCompressionLevel() const;
+    bool setAlwaysKeepCurrentFrame(bool a_keep);
 
-	bool setPNGSnapshotCompressionLevel(int a_level);
+    std::vector<TextBlockStyle> getLogStyles(const QString& a_logName) const;
 
-	bool getReloadBeforeExecution() const;
+    bool setLogStyles(const QString& a_logName, const std::vector<TextBlockStyle> a_styles);
 
-	bool setReloadBeforeExecution(bool a_reload);
+    QString getLastSnapshotExtension() const;
 
-private:
+    bool setLastSnapshotExtension(const QString& a_extension);
 
-	void initializeStandardActions();
+    int getPNGSnapshotCompressionLevel() const;
 
-	std::vector<StandardAction> m_standardActions;
+    bool setPNGSnapshotCompressionLevel(int a_level);
+
+    bool getShowDebugMessages() const;
+
+    bool setShowDebugMessages(bool a_debug);
+
+    bool getDarkMode() const;
+
+    bool setDarkMode(bool a_dark);
+
+    bool inDarkMode() const { return m_bInDarkMode; }
+
+    bool getSilentSnapshot() const;
+
+    bool setSilentSnapshot(bool a_set);
+
+    QString getSnapshotTemplate() const;
+
+    bool setSnapshotTemplate(const QString& a_template);
+
+  private:
+    void initializeStandardActions();
+
+    std::vector<StandardAction> m_standardActions;
+
+    bool m_bInDarkMode;
+    bool m_a_debug;
 };
 
 //==============================================================================
 
-#endif // SETTINGSMANAGER_H
+#endif  // SETTINGSMANAGER_H

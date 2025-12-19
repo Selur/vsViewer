@@ -11,64 +11,71 @@
 
 enum class ResamplingFilter : int
 {
-	Point,
-	Bilinear,
-	Bicubic,
-	Spline16,
-	Spline36,
-	Spline64,
-	Lanczos,
+  Point,
+  Bilinear,
+  Bicubic,
+  Spline16,
+  Spline36,
+  Spline64,
+  Lanczos,
 };
 
 enum class YuvMatrixCoefficients : int
 {
-	m709,
-	m470BG,
-	m170M,
-	m2020_NCL,
-	m2020_CL,
+  m709,
+  m470BG,
+  m170M,
+  m2020_NCL,
 };
 
 enum class ChromaPlacement : int
 {
-	LEFT,
-	CENTER,
-	TOP_LEFT,
+  LEFT,
+  CENTER,
+  TOP_LEFT,
+};
+
+enum class DitherType: int
+{
+  NONE,
+  ORDERED,
+  RANDOM,
+  ERROR_DIFFUSION,
 };
 
 enum class EncodingType
 {
-	CLI,
-	Raw,
-	VfW,
+  CLI,
+  Raw,
+  VfW,
 };
 
 enum class EncodingHeaderType
 {
-	NoHeader,
-	Y4M,
+  NoHeader,
+  Y4M,
 };
 
 enum class JobType
 {
-	EncodeScriptCLI,
-	RunProcess,
-	RunShellCommand,
+  EncodeScriptCLI,
+  RunProcess,
+  RunShellCommand,
 };
 
 enum class JobState
 {
-	Waiting,
-	Running,
-	Pausing,
-	Paused,
-	Aborting,
-	Aborted,
-	FailedCleanUp,
-	Failed,
-	DependencyNotMet,
-	CompletedCleanUp,
-	Completed,
+  Waiting,
+  Running,
+  Pausing,
+  Paused,
+  Aborting,
+  Aborted,
+  FailedCleanUp,
+  Failed,
+  DependencyNotMet,
+  CompletedCleanUp,
+  Completed,
 };
 
 extern const std::vector<JobState> ACTIVE_JOB_STATES;
@@ -94,64 +101,66 @@ extern const char JP_FPS[];
 
 struct JobProperties
 {
-	QUuid id;
-	JobType type;
-	JobState jobState;
-	std::vector<QUuid> dependsOnJobIds;
-	QDateTime timeStarted;
-	QDateTime timeEnded;
-	QString scriptName;
-	QString scriptText;
-	EncodingType encodingType;
-	EncodingHeaderType encodingHeaderType;
-	QString executablePath;
-	QString arguments;
-	QString shellCommand;
-	int firstFrame;
-	int firstFrameReal;
-	int lastFrame;
-	int lastFrameReal;
-	int framesProcessed;
-	double fps;
+    QUuid id;
+    JobType type;
+    JobState jobState;
+    std::vector<QUuid> dependsOnJobIds;
+    QDateTime timeStarted;
+    QDateTime timeEnded;
+    QString scriptName;
+    QString scriptText;
+    EncodingType encodingType;
+    EncodingHeaderType encodingHeaderType;
+    QString executablePath;
+    QString arguments;
+    QString shellCommand;
+    int firstFrame;
+    int firstFrameReal;
+    int lastFrame;
+    int lastFrameReal;
+    int framesProcessed;
+    double fps;
 
-	JobProperties();
-	JobProperties(const JobProperties &) = default;
-	JobProperties(JobProperties &&) = default;
-	JobProperties & operator=(const JobProperties &) = default;
-	JobProperties & operator=(JobProperties &&) = default;
+    JobProperties();
+    JobProperties(const JobProperties &) = default;
+    JobProperties(JobProperties &&) = default;
+    JobProperties & operator=(const JobProperties &) = default;
+    JobProperties & operator=(JobProperties &&) = default;
 
-	static QString typeName(JobType a_type);
-	static QString stateName(JobState a_state);
+    static QString typeName(JobType a_type);
+    static QString stateName(JobState a_state);
 
-	QString subject() const;
-	int framesTotal() const;
+    QString subject() const;
+    int framesTotal() const;
 
-	QJsonObject toJson() const;
-	static JobProperties fromJson(const QJsonObject & a_object);
+    QJsonObject toJson() const;
+    static JobProperties fromJson(const QJsonObject & a_object);
 };
 
 struct EncodingPreset
 {
-	QString name;
-	EncodingType type;
-	EncodingHeaderType headerType;
-	QString executablePath;
-	QString arguments;
+    QString name;
+    EncodingType type;
+    EncodingHeaderType headerType;
+    QString executablePath;
+    QString arguments;
 
-	EncodingPreset(const QString & a_name = QString());
-	bool operator==(const EncodingPreset & a_other) const;
-	bool operator<(const EncodingPreset & a_other) const;
-	bool isEmpty() const;
+    EncodingPreset(const QString & a_name = QString());
+    bool operator==(const EncodingPreset & a_other) const;
+    bool operator<(const EncodingPreset & a_other) const;
+    bool isEmpty() const;
 };
 
 //==============================================================================
 
+extern const bool DEFAULT_PREFER_VS_LIBRARIES_FROM_LIST;
 extern const ResamplingFilter DEFAULT_CHROMA_RESAMPLING_FILTER;
 extern const YuvMatrixCoefficients DEFAULT_YUV_MATRIX_COEFFICIENTS;
 extern const ChromaPlacement DEFAULT_CHROMA_PLACEMENT;
 extern const double DEFAULT_BICUBIC_FILTER_PARAMETER_B;
 extern const double DEFAULT_BICUBIC_FILTER_PARAMETER_C;
 extern const int DEFAULT_LANCZOS_FILTER_TAPS;
+extern const DitherType DEFAULT_DITHER_TYPE;
 extern const EncodingType DEFAULT_ENCODING_TYPE;
 extern const EncodingHeaderType DEFAULT_ENCODING_HEADER_TYPE;
 extern const JobType DEFAULT_JOB_TYPE;

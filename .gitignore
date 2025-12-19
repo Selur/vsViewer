@@ -1,0 +1,17 @@
+*.zip
+.DS_Store
+qrc_*
+*.user
+moc_*
+*.app
+/Makefile
+/Makefile.Debug
+/Makefile.Release
+/release
+/debug
+/.qmake.stash
+/.project
+/.cproject
+/generated
+*.user
+/build

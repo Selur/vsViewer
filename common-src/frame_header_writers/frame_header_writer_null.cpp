@@ -48,14 +48,14 @@ bool FrameHeaderWriterNull::needFramePrefix()
 // END OF bool FrameHeaderWriterNull::needFramePrefix()
 //==============================================================================
 
-QByteArray FrameHeaderWriterNull::framePrefix(const VSFrameRef * a_cpFrameRef)
+QByteArray FrameHeaderWriterNull::framePrefix(const VSFrame * a_cpFrameRef)
 {
 	(void)a_cpFrameRef;
 	return QByteArray();
 }
 
 // END OF QByteArray FrameHeaderWriterNull::framePrefix(
-//		const VSFrameRef * a_cpFrameRef)
+//		const VSFrame * a_cpFrameRef)
 //==============================================================================
 
 bool FrameHeaderWriterNull::needFramePostfix()
@@ -66,12 +66,12 @@ bool FrameHeaderWriterNull::needFramePostfix()
 // END OF bool FrameHeaderWriterNull::needFramePostfix()
 //==============================================================================
 
-QByteArray FrameHeaderWriterNull::framePostfix(const VSFrameRef * a_cpFrameRef)
+QByteArray FrameHeaderWriterNull::framePostfix(const VSFrame * a_cpFrameRef)
 {
 	(void)a_cpFrameRef;
 	return QByteArray();
 }
 
 // END OF QByteArray FrameHeaderWriterNull::framePostfix(
-//		const VSFrameRef * a_cpFrameRef)
+//		const VSFrame * a_cpFrameRef)
 //==============================================================================

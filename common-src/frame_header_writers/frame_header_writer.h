@@ -1,7 +1,8 @@
 #ifndef FRAME_HEADER_WRITER_H_INCLUDED
 #define FRAME_HEADER_WRITER_H_INCLUDED
 
-#include <VapourSynth.h>
+#include <VSScript4.h>
+#include <VapourSynth4.h>
 
 #include <QObject>
 
@@ -25,10 +26,10 @@ public:
 	virtual QByteArray videoHeader(int a_totalFrames = -1) = 0;
 
 	virtual bool needFramePrefix() = 0;
-	virtual QByteArray framePrefix(const VSFrameRef * a_cpFrameRef) = 0;
+  virtual QByteArray framePrefix(const VSFrame* a_cpFrameRef) = 0;
 
-	virtual bool needFramePostfix() = 0;
-	virtual QByteArray framePostfix(const VSFrameRef * a_cpFrameRef) = 0;
+  virtual bool needFramePostfix() = 0;
+  virtual QByteArray framePostfix(const VSFrame* a_cpFrameRef) = 0;
 
 protected:
 

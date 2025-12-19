@@ -15,19 +15,21 @@ const CropMode DEFAULT_CROP_MODE = CropMode::Relative;
 const int DEFAULT_CROP_ZOOM_RATIO = 1;
 const bool DEFAULT_PROMPT_TO_SAVE_CHANGES = true;
 const unsigned int DEFAULT_MAX_RECENT_FILES_NUMBER = 10;
-const QStringList DEFAULT_DOCUMENTATION_PATHS("./documentation");
 const int DEFAULT_CHARACTERS_TYPED_TO_START_COMPLETION = 2;
 const double DEFAULT_TIME_STEP = 5.0;
 const TimeLineSlider::DisplayMode DEFAULT_TIMELINE_MODE =
-	TimeLineSlider::DisplayMode::Time;
+  TimeLineSlider::DisplayMode::Time;
 const bool DEFAULT_COLOR_PICKER_VISIBLE = false;
 const PlayFPSLimitMode DEFAULT_PLAY_FPS_LIMIT_MODE =
-	PlayFPSLimitMode::FromVideo;
+  PlayFPSLimitMode::FromVideo;
 const double DEFAULT_PLAY_FPS_LIMIT = 23.976;
 const bool DEFAULT_USE_SPACES_AS_TAB = true;
 const int DEFAULT_SPACES_IN_TAB = 4;
 const bool DEFAULT_REMEMBER_LAST_PREVIEW_FRAME = false;
 const int DEFAULT_LAST_PREVIEW_FRAME = 0;
+const qlonglong DEFAULT_LAST_PREVIEW_TIMESTAMP = 0;
+const SyncOutputNodesMode DEFAULT_SYNC_OUTPUT_MODE =
+  SyncOutputNodesMode::Frame;
 const bool DEFAULT_HIGHLIGHT_SELECTION_MATCHES = true;
 const int DEFAULT_HIGHLIGHT_SELECTION_MATCHES_MIN_LENGTH = 3;
 const bool DEFAULT_TIMELINE_PANEL_VISIBLE = true;
@@ -38,7 +40,11 @@ const double DEFAULT_TIMELINE_LABELS_HEIGHT = 5.0;
 const char DEFAULT_DROP_FILE_TEMPLATE[] = "r\'{f}\'";
 const int DEFAULT_MAX_WATCHER_CONNECTION_ATTEMPTS = 5;
 const int DEFAULT_PNG_COMPRESSION_LEVEL = 0;
-const bool DEFAULT_RELOAD_BEFORE_EXECUTION = false;
+const bool DEFAULT_RELOAD_FROM_DISK = false;
+const bool DEFAULT_DEBUG_MESSAGES = false;
+const bool DEFAULT_DARK_MODE = false;
+const bool DEFAULT_SILENT_SNAPSHOT = false;
+const QString DEFAULT_SNAPSHOT_TEMPLATE = "{f}-{i}-{o}.png";
 
 //==============================================================================
 
@@ -53,6 +59,7 @@ const char ACTION_ID_CHECK_SCRIPT[] = "check_script";
 const char ACTION_ID_BENCHMARK[] = "benchmark";
 const char ACTION_ID_CLI_ENCODE[] = "cli_encode";
 const char ACTION_ID_ENQUEUE_ENCODE_JOB[] = "enqueue_encode_job";
+const char ACTION_ID_TOGGLE_CONSOLE[] = "toggle_console";
 const char ACTION_ID_JOBS[] = "jobs";
 const char ACTION_ID_EXIT[] = "exit";
 const char ACTION_ID_ABOUT[] = "about";
@@ -62,14 +69,14 @@ const char ACTION_ID_TOGGLE_ZOOM_PANEL[] = "toggle_zoom_panel";
 const char ACTION_ID_SET_ZOOM_MODE_NO_ZOOM[] = "set_zoom_mode_no_zoom";
 const char ACTION_ID_SET_ZOOM_MODE_FIXED_RATIO[] = "set_zoom_mode_fixed_ratio";
 const char ACTION_ID_SET_ZOOM_MODE_FIT_TO_FRAME[] =
-	"set_zoom_mode_fit_to_frame";
+  "set_zoom_mode_fit_to_frame";
 const char ACTION_ID_SET_ZOOM_SCALE_MODE_NEAREST[] =
-	"set_zoom_scale_mode_nearest";
+  "set_zoom_scale_mode_nearest";
 const char ACTION_ID_SET_ZOOM_SCALE_MODE_BILINEAR[] =
-	"set_zoom_scale_mode_bilinear";
+  "set_zoom_scale_mode_bilinear";
 const char ACTION_ID_TOGGLE_CROP_PANEL[] = "toggle_crop_panel";
 const char ACTION_ID_PASTE_CROP_SNIPPET_INTO_SCRIPT[] =
-	"paste_crop_snippet_into_script";
+  "paste_crop_snippet_into_script";
 const char ACTION_ID_FRAME_TO_CLIPBOARD[] = "frame_to_clipboard";
 const char ACTION_ID_TOGGLE_TIMELINE_PANEL[] = "toggle_timeline_panel";
 const char ACTION_ID_SET_TIMELINE_MODE_TIME[] = "set_timeline_mode_time";
@@ -86,21 +93,45 @@ const char ACTION_ID_REPLACE_TAB_WITH_SPACES[] = "replace_tab_with_spaces";
 const char ACTION_ID_TIMELINE_LOAD_CHAPTERS[] = "timeline_load_chapters";
 const char ACTION_ID_TIMELINE_CLEAR_BOOKMARKS[] = "timeline_clear_bookmarks";
 const char ACTION_ID_TIMELINE_BOOKMARK_CURRENT_FRAME[] =
-	"timeline_bookmark_current_frame";
+  "timeline_bookmark_current_frame";
 const char ACTION_ID_TIMELINE_UNBOOKMARK_CURRENT_FRAME[] =
-	"timeline_unbookmark_current_frame";
+  "timeline_unbookmark_current_frame";
 const char ACTION_ID_TIMELINE_GO_TO_PREVIOUS_BOOKMARK[] =
-	"timeline_go_to_previous_bookmark";
+  "timeline_go_to_previous_bookmark";
 const char ACTION_ID_TIMELINE_GO_TO_NEXT_BOOKMARK[] =
-	"timeline_go_to_next_bookmark";
+  "timeline_go_to_next_bookmark";
 const char ACTION_ID_PASTE_SHOWN_FRAME_NUMBER_INTO_SCRIPT[] =
-	"paste_shown_frame_number_into_script";
+  "paste_shown_frame_number_into_script";
 const char ACTION_ID_MOVE_TEXT_BLOCK_UP[] = "move_text_block_up";
 const char ACTION_ID_MOVE_TEXT_BLOCK_DOWN[] = "move_text_block_down";
 const char ACTION_ID_TOGGLE_COMMENT[] = "toggle_comment";
 const char ACTION_ID_SHUTDOWN_SERVER_AND_EXIT[] = "shutdown_server_and_exit";
 const char ACTION_ID_SET_TRUSTED_CLIENTS_ADDRESSES[] =
-	"set_trusted_clients_addresses";
+  "set_trusted_clients_addresses";
+const char ACTION_ID_JUMP_TO_FRAME[] = "jump_to_frame";
+const char ACTION_ID_TOGGLE_FRAME_PROPS[] = "toggle_frame_props_panel";
+const char ACTION_ID_SET_OUTPUT_INDEX_0[] = "switch_to_output_index_0";
+const char ACTION_ID_SET_OUTPUT_INDEX_1[] = "switch_to_output_index_1";
+const char ACTION_ID_SET_OUTPUT_INDEX_2[] = "switch_to_output_index_2";
+const char ACTION_ID_SET_OUTPUT_INDEX_3[] = "switch_to_output_index_3";
+const char ACTION_ID_SET_OUTPUT_INDEX_4[] = "switch_to_output_index_4";
+const char ACTION_ID_SET_OUTPUT_INDEX_5[] = "switch_to_output_index_5";
+const char ACTION_ID_SET_OUTPUT_INDEX_6[] = "switch_to_output_index_6";
+const char ACTION_ID_SET_OUTPUT_INDEX_7[] = "switch_to_output_index_7";
+const char ACTION_ID_SET_OUTPUT_INDEX_8[] = "switch_to_output_index_8";
+const char ACTION_ID_SET_OUTPUT_INDEX_9[] = "switch_to_output_index_9";
+const char ACTION_ID_SET_OUTPUT_INDEX_10[] = "switch_to_output_index_10";
+const char ACTION_ID_SET_OUTPUT_INDEX_11[] = "switch_to_output_index_11";
+const char ACTION_ID_SET_OUTPUT_INDEX_12[] = "switch_to_output_index_12";
+const char ACTION_ID_SET_OUTPUT_INDEX_13[] = "switch_to_output_index_13";
+const char ACTION_ID_SET_OUTPUT_INDEX_14[] = "switch_to_output_index_14";
+const char ACTION_ID_SET_OUTPUT_INDEX_15[] = "switch_to_output_index_15";
+const char ACTION_ID_SET_OUTPUT_INDEX_16[] = "switch_to_output_index_16";
+const char ACTION_ID_SET_OUTPUT_INDEX_17[] = "switch_to_output_index_17";
+const char ACTION_ID_SET_OUTPUT_INDEX_18[] = "switch_to_output_index_18";
+const char ACTION_ID_SET_OUTPUT_INDEX_19[] = "switch_to_output_index_19";
+const char ACTION_ID_PREVIOUS_OUTPUT_INDEX[] = "switch_to_previous_output_index";
+const char ACTION_ID_NEXT_OUTPUT_INDEX[] = "switch_to_next_output_index";
 
 //==============================================================================
 
@@ -125,35 +156,35 @@ const char COLOR_ID_TIMELINE_BOOKMARKS[] = "timeline_bookmarks";
 
 bool StandardAction::operator==(const StandardAction & a_other) const
 {
-	return id == a_other.id;
+  return id == a_other.id;
 }
 
 bool StandardAction::operator<(const StandardAction & a_other) const
 {
-	return id < a_other.id;
+  return id < a_other.id;
 }
 
 //==============================================================================
 
 CodeSnippet::CodeSnippet(const QString & a_name, const QString & a_text) :
-	  name(a_name)
-	, text(a_text)
+                                                                         name(a_name)
+                                                                         , text(a_text)
 {
 }
 
 bool CodeSnippet::operator==(const CodeSnippet & a_other) const
 {
-	return (name == a_other.name);
+  return (name == a_other.name);
 }
 
 bool CodeSnippet::operator<(const CodeSnippet & a_other) const
 {
-	return (name < a_other.name);
+  return (name < a_other.name);
 }
 
 bool CodeSnippet::isEmpty() const
 {
-	return (name.isEmpty() && text.isEmpty());
+  return (name.isEmpty() && text.isEmpty());
 }
 
 //==============================================================================

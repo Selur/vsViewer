@@ -1,91 +1,95 @@
 #ifndef VS_SCRIPT_LIBRARY_H_INCLUDED
 #define VS_SCRIPT_LIBRARY_H_INCLUDED
 
-#include <VSScript.h>
+#include "../version_info.h"
+#include <VSScript4.h>
 
 #include <QObject>
 #include <QLibrary>
+#include <map>
+#include <vector>
 
 class SettingsManagerCore;
 
 //==============================================================================
 
-typedef int (VS_CC *FNP_vssInit)(void);
-typedef const VSAPI * (VS_CC *FNP_vssGetVSApi)(void);
-typedef int (VS_CC *FNP_vssEvaluateScript)(VSScript ** a_ppScript,
-  const char * a_scriptText, const char * a_scriptFilename, int a_flags);
-typedef const char * (VS_CC *FNP_vssGetError)(VSScript * a_pScript);
-typedef VSCore * (VS_CC *FNP_vssGetCore)(VSScript * a_pScript);
-typedef VSNodeRef * (VS_CC *FNP_vssGetOutput)(VSScript * a_pScript,
-  int a_index);
-typedef void (VS_CC *FNP_vssFreeScript)(VSScript * a_pScript);
-typedef int (VS_CC *FNP_vssFinalize)(void);
+typedef const VSSCRIPTAPI * (VS_CC * FNP_getVSSAPI)(int);
 
 //==============================================================================
 
 class VSScriptLibrary : public QObject
 {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
+  public:
 
-  VSScriptLibrary(SettingsManagerCore * a_pSettingsManager,
-    QObject * a_pParent = nullptr);
+    VSScriptLibrary(SettingsManagerCore * a_pSettingsManager,
+                    QObject * a_pParent = nullptr);
 
-  virtual ~VSScriptLibrary();
+    virtual ~VSScriptLibrary();
 
-  bool initialize();
+    bool initialize();
 
-  bool finalize();
+    bool finalize();
 
-  bool isInitialized() const;
+    bool isInitialized() const;
 
-  const VSAPI * getVSAPI();
+    const VSAPI * getVSAPI();
 
-  int evaluateScript(VSScript ** a_ppScript, const char * a_scriptText,
-    const char * a_scriptFilename, int a_flags);
+    VSScript * createScript(VSCore * a_pCore = nullptr);
 
-  const char * getError(VSScript * a_pScript);
+    int evaluateScript(VSScript * a_pScript, const char * a_scriptText,
+                       const char * a_scriptFilename);
 
-  VSCore * getCore(VSScript * a_pScript);
+    const char * getError(VSScript * a_pScript);
 
-  VSNodeRef * getOutput(VSScript * a_pScript, int a_index);
+    VSCore * createCore(int a_flag = 0);
 
-  bool freeScript(VSScript * a_pScript);
+            // Returns empty vector if not supported by API
+    std::vector<int> getOutputIndices(VSScript * a_pScript) const;
 
-signals:
+    VSNode * getOutput(VSScript * a_pScript, int a_index);
 
-  void signalWriteLogMessage(int a_messageType, const QString & a_message);
+    bool freeScript(VSScript * a_pScript);
 
-private:
+    bool clearCoreCaches(VSCore * a_pCore);
 
-  bool initLibrary();
+    QString VSAPIInfo();
+    QString VSSAPIInfo();
 
-  void freeLibrary();
+  signals:
 
-  void handleVSMessage(int a_messageType, const QString & a_message);
+    void signalWriteLogMessage(int a_messageType, const QString & a_message);
 
-  friend void VS_CC vsMessageHandler(int a_msgType,
-    const char * a_message, void * a_pUserData);
+  private:
 
-  SettingsManagerCore * m_pSettingsManager;
+    bool initLibrary();
 
-  QLibrary m_vsScriptLibrary;
+    void freeLibrary();
 
-  FNP_vssInit vssInit;
-  FNP_vssGetVSApi vssGetVSApi;
-  FNP_vssEvaluateScript vssEvaluateScript;
-  FNP_vssGetError vssGetError;
-  FNP_vssGetCore vssGetCore;
-  FNP_vssGetOutput vssGetOutput;
-  FNP_vssFreeScript vssFreeScript;
-  FNP_vssFinalize vssFinalize;
+    void handleVSMessage(int a_messageType, const QString & a_message);
 
-  bool m_vsScriptInitialized;
+    friend void VS_CC vsMessageHandler(int a_msgType,
+                                       const char * a_message, void * a_pUserData);
 
-  bool m_initialized;
+    SettingsManagerCore * m_pSettingsManager;
 
-  const VSAPI * m_cpVSAPI;
+    QLibrary m_vsScriptLibrary;
+
+    FNP_getVSSAPI vssGetAPI;
+
+    bool m_initialized;
+
+    const VSSCRIPTAPI * m_cpVSSAPI;
+
+    const VSAPI * m_cpVSAPI;
+
+    std::map<VSCore *, VSLogHandle *> m_VSCoreLogHandles;
+
+    int m_VSAPIMajor;
+    int m_VSAPIMinor;
+    int m_VSSAPIMajor;
+    int m_VSSAPIMinor;
 };
 
 //==============================================================================

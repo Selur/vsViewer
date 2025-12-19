@@ -3,8 +3,9 @@
 #include "common-src/helpers.h"
 #include "common-src/settings/settings_manager.h"
 
-#include <VapourSynth.h>
-#include <VSHelper.h>
+#include <VSHelper4.h>
+#include <VSScript4.h>
+#include <VapourSynth4.h>
 
 #include <QMessageBox>
 #include <QFileDialog>
@@ -143,7 +144,7 @@ void EncodeDialog::showActive()
     showNormal();
   else
     show();
-  QApplication::setActiveWindow(this);
+  activateWindow();
 }
 
 // END OF void EncodeDialog::showActive()
