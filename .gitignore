@@ -4,6 +4,8 @@ qrc_*
 *.user
 moc_*
 *.app
+ui_*
+.qtc_*
 /Makefile
 /Makefile.Debug
 /Makefile.Release

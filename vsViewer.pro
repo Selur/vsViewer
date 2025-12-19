@@ -344,7 +344,9 @@ p2p_sse41.commands = $${QMAKE_CXX} $(CXXFLAGS) -DP2P_SIMD $(INCPATH) -c ${QMAKE_
 contains(QMAKE_COMPILER, msvc) {
  p2p_sse41.commands += -Fo${QMAKE_FILE_OUT}
 } else {
- p2p_sse41.commands += -msse4.1
+ !macx {
+   p2p_sse41.commands += -msse4.1
+ }
  p2p_sse41.commands += -o ${QMAKE_FILE_OUT}
  p2p_sse41.commands += -std=c++14
  p2p_sse41.commands += -Wno-missing-field-initializers
