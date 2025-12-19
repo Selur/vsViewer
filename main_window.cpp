@@ -42,38 +42,15 @@
 
 //==============================================================================
 
-MainWindow::MainWindow() : QMainWindow()
-  , m_pSettingsManager(nullptr)
-  , m_pVapourSynthPluginsManager(nullptr)
-  , m_pVSScriptLibrary(nullptr)
-  , m_pActionNewScript(nullptr)
-  , m_pActionOpenScript(nullptr)
-  , m_pActionSaveScript(nullptr)
-  , m_pActionSaveScriptAs(nullptr)
-  , m_pActionTemplates(nullptr)
-  , m_pActionSettings(nullptr)
-  , m_pActionPreview(nullptr)
-  , m_pActionCheckScript(nullptr)
-  , m_pActionBenchmark(nullptr)
-  , m_pActionEncode(nullptr)
-  , m_pActionEnqueueEncodeJob(nullptr)
-  , m_pActionJobs(nullptr)
-  , m_pActionExit(nullptr)
-  , m_pActionAbout(nullptr)
-  , m_settableActionsList()
-  , m_pMenuRecentScripts(nullptr)
-  , m_pPreviewDialog(nullptr)
-  , m_pSettingsDialog(nullptr)
-  , m_pBenchmarkDialog(nullptr)
-  , m_pEncodeDialog(nullptr)
-  , m_pTemplatesDialog(nullptr)
-  , m_scriptFilePath()
-  , m_lastSavedText()
-  , m_pJobServerWatcherSocket(nullptr)
-  , m_pGeometrySaveTimer(nullptr)
-  , m_ipcClient(nullptr)
-  , m_ipcServer(nullptr)
-  , m_hideMainWindow(false)
+MainWindow::MainWindow(SettingsManager *settings)
+  : QMainWindow(), m_pSettingsManager(settings), m_pVapourSynthPluginsManager(nullptr), m_pVSScriptLibrary(nullptr),
+    m_pActionNewScript(nullptr), m_pActionOpenScript(nullptr), m_pActionSaveScript(nullptr), m_pActionSaveScriptAs(nullptr),
+    m_pActionTemplates(nullptr), m_pActionSettings(nullptr), m_pActionPreview(nullptr), m_pActionCheckScript(nullptr),
+    m_pActionBenchmark(nullptr), m_pActionEncode(nullptr), m_pActionEnqueueEncodeJob(nullptr), m_pActionJobs(nullptr),
+    m_pActionExit(nullptr), m_pActionAbout(nullptr), m_settableActionsList(), m_pMenuRecentScripts(nullptr), m_pPreviewDialog(nullptr),
+    m_pSettingsDialog(nullptr), m_pBenchmarkDialog(nullptr), m_pEncodeDialog(nullptr), m_pTemplatesDialog(nullptr), m_scriptFilePath(),
+    m_lastSavedText(), m_pJobServerWatcherSocket(nullptr), m_pGeometrySaveTimer(nullptr), m_pReloadTextTimer(nullptr), m_ipcClient(nullptr),
+    m_ipcServer(nullptr), m_hideMainWindow(false)
 {
   loadFonts();
 
@@ -81,32 +58,45 @@ MainWindow::MainWindow() : QMainWindow()
 
   setWindowIcon(QIcon(":vsviewer.ico"));
 
-  m_pSettingsManager = new SettingsManager(this);
+  if (m_pSettingsManager->inDarkMode()) {
+    // Load qDarkStyle colors
+    QFile styleSheetDark(":/dark/style.qss");
+    if (!styleSheetDark.open(QFile::ReadOnly | QFile::Text)) {
+      QMessageBox::critical(this, QString::fromUtf8("File open error"),
+                            QString::fromUtf8("Failed to open stylesheet file ") + styleSheetDark.errorString());
+    }
+    qApp->setStyleSheet(styleSheetDark.readAll());
+    // With the current impl of the timeline slider
+    // we have to relaunch anyway
+    QPalette newPal(qApp->palette());
+    newPal.setColor(QPalette::Base, QColor(0, 0, 0));
+    newPal.setColor(QPalette::Highlight, QColor(128, 128, 128));
+    newPal.setColor(QPalette::Dark, QColor(192, 192, 192));
+    newPal.setColor(QPalette::Text, QColor(64, 192, 0));
+    qApp->setPalette(newPal);
+  }
+#ifdef Q_OS_WIN
+  else
+    qApp->setStyle("fusion");
+#endif
   m_pSettingsDialog = new SettingsDialog(m_pSettingsManager, nullptr);
 
-  connect(m_pSettingsDialog, SIGNAL(signalSettingsChanged()),
-    this, SLOT(slotSettingsChanged()));
+  connect(m_pSettingsDialog, SIGNAL(signalSettingsChanged()), this, SLOT(slotSettingsChanged()));
 
   m_pVSScriptLibrary = new VSScriptLibrary(m_pSettingsManager, this);
 
-  connect(m_pVSScriptLibrary,
-    SIGNAL(signalWriteLogMessage(int, const QString &)),
-    this, SLOT(slotWriteLogMessage(int, const QString &)));
+  connect(m_pVSScriptLibrary, SIGNAL(signalWriteLogMessage(int, const QString &)), this, SLOT(slotWriteLogMessage(int, const QString &)));
 
-  m_pVapourSynthPluginsManager =
-    new VapourSynthPluginsManager(m_pSettingsManager, this);
+  m_pVapourSynthPluginsManager = new VapourSynthPluginsManager(m_pSettingsManager, m_pVSScriptLibrary->getVSAPI(), this);
   VSPluginsList vsPluginsList = m_pVapourSynthPluginsManager->pluginsList();
 
   m_ui.scriptEdit->setPluginsList(vsPluginsList);
   m_ui.scriptEdit->setSettingsManager(m_pSettingsManager);
 
-  connect(m_ui.scriptEdit, SIGNAL(textChanged()),
-    this, SLOT(slotEditorTextChanged()));
-  connect(m_ui.scriptEdit, SIGNAL(modificationChanged(bool)),
-    this, SLOT(slotChangeWindowTitle()));
-  connect(m_ui.scriptEdit,
-    SIGNAL(signalScriptFileDropped(const QString &, bool *)),
-    this, SLOT(slotScriptFileDropped(const QString &, bool *)));
+  connect(m_ui.scriptEdit, SIGNAL(textChanged()), this, SLOT(slotEditorTextChanged()));
+  connect(m_ui.scriptEdit, SIGNAL(modificationChanged(bool)), this, SLOT(slotChangeWindowTitle()));
+  connect(m_ui.scriptEdit, SIGNAL(signalScriptFileDropped(const QString &, bool *)), this,
+          SLOT(slotScriptFileDropped(const QString &, bool *)));
 
   m_ui.logView->setName("main_log");
   m_ui.logView->setSettingsManager(m_pSettingsManager);
@@ -127,54 +117,46 @@ MainWindow::MainWindow() : QMainWindow()
   connect(m_pSettingsDialog, SIGNAL(signalSettingsChanged()),
     m_pPreviewDialog, SLOT(slotSettingsChanged()));
 
-  m_pBenchmarkDialog =
-    new ScriptBenchmarkDialog(m_pSettingsManager, m_pVSScriptLibrary);
-  connect(m_pBenchmarkDialog,
-    SIGNAL(signalWriteLogMessage(int, const QString &)),
-    this, SLOT(slotWriteLogMessage(int, const QString &)));
+  m_pBenchmarkDialog = new ScriptBenchmarkDialog(m_pSettingsManager, m_pVSScriptLibrary);
+  connect(m_pBenchmarkDialog, SIGNAL(signalWriteLogMessage(int, const QString &)), this, SLOT(slotWriteLogMessage(int, const QString &)));
 
   m_pEncodeDialog = new EncodeDialog(m_pSettingsManager, m_pVSScriptLibrary);
-  connect(m_pEncodeDialog,
-    SIGNAL(signalWriteLogMessage(const QString &, const QString &)),
-    this, SLOT(slotWriteLogMessage(const QString &, const QString &)));
+  connect(m_pEncodeDialog, SIGNAL(signalWriteLogMessage(const QString &, const QString &)), this,
+          SLOT(slotWriteLogMessage(const QString &, const QString &)));
 
   m_pTemplatesDialog = new TemplatesDialog(m_pSettingsManager);
   m_pTemplatesDialog->setPluginsList(vsPluginsList);
 
-  connect(m_pTemplatesDialog, SIGNAL(signalPasteCodeSnippet(const QString &)),
-    this, SLOT(slotInsertTextIntoScriptAtNewLine(const QString &)));
+  connect(m_pTemplatesDialog, SIGNAL(signalPasteCodeSnippet(const QString &)), this,
+          SLOT(slotInsertTextIntoScriptAtNewLine(const QString &)));
 
-  m_orphanQObjects =
-  {
-    (QObject **)&m_pPreviewDialog,
-    (QObject **)&m_pSettingsDialog,
-    (QObject **)&m_pBenchmarkDialog,
-    (QObject **)&m_pEncodeDialog,
-    (QObject **)&m_pTemplatesDialog
-  };
+  m_orphanQObjects = {(QObject **)&m_pPreviewDialog, (QObject **)&m_pSettingsDialog, (QObject **)&m_pBenchmarkDialog,
+                      (QObject **)&m_pEncodeDialog, (QObject **)&m_pTemplatesDialog};
 
   m_pJobServerWatcherSocket = new JobServerWatcherSocket(this);
-  connect(m_pJobServerWatcherSocket,
-    SIGNAL(signalWriteLogMessage(const QString &, const QString &)),
-    this, SLOT(slotWriteLogMessage(const QString &, const QString &)));
+  connect(m_pJobServerWatcherSocket, SIGNAL(signalWriteLogMessage(const QString &, const QString &)), this,
+          SLOT(slotWriteLogMessage(const QString &, const QString &)));
 
   m_pGeometrySaveTimer = new QTimer(this);
   m_pGeometrySaveTimer->setInterval(DEFAULT_WINDOW_GEOMETRY_SAVE_DELAY);
-  connect(m_pGeometrySaveTimer, &QTimer::timeout,
-    this, &MainWindow::slotSaveGeometry);
+  connect(m_pGeometrySaveTimer, &QTimer::timeout, this, &MainWindow::slotSaveGeometry);
+
+  m_pReloadTextTimer = new QTimer(this);
+  m_pReloadTextTimer->setInterval(500);
+  connect(m_pReloadTextTimer, &QTimer::timeout, this, &MainWindow::slotReloadTextFromDisk);
 
   createActionsAndMenus();
 
   slotChangeWindowTitle();
 
   m_windowGeometry = m_pSettingsManager->getMainWindowGeometry();
-  if(!m_windowGeometry.isEmpty())
-    restoreGeometry(m_windowGeometry);
+  if (!m_windowGeometry.isEmpty()) restoreGeometry(m_windowGeometry);
 
-  if(m_pSettingsManager->getMainWindowMaximized())
-    showMaximized();
+  if (m_pSettingsManager->getMainWindowMaximized()) showMaximized();
 
   loadStartUpScript();
+
+  if (m_pSettingsManager->getReloadScriptFromDisk()) m_pReloadTextTimer->start();
 }
 
 // END OF MainWindow::MainWindow()
@@ -417,17 +399,14 @@ void MainWindow::slotTemplates()
 
 void MainWindow::slotPreview()
 {
-  if(m_pPreviewDialog->busy())
-  {
-    QString message = tr("Preview dialog appears busy processing "
+  if (m_pPreviewDialog->busy()) {
+    QString message = tr(
+      "Preview dialog appears busy processing "
       "frames. Please stop any active actions in the dialog and wait "
       "for script processor to finish processing.");
     m_ui.logView->addEntry(message, LOG_STYLE_WARNING);
     return;
   }
-
-  if(m_pSettingsManager->getReloadBeforeExecution())
-    reloadTexts();
 
   m_pPreviewDialog->previewScript(m_ui.scriptEdit->text(), m_scriptFilePath);
 }
@@ -437,22 +416,20 @@ void MainWindow::slotPreview()
 
 void MainWindow::slotCheckScript()
 {
-  if(m_pSettingsManager->getReloadBeforeExecution())
-    reloadTexts();
+  VapourSynthScriptProcessor tempProcessor(m_pSettingsManager, m_pVSScriptLibrary, this);
 
-  VapourSynthScriptProcessor tempProcessor(m_pSettingsManager,
-    m_pVSScriptLibrary, this);
+  const VSAPI *cpVSAPI = m_pVSScriptLibrary->getVSAPI();
 
-  connect(&tempProcessor, SIGNAL(signalWriteLogMessage(int, const QString &)),
-    this, SLOT(slotWriteLogMessage(int, const QString &)));
+  connect(&tempProcessor, SIGNAL(signalWriteLogMessage(int, const QString &)), this, SLOT(slotWriteLogMessage(int, const QString &)));
 
-  bool correct = tempProcessor.initialize(m_ui.scriptEdit->text(),
-    m_scriptFilePath);
-  if(correct)
-  {
-    QString message = tr("Script was successfully evaluated. "
-      "Output video info:\n");
-    message += vsedit::videoInfoString(tempProcessor.videoInfo());
+  bool correct = tempProcessor.initialize(m_ui.scriptEdit->text(), m_scriptFilePath, 0, ProcessReason::Check);
+  if (correct) {
+    VSNodeInfo info = tempProcessor.nodeInfo();
+    QString message = tr(
+                        "Script was successfully evaluated. "
+                        "Output %1 info:\n")
+                        .arg(info.isAudio() ? "audio" : "video");
+    message += vsedit::nodeInfoString(info, cpVSAPI);
     m_ui.logView->addEntry(message, LOG_STYLE_POSITIVE);
   }
 }
@@ -462,17 +439,14 @@ void MainWindow::slotCheckScript()
 
 void MainWindow::slotBenchmark()
 {
-  if(m_pBenchmarkDialog->busy())
-  {
-    QString message = tr("Benchmark dialog appears busy processing "
+  if (m_pBenchmarkDialog->busy()) {
+    QString message = tr(
+      "Benchmark dialog appears busy processing "
       "frames. Please stop any active actions in the dialog and wait "
       "for script processor to finish processing.");
     m_ui.logView->addEntry(message, LOG_STYLE_WARNING);
     return;
   }
-
-  if(m_pSettingsManager->getReloadBeforeExecution())
-    reloadTexts();
 
   m_pBenchmarkDialog->initialize(m_ui.scriptEdit->text(), m_scriptFilePath);
   m_pBenchmarkDialog->call();
@@ -483,19 +457,13 @@ void MainWindow::slotBenchmark()
 
 void MainWindow::slotEncode()
 {
-  if(m_pEncodeDialog->busy())
-  {
+  if (m_pEncodeDialog->busy()) {
     m_pEncodeDialog->showActive();
     return;
   }
 
-  if(m_pSettingsManager->getReloadBeforeExecution())
-    reloadTexts();
-
-  bool initialized = m_pEncodeDialog->initialize(
-    m_ui.scriptEdit->text(), m_scriptFilePath);
-  if(initialized)
-    m_pEncodeDialog->showActive();
+  bool initialized = m_pEncodeDialog->initialize(m_ui.scriptEdit->text(), m_scriptFilePath);
+  if (initialized) m_pEncodeDialog->showActive();
 }
 
 // END OF void MainWindow::slotEncode()
@@ -503,18 +471,13 @@ void MainWindow::slotEncode()
 
 void MainWindow::slotEnqueueEncodeJob()
 {
-  if(m_scriptFilePath.isEmpty())
-    return;
-
-  if(m_pSettingsManager->getReloadBeforeExecution())
-    reloadTexts();
+  if (m_scriptFilePath.isEmpty()) return;
 
   JobProperties properties;
   properties.type = JobType::EncodeScriptCLI;
   properties.scriptName = m_scriptFilePath;
 
-  QByteArray message = vsedit::jsonMessage(WMSG_CLI_ENCODE_JOB,
-    properties.toJson());
+  QByteArray message = vsedit::jsonMessage(WMSG_CLI_ENCODE_JOB, properties.toJson());
   m_pJobServerWatcherSocket->sendMessage(message);
 }
 
@@ -585,18 +548,22 @@ void MainWindow::slotOpenRecentScriptActionTriggered()
 void MainWindow::slotSettingsChanged()
 {
   QKeySequence hotkey;
-  for(QAction * pAction : m_settableActionsList)
-  {
+  for (QAction *pAction : m_settableActionsList) {
     hotkey = m_pSettingsManager->getHotkey(pAction->data().toString());
     pAction->setShortcut(hotkey);
   }
 
-  m_pVapourSynthPluginsManager->slotRefill();
+  m_pVapourSynthPluginsManager->slotRefill(m_pVSScriptLibrary->getVSAPI());
   VSPluginsList vsPluginsList = m_pVapourSynthPluginsManager->pluginsList();
   m_ui.scriptEdit->setPluginsList(vsPluginsList);
   m_ui.scriptEdit->slotLoadSettings();
   m_pTemplatesDialog->setPluginsList(vsPluginsList);
   m_pTemplatesDialog->slotLoadSettings();
+
+  if (m_pSettingsManager->getReloadScriptFromDisk())
+    m_pReloadTextTimer->start(500);
+  else
+    m_pReloadTextTimer->stop();
 }
 
 // END OF void MainWindow::slotSettingsChanged()
@@ -622,9 +589,32 @@ void MainWindow::slotSaveGeometry()
   m_pGeometrySaveTimer->stop();
   m_pSettingsManager->setMainWindowGeometry(m_windowGeometry);
 }
-
-// END OF void MainWindow::slotSaveGeometry()
+// void slotReloadTextFromDisk();
 //==============================================================================
+
+void MainWindow::slotReloadTextFromDisk()
+{
+  if (m_ui.scriptEdit->isModified()) return;
+
+  if (m_scriptFilePath.isEmpty()) return;
+
+  QFile scriptFile(m_scriptFilePath);
+  bool loadSuccess = scriptFile.open(QIODevice::ReadOnly | QIODevice::Text);
+  if (!loadSuccess) return;
+
+  QByteArray utf8Script = scriptFile.readAll();
+  QString scriptText = QString::fromUtf8(utf8Script);
+  if (scriptText.isEmpty())  // To prevent an occasional bug?
+    return;
+  if (scriptText == m_ui.scriptEdit->text()) return;
+
+  QPoint pos = m_ui.scriptEdit->cursorPosition();
+  m_ui.scriptEdit->setPlainText(scriptText);
+  m_ui.scriptEdit->setCursorPosition(pos);
+  m_ui.scriptEdit->setModified(false);
+
+  m_pBenchmarkDialog->resetSavedRange();
+}
 
 void MainWindow::createActionsAndMenus()
 {
@@ -986,15 +976,19 @@ bool MainWindow::checkHybridScript()
   VapourSynthScriptProcessor tempProcessor(m_pSettingsManager,
     m_pVSScriptLibrary, this);
 
+  const VSAPI *cpVSAPI = m_pVSScriptLibrary->getVSAPI();
+
   connect(&tempProcessor, SIGNAL(signalWriteLogMessage(int, const QString &)),
     this, SLOT(slotWriteLogMessage(int, const QString &)));
 
-  bool correct = tempProcessor.initialize(m_ui.scriptEdit->text(), m_scriptFilePath);
-  if(correct)
-  {
-    QString message = tr("Script was successfully evaluated. "
-      "Output video info:\n");
-    message += vsedit::videoInfoString(tempProcessor.videoInfo());
+  bool correct = tempProcessor.initialize(m_ui.scriptEdit->text(), m_scriptFilePath, 0, ProcessReason::Check);
+  if (correct) {
+    VSNodeInfo info = tempProcessor.nodeInfo();
+    QString message = tr(
+                        "Script was successfully evaluated. "
+                        "Output %1 info:\n")
+                        .arg(info.isAudio() ? "audio" : "video");
+    message += vsedit::nodeInfoString(info, cpVSAPI);
     m_ui.logView->addEntry(message, LOG_STYLE_POSITIVE);
   }
   return correct;

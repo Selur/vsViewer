@@ -1,76 +1,84 @@
 #ifndef PREVIEWAREA_H
 #define PREVIEWAREA_H
 
-#include <QScrollArea>
 #include <QPixmap>
 #include <QPoint>
+#include <QScrollArea>
 
 class QLabel;
 class ScrollNavigator;
 class QKeyEvent;
 class QWheelEvent;
 class QMouseEvent;
+class QEnterEvent;
 
 class PreviewArea : public QScrollArea
 {
-  Q_OBJECT
+    Q_OBJECT
 
-public:
+  public:
+    PreviewArea(QWidget* a_pParent = nullptr);
 
-  PreviewArea(QWidget * a_pParent = nullptr);
+    virtual ~PreviewArea();
 
-  virtual ~PreviewArea();
+    void setWidget(QWidget* a_pWidget) = delete;
 
-  void setWidget(QWidget * a_pWidget) = delete;
+    int pixmapWidth() const { return m_pixmapWidth; }
 
-  int pixmapWidth() const { return m_pixmapWidth; }
+    int pixmapHeight() const { return m_pixmapHeight; }
 
-  int pixmapHeight() const { return m_pixmapHeight; }
+    void setPixmap(const QPixmap& a_pixmap, bool a_isVideoFrame = false);
 
-  void setPixmap(const QPixmap & a_pixmap, qreal a_devicePixelRatio);
+    void checkMouseOverPreview(const QPointF& a_pixelPos);
 
-  void checkMouseOverPreview(const QPoint & a_globalMousePos);
+    QPointF pixelPosition() const;
 
-public slots:
+    QPoint getScrollBarPositions() const;
 
-  void slotScrollLeft();
-  void slotScrollRight();
-  void slotScrollTop();
-  void slotScrollBottom();
+    void getScrollBarPositionsFromPreviewer(const QPoint& pos);
 
-protected:
+  public slots:
 
-  void resizeEvent(QResizeEvent * a_pEvent) override;
-  void keyPressEvent(QKeyEvent * a_pEvent) override;
-  void wheelEvent(QWheelEvent * a_pEvent) override;
-  void mousePressEvent(QMouseEvent * a_pEvent) override;
-  void mouseMoveEvent(QMouseEvent * a_pEvent) override;
-  void mouseReleaseEvent(QMouseEvent * a_pEvent) override;
+    void slotScrollLeft();
+    void slotScrollRight();
+    void slotScrollTop();
+    void slotScrollBottom();
+    void slotSetScrollBarPositions();
 
-signals:
+  protected:
+    void resizeEvent(QResizeEvent* a_pEvent) override;
+    void keyPressEvent(QKeyEvent* a_pEvent) override;
+    void wheelEvent(QWheelEvent* a_pEvent) override;
+    void mousePressEvent(QMouseEvent* a_pEvent) override;
+    void mouseMoveEvent(QMouseEvent* a_pEvent) override;
+    void mouseReleaseEvent(QMouseEvent* a_pEvent) override;
+    void enterEvent(QEnterEvent* a_pEvent) override;
 
-  void signalSizeChanged();
-  void signalCtrlWheel(QPoint a_angleDelta);
-  void signalMouseMiddleButtonReleased();
-  void signalMouseRightButtonReleased();
-  void signalMouseOverPoint(float a_normX, float a_normY);
+  signals:
 
-private:
+    void signalSizeChanged();
+    void signalCtrlWheel(QPoint a_angleDelta);
+    void signalMouseMiddleButtonReleased();
+    void signalMouseRightButtonReleased();
+    void signalMouseOverPoint(double a_normX, double a_normY);
 
-  void drawScrollNavigator();
+  private:
+    void drawScrollNavigator();
 
-  QLabel * m_pPreviewLabel;
+    QLabel* m_pPreviewLabel;
 
-  ScrollNavigator * m_pScrollNavigator;
+    ScrollNavigator* m_pScrollNavigator;
 
-  bool m_draggingPreview;
-  QPoint m_lastCursorPos;
-  QPoint m_lastPreviewLabelPos;
+    bool m_draggingPreview;
+    QPoint m_lastCursorPos;
+    QPoint m_lastPreviewLabelPos;
+    QPointF m_lastScenePos;
 
-  int m_pixmapWidth = 0;
-  int m_pixmapHeight = 0;
+    int m_pixmapWidth = 0;
+    int m_pixmapHeight = 0;
 
-  qreal m_devicePixelRatio = 1;
+    bool m_newToPreviewer;
+    QPoint m_lastScrollBarPos;
 };
 
-#endif // PREVIEWAREA_H
+#endif  // PREVIEWAREA_H

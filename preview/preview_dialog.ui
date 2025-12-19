@@ -30,7 +30,7 @@
     <number>0</number>
    </property>
    <item>
-    <widget class="PreviewArea" name="previewArea"/>
+    <widget class="PreviewArea" name="previewArea" native="true"/>
    </item>
    <item>
     <widget class="QWidget" name="toolBar" native="true">
@@ -63,6 +63,30 @@
         </property>
         <property name="checkable">
          <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="outputIndexLabel">
+        <property name="text">
+         <string>Index:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="outputIndexComboBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="frameLabel">
+        <property name="text">
+         <string>Frame:</string>
         </property>
        </widget>
       </item>
@@ -178,7 +202,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QDoubleSpinBox" name="zoomRatioSpinBox">
+          <widget class="ZoomRatioSpinBox" name="zoomRatioSpinBox">
            <property name="keyboardTracking">
             <bool>false</bool>
            </property>
@@ -213,6 +237,9 @@
        </widget>
       </item>
      </layout>
+     <zorder>outputIndexLabel</zorder>
+     <zorder>outputIndexComboBox</zorder>
+     <zorder>frameLabel</zorder>
      <zorder>colorPickerButton</zorder>
      <zorder>frameNumberSlider</zorder>
      <zorder>frameToClipboardButton</zorder>
@@ -277,7 +304,7 @@
       <item>
        <spacer name="horizontalSpacer_2">
         <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+         <enum>Qt::Orientation::Horizontal</enum>
         </property>
         <property name="sizeHint" stdset="0">
          <size>
@@ -316,7 +343,7 @@
       <item>
        <spacer name="horizontalSpacer_3">
         <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+         <enum>Qt::Orientation::Horizontal</enum>
         </property>
         <property name="sizeHint" stdset="0">
          <size>
@@ -401,7 +428,7 @@
       <item>
        <spacer name="horizontalSpacer">
         <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+         <enum>Qt::Orientation::Horizontal</enum>
         </property>
         <property name="sizeHint" stdset="0">
          <size>
@@ -423,7 +450,7 @@
          <string>Crop mode:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -445,7 +472,7 @@
          <string>Left:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -471,7 +498,7 @@
          <string>Top:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -497,7 +524,7 @@
          <string>Width:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -526,7 +553,7 @@
          <string>Height:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -555,7 +582,7 @@
          <string>Right:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -581,7 +608,7 @@
          <string>Bottom:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -607,7 +634,7 @@
          <string>Zoom:</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
         </property>
         <property name="margin">
          <number>4</number>
@@ -654,6 +681,12 @@
    <class>TimeLineSlider</class>
    <extends>QWidget</extends>
    <header>common-src/timeline_slider/timeline_slider.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ZoomRatioSpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header>preview/zoom_ratio_spinbox.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -11,68 +11,52 @@ class ThemeElementsModel;
 
 class SettingsDialog : public QDialog
 {
-	Q_OBJECT
+    Q_OBJECT
 
-public:
+  public:
+    SettingsDialog(SettingsManager* a_pSettingsManager, QWidget* a_pParent = nullptr);
 
-	SettingsDialog(SettingsManager * a_pSettingsManager,
-		QWidget * a_pParent = nullptr);
+    virtual ~SettingsDialog();
 
-	virtual ~SettingsDialog();
+  public slots:
 
-public slots:
+    void slotCall();
 
-	void slotCall();
+  protected:
+  signals:
 
-protected:
+    void signalSettingsChanged();
 
-signals:
+  private:
+    void addThemeElements();
 
-	void signalSettingsChanged();
+    Ui::SettingsDialog m_ui;
 
-private:
+    SettingsManager* m_pSettingsManager;
 
-	void addThemeElements();
+    ActionsHotkeyEditModel* m_pActionsHotkeyEditModel;
 
-	Ui::SettingsDialog m_ui;
+    ItemDelegateForHotkey* m_pItemDelegateForHotkey;
 
-	SettingsManager * m_pSettingsManager;
+    ThemeElementsModel* m_pThemeElementsModel;
 
-	ActionsHotkeyEditModel * m_pActionsHotkeyEditModel;
+  private slots:
 
-	ItemDelegateForHotkey * m_pItemDelegateForHotkey;
+    void slotOk();
 
-	ThemeElementsModel * m_pThemeElementsModel;
+    void slotApply();
 
-private slots:
+    void slotAddVSLibraryPath();
 
-	void slotOk();
+    void slotRemoveVSLibraryPath();
 
-	void slotApply();
+    void slotSelectVSLibraryPath();
 
-	void slotAddVSLibraryPath();
+    void slotThemeElementSelected(const QModelIndex& a_index);
 
-	void slotRemoveVSLibraryPath();
+    void slotFontButtonClicked();
 
-	void slotSelectVSLibraryPath();
-
-	void slotAddVSPluginsPath();
-
-	void slotRemoveVSPluginsPath();
-
-	void slotSelectVSPluginsPath();
-
-	void slotAddVSDocumentationPath();
-
-	void slotRemoveVSDocumentationPath();
-
-	void slotSelectVSDocumentationPath();
-
-	void slotThemeElementSelected(const QModelIndex & a_index);
-
-	void slotFontButtonClicked();
-
-	void slotColourButtonClicked();
+    void slotColourButtonClicked();
 };
 
-#endif // SETTINGSDIALOG_H
+#endif  // SETTINGSDIALOG_H

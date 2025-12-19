@@ -2,34 +2,34 @@
 
 #include "scroll_navigator.h"
 
-#include <QLabel>
+#include <QCoreApplication>
+#include <QEnterEvent>
 #include <QKeyEvent>
-#include <QWheelEvent>
+#include <QLabel>
 #include <QMouseEvent>
 #include <QScrollBar>
-#include <QCoreApplication>
+#include <QTimer>
+#include <QWheelEvent>
 
 //==============================================================================
 
-PreviewArea::PreviewArea(QWidget * a_pParent) : QScrollArea(a_pParent)
-  , m_pPreviewLabel(nullptr)
-  , m_pScrollNavigator(nullptr)
-  , m_draggingPreview(false)
-  , m_lastCursorPos(0, 0)
-  , m_lastPreviewLabelPos(0, 0)
+PreviewArea::PreviewArea(QWidget *a_pParent)
+  : QScrollArea(a_pParent), m_pPreviewLabel(nullptr), m_pScrollNavigator(nullptr), m_draggingPreview(false), m_lastCursorPos(0, 0),
+    m_lastPreviewLabelPos(0, 0), m_lastScenePos(0.0, 0.0), m_newToPreviewer(false)
 {
   m_pPreviewLabel = new QLabel(this);
   m_pPreviewLabel->setPixmap(QPixmap());
   m_pPreviewLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  m_pPreviewLabel->move(0, 0);
   QScrollArea::setWidget(m_pPreviewLabel);
   setWidgetResizable(true);
 
   m_pScrollNavigator = new ScrollNavigator(this);
   int scrollFrameWidth = frameWidth();
-  m_pScrollNavigator->move(pos() +
-    QPoint(scrollFrameWidth, scrollFrameWidth));
+  m_pScrollNavigator->move(pos() + QPoint(scrollFrameWidth, scrollFrameWidth));
   m_pScrollNavigator->setVisible(false);
 
+  setAttribute(Qt::WA_Hover, true);
   setMouseTracking(true);
   m_pPreviewLabel->setMouseTracking(true);
 }
@@ -37,58 +37,42 @@ PreviewArea::PreviewArea(QWidget * a_pParent) : QScrollArea(a_pParent)
 // END OF PreviewArea::PreviewArea(QWidget * a_pParent)
 //==============================================================================
 
-PreviewArea::~PreviewArea()
-{
-
-}
+PreviewArea::~PreviewArea() {}
 
 // END OF PreviewArea::~PreviewArea()
 //==============================================================================
 
-void PreviewArea::setPixmap(const QPixmap & a_pixmap, qreal a_devicePixelRatio)
+void PreviewArea::setPixmap(const QPixmap &a_pixmap, bool a_isVideoFrame)
 {
   m_pPreviewLabel->setPixmap(a_pixmap);
   m_pixmapWidth = a_pixmap.width();
   m_pixmapHeight = a_pixmap.height();
-#if (QT_VERSION_MAJOR < 6)
-  m_devicePixelRatio = 1;
-#else
-  m_devicePixelRatio = a_devicePixelRatio;
-#endif
+  if (a_isVideoFrame && m_newToPreviewer) {
+    m_newToPreviewer = false;
+    QCoreApplication::processEvents();
+    QTimer::singleShot(0, this, SLOT(slotSetScrollBarPositions()));
+  }
 }
 
 // END OF void PreviewArea::setPixmap(const QPixmap & a_pixmap)
 //==============================================================================
 
-void PreviewArea::checkMouseOverPreview(const QPoint & a_globalMousePos)
+void PreviewArea::checkMouseOverPreview(const QPointF &a_pixelPos)
 {
-  if(!m_pPreviewLabel->underMouse())
-    return;
+  if (!m_pPreviewLabel->underMouse()) return;
 
-  QPoint imagePoint = m_pPreviewLabel->mapFromGlobal(a_globalMousePos);
+  double pX = a_pixelPos.x();
+  double pY = a_pixelPos.y();
+  if (pX < 0 || pY < 0 || pX >= pixmapWidth() || pY >= pixmapHeight()) return;
 
-  int pixmapWidth = this->pixmapWidth();
-  int pixmapHeight = this->pixmapHeight();
-
-  if((imagePoint.x() < 0) || (imagePoint.y() < 0) ||
-     (imagePoint.x() * m_devicePixelRatio >= pixmapWidth) ||
-     (imagePoint.y() * m_devicePixelRatio >= pixmapHeight))
-    return;
-
-  float normX = imagePoint.x() * m_devicePixelRatio / pixmapWidth;
-  float normY = imagePoint.y() * m_devicePixelRatio / pixmapHeight;
-
-  emit signalMouseOverPoint(normX, normY);
+  emit signalMouseOverPoint(pX, pY);
 }
 
 // END OF void PreviewArea::checkMouseOverPreview(
 //		const QPoint & a_globalMousePos)
 //==============================================================================
 
-void PreviewArea::slotScrollLeft()
-{
-  horizontalScrollBar()->setValue(0);
-}
+void PreviewArea::slotScrollLeft() { horizontalScrollBar()->setValue(0); }
 
 // END OF void PreviewArea::slotScrollLeft()
 //==============================================================================
@@ -96,17 +80,14 @@ void PreviewArea::slotScrollLeft()
 void PreviewArea::slotScrollRight()
 {
   QCoreApplication::processEvents();
-  QScrollBar * pHorizontalScrollbar = horizontalScrollBar();
+  QScrollBar *pHorizontalScrollbar = horizontalScrollBar();
   pHorizontalScrollbar->setValue(pHorizontalScrollbar->maximum());
 }
 
 // END OF void PreviewArea::slotScrollRight()
 //==============================================================================
 
-void PreviewArea::slotScrollTop()
-{
-  verticalScrollBar()->setValue(0);
-}
+void PreviewArea::slotScrollTop() { verticalScrollBar()->setValue(0); }
 
 // END OF void PreviewArea::slotScrollTop()
 //==============================================================================
@@ -114,14 +95,14 @@ void PreviewArea::slotScrollTop()
 void PreviewArea::slotScrollBottom()
 {
   QCoreApplication::processEvents();
-  QScrollBar * pVerticalScrollbar = verticalScrollBar();
+  QScrollBar *pVerticalScrollbar = verticalScrollBar();
   pVerticalScrollbar->setValue(pVerticalScrollbar->maximum());
 }
 
 // END OF void PreviewArea::slotScrollBottom()
 //==============================================================================
 
-void PreviewArea::resizeEvent(QResizeEvent * a_pEvent)
+void PreviewArea::resizeEvent(QResizeEvent *a_pEvent)
 {
   QScrollArea::resizeEvent(a_pEvent);
   emit signalSizeChanged();
@@ -130,20 +111,17 @@ void PreviewArea::resizeEvent(QResizeEvent * a_pEvent)
 // END OF void PreviewArea::resizeEvent(QResizeEvent * a_pEvent)
 //==============================================================================
 
-void PreviewArea::keyPressEvent(QKeyEvent * a_pEvent)
+void PreviewArea::keyPressEvent(QKeyEvent *a_pEvent)
 {
-  if(a_pEvent->modifiers() != Qt::NoModifier)
-  {
+  if (a_pEvent->modifiers() != Qt::NoModifier) {
     QScrollArea::keyPressEvent(a_pEvent);
     return;
   }
 
   int key = a_pEvent->key();
-  int wantedKeys[] = {Qt::Key_Left, Qt::Key_Right, Qt::Key_Up, Qt::Key_Down,
-    Qt::Key_PageUp, Qt::Key_PageDown, Qt::Key_Home, Qt::Key_End};
-  int * pKeysEnd = wantedKeys + sizeof(wantedKeys) / sizeof(*wantedKeys);
-  if(pKeysEnd != std::find(wantedKeys, pKeysEnd, key))
-  {
+  int wantedKeys[] = {Qt::Key_Left, Qt::Key_Right, Qt::Key_Up, Qt::Key_Down, Qt::Key_PageUp, Qt::Key_PageDown, Qt::Key_Home, Qt::Key_End};
+  int *pKeysEnd = wantedKeys + sizeof(wantedKeys) / sizeof(*wantedKeys);
+  if (pKeysEnd != std::find(wantedKeys, pKeysEnd, key)) {
     a_pEvent->ignore();
     return;
   }
@@ -154,10 +132,9 @@ void PreviewArea::keyPressEvent(QKeyEvent * a_pEvent)
 // END OF void PreviewArea::keyPressEvent(QKeyEvent * a_pEvent)
 //==============================================================================
 
-void PreviewArea::wheelEvent(QWheelEvent * a_pEvent)
+void PreviewArea::wheelEvent(QWheelEvent *a_pEvent)
 {
-  if(a_pEvent->modifiers() == Qt::ControlModifier)
-  {
+  if (a_pEvent->modifiers() == Qt::ControlModifier) {
     emit signalCtrlWheel(a_pEvent->angleDelta());
     a_pEvent->ignore();
     return;
@@ -169,12 +146,11 @@ void PreviewArea::wheelEvent(QWheelEvent * a_pEvent)
 // END OF void PreviewArea::wheelEvent(QWheelEvent * a_pEvent)
 //==============================================================================
 
-void PreviewArea::mousePressEvent(QMouseEvent * a_pEvent)
+void PreviewArea::mousePressEvent(QMouseEvent *a_pEvent)
 {
-  if(a_pEvent->buttons() == Qt::LeftButton)
-  {
+  if (a_pEvent->buttons() == Qt::LeftButton) {
     m_draggingPreview = true;
-    m_lastCursorPos = a_pEvent->globalPos();
+    m_lastCursorPos = a_pEvent->globalPosition().toPoint();
     m_lastPreviewLabelPos = m_pPreviewLabel->pos();
     m_pScrollNavigator->setVisible(true);
     drawScrollNavigator();
@@ -188,14 +164,12 @@ void PreviewArea::mousePressEvent(QMouseEvent * a_pEvent)
 // END OF void PreviewArea::mousePressEvent(QMouseEvent * a_pEvent)
 //==============================================================================
 
-void PreviewArea::mouseMoveEvent(QMouseEvent * a_pEvent)
+void PreviewArea::mouseMoveEvent(QMouseEvent *a_pEvent)
 {
-  if((a_pEvent->buttons() & Qt::LeftButton) && m_draggingPreview)
-  {
-    QPoint newCursorPos = a_pEvent->globalPos();
+  if ((a_pEvent->buttons() & Qt::LeftButton) && m_draggingPreview) {
+    QPoint newCursorPos = a_pEvent->globalPosition().toPoint();
     QPoint posDifference = newCursorPos - m_lastCursorPos;
-    QPoint newPreviewLabelPos = m_lastPreviewLabelPos +
-      posDifference;
+    QPoint newPreviewLabelPos = m_lastPreviewLabelPos + posDifference;
 
     horizontalScrollBar()->setValue(-newPreviewLabelPos.x());
     verticalScrollBar()->setValue(-newPreviewLabelPos.y());
@@ -204,9 +178,8 @@ void PreviewArea::mouseMoveEvent(QMouseEvent * a_pEvent)
     a_pEvent->accept();
     return;
   }
-
-  QPoint globalPoint = a_pEvent->globalPos();
-  checkMouseOverPreview(globalPoint);
+  m_lastScenePos = a_pEvent->scenePosition();
+  checkMouseOverPreview(pixelPosition());
 
   QScrollArea::mouseMoveEvent(a_pEvent);
 }
@@ -214,22 +187,29 @@ void PreviewArea::mouseMoveEvent(QMouseEvent * a_pEvent)
 // END OF void PreviewArea::mouseMoveEvent(QMouseEvent * a_pEvent)
 //==============================================================================
 
-void PreviewArea::mouseReleaseEvent(QMouseEvent * a_pEvent)
+void PreviewArea::mouseReleaseEvent(QMouseEvent *a_pEvent)
 {
   Qt::MouseButton releasedButton = a_pEvent->button();
-  if(releasedButton == Qt::LeftButton)
-  {
+  if (releasedButton == Qt::LeftButton) {
     m_draggingPreview = false;
     m_pScrollNavigator->setVisible(false);
     a_pEvent->accept();
     return;
   }
-  else if(releasedButton == Qt::MiddleButton)
+  else if (releasedButton == Qt::MiddleButton)
     emit signalMouseMiddleButtonReleased();
-  else if(releasedButton == Qt::RightButton)
+  else if (releasedButton == Qt::RightButton)
     emit signalMouseRightButtonReleased();
 
   QScrollArea::mouseReleaseEvent(a_pEvent);
+}
+
+void PreviewArea::enterEvent(QEnterEvent *a_pEvent)
+{
+  m_lastScenePos = a_pEvent->scenePosition();
+  checkMouseOverPreview(pixelPosition());
+  QScrollArea::enterEvent(a_pEvent);
+  setAttribute(Qt::WA_Hover, false);
 }
 
 // END OF void PreviewArea::mouseReleaseEvent(QMouseEvent * a_pEvent)
@@ -244,9 +224,35 @@ void PreviewArea::drawScrollNavigator()
   int viewportWidth = viewport()->width();
   int viewportHeight = viewport()->height();
 
-  m_pScrollNavigator->draw(contentsWidth, contentsHeight, viewportX,
-    viewportY, viewportWidth, viewportHeight);
+  m_pScrollNavigator->draw(contentsWidth, contentsHeight, viewportX, viewportY, viewportWidth, viewportHeight);
 }
 
 // END OF void PreviewArea::drawScrollNavigator()
 //==============================================================================
+
+QPointF PreviewArea::pixelPosition() const
+{
+  QPoint lPos = m_pPreviewLabel->geometry().topLeft();
+  QMargins lMargin = contentsMargins();
+  QPoint mOffset = QPoint(lMargin.left(), lMargin.top());
+  return m_lastScenePos - lPos - mOffset;
+}
+
+QPoint PreviewArea::getScrollBarPositions() const
+{
+  int x = horizontalScrollBar()->value();
+  int y = verticalScrollBar()->value();
+  return QPoint(x, y);
+}
+
+void PreviewArea::slotSetScrollBarPositions()
+{
+  horizontalScrollBar()->setValue(m_lastScrollBarPos.x());
+  verticalScrollBar()->setValue(m_lastScrollBarPos.y());
+}
+
+void PreviewArea::getScrollBarPositionsFromPreviewer(const QPoint &pos)
+{
+  m_newToPreviewer = true;
+  m_lastScrollBarPos = pos;
+}

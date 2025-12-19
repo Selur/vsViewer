@@ -2,52 +2,90 @@
 
 #include "common-src/helpers.h"
 #include "common-src/libp2p/p2p_api.h"
-#include "common-src/vapoursynth/vapoursynth_script_processor.h"
 #include "common-src/settings/settings_manager.h"
-#include "settings/settings_dialog.h"
-#include "scroll_navigator.h"
 #include "common-src/timeline_slider/timeline_slider.h"
+#include "common-src/vapoursynth/vapoursynth_script_processor.h"
 #include "preview_advanced_settings_dialog.h"
+#include "preview_dialog.h"
+#include "scroll_navigator.h"
+#include "settings/settings_dialog.h"
 
-#include <VapourSynth.h>
+#include "preview_advanced_settings_dialog.h"
+#include "scroll_navigator.h"
+#include "zoom_ratio_spinbox.h"
 
-#include <QScreen>
-#include <QWindow>
-#include <QEvent>
-#include <QCloseEvent>
-#include <QMoveEvent>
-#include <QResizeEvent>
-#include <QKeyEvent>
-#include <QWheelEvent>
-#include <QStatusBar>
-#include <QLabel>
-#include <QToolTip>
-#include <QCursor>
-#include <QStandardPaths>
-#include <QFileDialog>
-#include <QMessageBox>
-#include <QScrollBar>
-#include <QPoint>
-#include <QMenu>
-#include <QActionGroup>
+#include <VSHelper4.h>
+#include <VapourSynth4.h>
+
 #include <QAction>
+#include <QActionGroup>
 #include <QByteArray>
 #include <QClipboard>
-#include <QTimer>
-#include <QImageWriter>
+#include <QCloseEvent>
+#include <QCursor>
+#include <QEvent>
+#include <QFileDialog>
 #include <QFileInfo>
+#include <QImageWriter>
+#include <QInputDialog>
+#include <QKeyEvent>
+#include <QMenu>
+#include <QMessageBox>
+#include <QMoveEvent>
+#include <QPoint>
+#include <QResizeEvent>
+#include <QScrollBar>
+#include <QStandardPaths>
+#include <QTimer>
 #include <algorithm>
 #include <cmath>
+
+#ifdef Q_OS_WIN  // AUDIO
+#include <QMediaDevices>
+#include <random>
+
+// Random numbers
+std::random_device rd;
+std::mt19937_64 gen(rd());
+std::uniform_int_distribution<int64_t> unif16(-32768, 32768);
+
+static inline uint16_t dither32to16(uint32_t a)
+{
+  int64_t perturbed = VSMAX(VSMIN((int64_t)a + unif16(gen) + unif16(gen) + 32768, 0xFFFFFFFF), 0);
+  uint16_t base = perturbed >> 16;
+  return base;
+}
+
+static inline int16_t dither32Fto16(float a)
+{
+  static double den = 65536 * 32767;
+  float perturbed = VSMAX(VSMIN(a + 1.0f + (float)((unif16(gen) + unif16(gen)) / den), 2.0f), 0.0f);
+  return int(perturbed * 32767.0f) - 32767;
+}
+
+PreviewDialog::AudioFrame::AudioFrame() : number(-1), outputIndex(-1), data(QByteArray()) {}
+
+PreviewDialog::AudioFrame::AudioFrame(int a_number, int a_outputIndex, QByteArray a_data)
+  : number(a_number), outputIndex(a_outputIndex), data(a_data)
+{
+  data.detach();
+}
+
+bool PreviewDialog::AudioFrame::operator==(const AudioFrame &a_other) const
+{
+  return ((number == a_other.number) && (outputIndex == a_other.outputIndex));
+}
+#endif
 
 //==============================================================================
 
 #define BEGIN_CROP_VALUES_CHANGE \
-  if(m_changingCropValues) \
-    return; \
+if(m_changingCropValues) \
+  return; \
   m_changingCropValues = true;
 
 #define END_CROP_VALUES_CHANGE \
-  m_changingCropValues = false;
+m_changingCropValues = false;
 
 //==============================================================================
 
@@ -55,85 +93,58 @@ const char TIMELINE_BOOKMARKS_FILE_SUFFIX[] = ".bookmarks";
 
 //==============================================================================
 
-PreviewDialog::PreviewDialog(SettingsManager * a_pSettingsManager,
-  VSScriptLibrary * a_pVSScriptLibrary, QWidget * a_pParent) :
-  VSScriptProcessorDialog(a_pSettingsManager, a_pVSScriptLibrary, a_pParent)
-  , m_pAdvancedSettingsDialog(nullptr)
-  , m_frameExpected(0)
-  , m_frameShown(-1)
-  , m_lastFrameRequestedForPlay(-1)
-  , m_bigFrameStep(10)
-  , m_cpFrameRef(nullptr)
-  , m_cpPreviewFrameRef(nullptr)
-  , m_changingCropValues(false)
-  , m_pPreviewContextMenu(nullptr)
-  , m_pActionFrameToClipboard(nullptr)
-  , m_pActionSaveSnapshot(nullptr)
-  , m_pActionToggleZoomPanel(nullptr)
-  , m_pMenuZoomModes(nullptr)
-  , m_pActionGroupZoomModes(nullptr)
-  , m_pActionSetZoomModeNoZoom(nullptr)
-  , m_pActionSetZoomModeFixedRatio(nullptr)
-  , m_pActionSetZoomModeFitToFrame(nullptr)
-  , m_pMenuZoomScaleModes(nullptr)
-  , m_pActionGroupZoomScaleModes(nullptr)
-  , m_pActionSetZoomScaleModeNearest(nullptr)
-  , m_pActionSetZoomScaleModeBilinear(nullptr)
-  , m_pActionToggleCropPanel(nullptr)
-  , m_pActionToggleTimeLinePanel(nullptr)
-  , m_pMenuTimeLineModes(nullptr)
-  , m_pActionGroupTimeLineModes(nullptr)
-  , m_pActionSetTimeLineModeTime(nullptr)
-  , m_pActionSetTimeLineModeFrames(nullptr)
-  , m_pActionTimeStepForward(nullptr)
-  , m_pActionTimeStepBack(nullptr)
-  , m_pActionPasteCropSnippetIntoScript(nullptr)
-  , m_pActionAdvancedSettingsDialog(nullptr)
-  , m_pActionToggleColorPicker(nullptr)
-  , m_pActionPlay(nullptr)
-  , m_pActionLoadChapters(nullptr)
-  , m_pActionClearBookmarks(nullptr)
-  , m_pActionBookmarkCurrentFrame(nullptr)
-  , m_pActionUnbookmarkCurrentFrame(nullptr)
-  , m_pActionGoToPreviousBookmark(nullptr)
-  , m_pActionGoToNextBookmark(nullptr)
-  , m_pActionPasteShownFrameNumberIntoScript(nullptr)
-  , m_playing(false)
-  , m_processingPlayQueue(false)
-  , m_secondsBetweenFrames(0)
-  , m_pPlayTimer(nullptr)
-  , m_alwaysKeepCurrentFrame(DEFAULT_ALWAYS_KEEP_CURRENT_FRAME)
-  , m_pGeometrySaveTimer(nullptr)
-  , m_devicePixelRatio(-1)
-  , m_devicePixelNeedsInit(false)
+PreviewDialog::PreviewDialog(SettingsManager *a_pSettingsManager, VSScriptLibrary *a_pVSScriptLibrary, bool a_inPreviewer,
+                             QWidget *a_pParent)
+  : VSScriptProcessorDialog(a_pSettingsManager, a_pVSScriptLibrary, a_pParent), m_pAdvancedSettingsDialog(nullptr), m_frameExpected(0),
+    m_frameTimestampExpected(0), m_frameShown(-1), m_lastFrameRequestedForPlay(-1), m_bigFrameStep(10), m_cpFrame(nullptr),
+    m_cpPreviewFrame(nullptr), m_changingCropValues(false), m_pPreviewContextMenu(nullptr), m_pActionFrameToClipboard(nullptr),
+    m_pActionSaveSnapshot(nullptr), m_pActionToggleZoomPanel(nullptr), m_pMenuZoomModes(nullptr), m_pActionGroupZoomModes(nullptr),
+    m_pActionSetZoomModeNoZoom(nullptr), m_pActionSetZoomModeFixedRatio(nullptr), m_pActionSetZoomModeFitToFrame(nullptr),
+    m_pMenuZoomScaleModes(nullptr), m_pActionGroupZoomScaleModes(nullptr), m_pActionSetZoomScaleModeNearest(nullptr),
+    m_pActionSetZoomScaleModeBilinear(nullptr), m_pActionToggleCropPanel(nullptr), m_pActionToggleTimeLinePanel(nullptr),
+    m_pMenuTimeLineModes(nullptr), m_pActionGroupTimeLineModes(nullptr), m_pActionSetTimeLineModeTime(nullptr),
+    m_pActionSetTimeLineModeFrames(nullptr), m_pActionTimeStepForward(nullptr), m_pActionTimeStepBack(nullptr),
+    m_pActionPasteCropSnippetIntoScript(nullptr), m_pActionAdvancedSettingsDialog(nullptr), m_pActionToggleColorPicker(nullptr),
+    m_pActionPlay(nullptr), m_pActionLoadChapters(nullptr), m_pActionClearBookmarks(nullptr), m_pActionBookmarkCurrentFrame(nullptr),
+    m_pActionUnbookmarkCurrentFrame(nullptr), m_pActionGoToPreviousBookmark(nullptr), m_pActionGoToNextBookmark(nullptr),
+    m_pActionPasteShownFrameNumberIntoScript(nullptr), m_pActionJumpToFrame(nullptr), m_pActionToggleFramePropsPanel(nullptr),
+    m_pActionSwitchToOutputIndex0(nullptr), m_pActionSwitchToOutputIndex1(nullptr), m_pActionSwitchToOutputIndex2(nullptr),
+    m_pActionSwitchToOutputIndex3(nullptr), m_pActionSwitchToOutputIndex4(nullptr), m_pActionSwitchToOutputIndex5(nullptr),
+    m_pActionSwitchToOutputIndex6(nullptr), m_pActionSwitchToOutputIndex7(nullptr), m_pActionSwitchToOutputIndex8(nullptr),
+    m_pActionSwitchToOutputIndex9(nullptr), m_pActionSwitchToOutputIndex10(nullptr), m_pActionSwitchToOutputIndex11(nullptr),
+    m_pActionSwitchToOutputIndex12(nullptr), m_pActionSwitchToOutputIndex13(nullptr), m_pActionSwitchToOutputIndex14(nullptr),
+    m_pActionSwitchToOutputIndex15(nullptr), m_pActionSwitchToOutputIndex16(nullptr), m_pActionSwitchToOutputIndex17(nullptr),
+    m_pActionSwitchToOutputIndex18(nullptr), m_pActionSwitchToOutputIndex19(nullptr), m_pActionSwitchToPreviousOutputIndex(nullptr),
+    m_pActionSwitchToNextOutputIndex(nullptr), m_playing(false), m_processingPlayQueue(false), m_nativePlaybackRate(false),
+    m_secondsBetweenFrames(0), m_pPlayTimer(nullptr), m_alwaysKeepCurrentFrame(DEFAULT_ALWAYS_KEEP_CURRENT_FRAME),
+    m_pGeometrySaveTimer(nullptr), m_devicePixelRatio(-1), m_pFramePropsPanel(nullptr), m_toChangeTitle(false), m_inPreviewer(a_inPreviewer)
 {
+  vsedit::disableFontKerning(this);
   m_ui.setupUi(this);
   setWindowIcon(QIcon(":preview.png"));
 
   m_iconPlay = QIcon(":play.png");
   m_iconPause = QIcon(":pause.png");
 
-  m_pAdvancedSettingsDialog = new PreviewAdvancedSettingsDialog(
-    m_pSettingsManager, this);
+  m_pAdvancedSettingsDialog = new PreviewAdvancedSettingsDialog(m_pSettingsManager, this);
 
   m_pPlayTimer = new QTimer(this);
   m_pPlayTimer->setTimerType(Qt::PreciseTimer);
   m_pPlayTimer->setSingleShot(true);
 
+  m_pFramePropsPanel = new FramePropsPanel(a_pSettingsManager, this);
+
   createActionsAndMenus();
 
   createStatusBar();
-  m_pStatusBarWidget->setColorPickerVisible(
-    m_pSettingsManager->getColorPickerVisible());
+  m_pStatusBarWidget->setColorPickerVisible(m_pSettingsManager->getColorPickerVisible());
 
   m_ui.frameNumberSlider->setBigStep(m_bigFrameStep);
-  m_ui.frameNumberSlider->setDisplayMode(
-    m_pSettingsManager->getTimeLineMode());
+  m_ui.frameNumberSlider->setDisplayMode(m_pSettingsManager->getTimeLineMode());
 
   m_ui.frameToClipboardButton->setDefaultAction(m_pActionFrameToClipboard);
   m_ui.saveSnapshotButton->setDefaultAction(m_pActionSaveSnapshot);
-  m_ui.advancedSettingsButton->setDefaultAction(
-    m_pActionAdvancedSettingsDialog);
+  m_ui.advancedSettingsButton->setDefaultAction(m_pActionAdvancedSettingsDialog);
 
   setUpZoomPanel();
   setUpCropPanel();
@@ -143,39 +154,43 @@ PreviewDialog::PreviewDialog(SettingsManager * a_pSettingsManager,
 
   m_pGeometrySaveTimer = new QTimer(this);
   m_pGeometrySaveTimer->setInterval(DEFAULT_WINDOW_GEOMETRY_SAVE_DELAY);
-  connect(m_pGeometrySaveTimer, &QTimer::timeout,
-    this, &PreviewDialog::slotSaveGeometry);
+  connect(m_pGeometrySaveTimer, &QTimer::timeout, this, &PreviewDialog::slotSaveGeometry);
 
   m_windowGeometry = m_pSettingsManager->getPreviewDialogGeometry();
-  if(!m_windowGeometry.isEmpty())
-    restoreGeometry(m_windowGeometry);
+  if (!m_windowGeometry.isEmpty()) restoreGeometry(m_windowGeometry);
 
-  connect(m_pAdvancedSettingsDialog, SIGNAL(signalSettingsChanged()),
-    this, SLOT(slotAdvancedSettingsChanged()));
-  connect(m_ui.frameNumberSlider, SIGNAL(signalFrameChanged(int)),
-    this, SLOT(slotShowFrame(int)));
-  connect(m_ui.frameNumberSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotShowFrame(int)));
-  connect(m_ui.previewArea, SIGNAL(signalSizeChanged()),
-    this, SLOT(slotPreviewAreaSizeChanged()));
-  connect(m_ui.previewArea, SIGNAL(signalCtrlWheel(QPoint)),
-    this, SLOT(slotPreviewAreaCtrlWheel(QPoint)));
-  connect(m_ui.previewArea, SIGNAL(signalMouseMiddleButtonReleased()),
-    this, SLOT(slotPreviewAreaMouseMiddleButtonReleased()));
-  connect(m_ui.previewArea, SIGNAL(signalMouseRightButtonReleased()),
-    this, SLOT(slotPreviewAreaMouseRightButtonReleased()));
-  connect(m_ui.previewArea, SIGNAL(signalMouseOverPoint(float, float)),
-    this, SLOT(slotPreviewAreaMouseOverPoint(float, float)));
-  connect(m_pPlayTimer, SIGNAL(timeout()),
-    this, SLOT(slotProcessPlayQueue()));
+  connect(m_pAdvancedSettingsDialog, SIGNAL(signalSettingsChanged()), this, SLOT(slotAdvancedSettingsChanged()));
+  connect(m_ui.frameNumberSlider, SIGNAL(signalFrameChanged(int, bool)), this, SLOT(slotShowFrame(int, bool)));
+  connect(m_ui.frameNumberSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotShowFrame(int)));
+  connect(m_ui.previewArea, SIGNAL(signalSizeChanged()), this, SLOT(slotPreviewAreaSizeChanged()));
+  connect(m_ui.previewArea, SIGNAL(signalCtrlWheel(QPoint)), this, SLOT(slotPreviewAreaCtrlWheel(QPoint)));
+  connect(m_ui.previewArea, SIGNAL(signalMouseMiddleButtonReleased()), this, SLOT(slotPreviewAreaMouseMiddleButtonReleased()));
+  connect(m_ui.previewArea, SIGNAL(signalMouseRightButtonReleased()), this, SLOT(slotPreviewAreaMouseRightButtonReleased()));
+  connect(m_ui.previewArea, SIGNAL(signalMouseOverPoint(double, double)), this, SLOT(slotPreviewAreaMouseOverPoint(double, double)));
+  connect(m_pPlayTimer, SIGNAL(timeout()), this, SLOT(slotProcessPlayQueue()));
+  connect(this, SIGNAL(signalProcessorIdle(bool)), this, SLOT(slotEnableSwitchOutputIndex(bool)));
+
+#ifdef Q_OS_WIN  // AUDIO
+  qputenv("QT_MEDIA_BACKEND", QString("windows").toLocal8Bit());
+
+  m_pAudioPlayTimer = new QTimer(this);
+  m_pAudioPlayTimer->setTimerType(Qt::PreciseTimer);
+  m_pAudioPlayTimer->setSingleShot(true);
+
+  connect(m_pAudioPlayTimer, &QTimer::timeout, this, &PreviewDialog::slotProcessAudioPlayQueue);
+#endif
 
   slotSettingsChanged();
 
-  bool rememberLastPreviewFrame =
-    m_pSettingsManager->getRememberLastPreviewFrame();
-  if(rememberLastPreviewFrame)
-  {
+  if (m_inPreviewer) {
+    m_frameExpected = m_pSettingsManager->getLastPreviewFrame(true);
+    m_frameTimestampExpected = m_pSettingsManager->getLastPreviewTimestamp(true);
+    QPoint scrollBarPos = loadLastScrollBarPositions();
+    m_ui.previewArea->getScrollBarPositionsFromPreviewer(scrollBarPos);
+  }
+  else if (m_pSettingsManager->getRememberLastPreviewFrame()) {
     m_frameExpected = m_pSettingsManager->getLastPreviewFrame();
+    m_frameTimestampExpected = m_pSettingsManager->getLastPreviewTimestamp();
     setScriptName(m_pSettingsManager->getLastUsedPath());
   }
 }
@@ -186,17 +201,17 @@ PreviewDialog::PreviewDialog(SettingsManager * a_pSettingsManager,
 
 PreviewDialog::~PreviewDialog()
 {
-  if(m_pGeometrySaveTimer->isActive())
-  {
+  if (m_pGeometrySaveTimer->isActive()) {
     m_pGeometrySaveTimer->stop();
     slotSaveGeometry();
   }
+  delete m_pFramePropsPanel;
 }
 
 // END OF PreviewDialog::~PreviewDialog()
 //==============================================================================
 
-void PreviewDialog::setScriptName(const QString & a_scriptName)
+void PreviewDialog::setScriptName(const QString &a_scriptName)
 {
   VSScriptProcessorDialog::setScriptName(a_scriptName);
   setTitle();
@@ -205,42 +220,95 @@ void PreviewDialog::setScriptName(const QString & a_scriptName)
 // END OF void PreviewDialog::setScriptName(const QString & a_scriptName)
 //==============================================================================
 
-void PreviewDialog::previewScript(const QString& a_script,
-  const QString& a_scriptName)
+void PreviewDialog::previewScript(const QString &a_script, const QString &a_scriptName)
 {
   QString previousScript = script();
   QString previousScriptName = scriptName();
+  m_scriptTextChanged = false;
 
-  stopAndCleanUp();
+  if (!m_inPreviewer) stopAndCleanUp();
 
-  bool initialized = initialize(a_script, a_scriptName);
-  if(!initialized)
-    return;
+  bool initialized = initialize(a_script, a_scriptName, ProcessReason::Preview);
+  if (!initialized) return;
 
-  setTitle();
+  m_outputIndices = m_pVapourSynthScriptProcessor->getOutputIndices();
+  if (m_outputIndices.size() > 0) {
+    m_ui.outputIndexComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_ui.outputIndexComboBox->clear();
+    for (auto i : m_outputIndices) m_ui.outputIndexComboBox->addItem(QString::number(i));
+    m_ui.outputIndexComboBox->setCurrentText(QString::number(m_outputIndex));
+  }
+  else {
+    // Use old layout
+    m_ui.outputIndexLabel->hide();
+    m_ui.outputIndexComboBox->hide();
+    m_ui.frameLabel->hide();
+  }
 
-  int lastFrameNumber = m_cpVideoInfo->numFrames - 1;
+  int lastFrameNumber;
+
+  auto mt = m_nodeInfo[m_outputIndex].mediaType();
+#ifdef Q_OS_WIN  // AUDIO
+  if (mt == mtVideo) {
+    m_currentIsAudio = false;
+    const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+    if (!vi) return;
+
+    lastFrameNumber = vi->numFrames - 1;
+    m_ui.frameNumberSpinBox->setMaximum(lastFrameNumber);
+    m_ui.frameNumberSlider->setFramesNumber(vi->numFrames, false);
+    auto fpsPair = m_nodeInfo[m_outputIndex].fpsPair();
+    m_fpsNum = fpsPair.first;
+    m_fpsDen = fpsPair.second;
+    m_ui.frameNumberSlider->setFPS(m_fpsDen == 0 ? 0.0 : (double)m_fpsNum / (double)m_fpsDen);
+  }
+  else {
+    m_currentIsAudio = true;
+    const VSAudioInfo *ai = m_nodeInfo[m_outputIndex].getAsAudio();
+    if (!ai) return;
+
+    lastFrameNumber = ai->numFrames - 1;
+    m_ui.frameNumberSpinBox->setMaximum(lastFrameNumber);
+    m_ui.frameNumberSlider->setFramesNumber(ai->numFrames, false);
+    auto fpsPair = m_nodeInfo[m_outputIndex].fpsPair();
+    m_fpsNum = fpsPair.first;
+    m_fpsDen = fpsPair.second;
+    m_ui.frameNumberSlider->setFPS((double)m_fpsNum / (double)m_fpsDen);
+
+    if (m_ui.cropCheckButton->isChecked()) m_ui.cropCheckButton->click();
+    m_ui.cropCheckButton->setEnabled(false);
+    m_pActionToggleCropPanel->setEnabled(false);
+    m_ui.saveSnapshotButton->setEnabled(false);
+    m_pActionSaveSnapshot->setEnabled(false);
+    m_pStatusBarWidget->setColorPickerString("");
+    m_ui.playFpsLimitSpinBox->setEnabled(false);
+    m_ui.playFpsLimitModeComboBox->setEnabled(false);
+    int comboIndex = m_ui.playFpsLimitModeComboBox->findData((int)PlayFPSLimitMode::FromVideo);
+    if (comboIndex != -1) m_ui.playFpsLimitModeComboBox->setCurrentIndex(comboIndex);
+
+    setAudioOutput();
+  }
+#else
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) return;
+
+  lastFrameNumber = vi->numFrames - 1;
   m_ui.frameNumberSpinBox->setMaximum(lastFrameNumber);
-  m_ui.frameNumberSlider->setFramesNumber(m_cpVideoInfo->numFrames);
-  if(m_cpVideoInfo->fpsDen == 0)
-    m_ui.frameNumberSlider->setFPS(0.0);
-  else
-  {
-    m_ui.frameNumberSlider->setFPS((double)m_cpVideoInfo->fpsNum /
-      (double)m_cpVideoInfo->fpsDen);
-  }
+  m_ui.frameNumberSlider->setFramesNumber(vi->numFrames, false);
+  auto fpsPair = m_nodeInfo[m_outputIndex].fpsPair();
+  m_fpsNum = fpsPair.first;
+  m_fpsDen = fpsPair.second;
+  m_ui.frameNumberSlider->setFPS(m_fpsDen == 0 ? 0.0 : (double)m_fpsNum / (double)m_fpsDen);
+#endif
 
-  bool scriptChanged = ((previousScript != a_script) &&
-    (previousScriptName != a_scriptName));
+  bool scriptChanged = ((previousScript != a_script) && (previousScriptName != a_scriptName));
 
-  if(scriptChanged && (!m_alwaysKeepCurrentFrame))
-  {
+  if (scriptChanged && (!m_alwaysKeepCurrentFrame)) {
     m_frameExpected = 0;
-    m_ui.previewArea->setPixmap(QPixmap(), 0);
+    m_ui.previewArea->setPixmap(QPixmap());
   }
 
-  if(m_frameExpected > lastFrameNumber)
-    m_frameExpected = lastFrameNumber;
+  if (m_frameExpected > lastFrameNumber) m_frameExpected = lastFrameNumber;
 
   resetCropSpinBoxes();
 
@@ -250,12 +318,37 @@ void PreviewDialog::previewScript(const QString& a_script,
 
   loadTimelineBookmarks();
 
-  if(m_pSettingsManager->getPreviewDialogMaximized())
+  if (m_pSettingsManager->getPreviewDialogMaximized())
     showMaximized();
   else
     showNormal();
 
-  slotShowFrame(m_frameExpected);
+  auto timelineMode = m_pSettingsManager->getTimeLineMode();
+  if (timelineMode == TimeLineSlider::DisplayMode::Frames)
+    m_frameTimestampExpected = frameToTimestamp(m_frameExpected);
+  else
+    m_frameExpected = timestampToFrame(m_frameTimestampExpected);
+
+  if (m_frameExpected > lastFrameNumber)
+    setExpectedFrame(lastFrameNumber);
+  else if (m_frameExpected < 0)
+    setExpectedFrame(0);
+
+  slotShowFrame(m_frameExpected, false);
+
+  if (m_outputIndices.size() > 0) {
+    m_ui.outputIndexComboBox->disconnect(m_outputIndexComboBoxConnection);
+
+    m_outputIndexComboBoxConnection = connect(m_ui.outputIndexComboBox,
+                                              &QComboBox::currentTextChanged,
+                                              [this]()
+                                              {
+                                                int idx = m_ui.outputIndexComboBox->currentText().toInt();
+                                                slotSwitchOutputIndex(idx);
+                                              });
+  }
+
+  setTitle();
 }
 
 // END OF void PreviewDialog::previewScript(const QString& a_script,
@@ -266,15 +359,13 @@ void PreviewDialog::stopAndCleanUp()
 {
   slotPlay(false);
 
-  if(m_ui.cropCheckButton->isChecked())
-    m_ui.cropCheckButton->click();
+  if (m_ui.cropCheckButton->isChecked()) m_ui.cropCheckButton->click();
 
-  bool rememberLastPreviewFrame =
-    m_pSettingsManager->getRememberLastPreviewFrame();
-  if(rememberLastPreviewFrame && (!scriptName().isEmpty()) &&
-    (m_frameShown > -1))
-    m_pSettingsManager->setLastPreviewFrame(m_frameShown);
-
+  bool rememberLastPreviewFrame = m_inPreviewer || m_pSettingsManager->getRememberLastPreviewFrame();
+  if (rememberLastPreviewFrame && (!scriptName().isEmpty()) && (m_frameExpected > -1)) {
+    m_pSettingsManager->setLastPreviewFrame(m_frameExpected, m_inPreviewer);
+    m_pSettingsManager->setLastPreviewTimestamp(m_frameTimestampExpected, m_inPreviewer);
+  }
   m_frameShown = -1;
   m_framePixmap = QPixmap();
   // Replace shown image with a blank one of the same dimension:
@@ -285,29 +376,30 @@ void PreviewDialog::stopAndCleanUp()
   int pixmapHeight = m_ui.previewArea->pixmapHeight();
   QPixmap blackPixmap(pixmapWidth, pixmapHeight);
   blackPixmap.fill(Qt::black);
-  m_ui.previewArea->setPixmap(blackPixmap, m_devicePixelRatio);
+  m_ui.previewArea->setPixmap(blackPixmap);
 
-  if(m_cpFrameRef)
-  {
+  if (m_cpFrame) {
     Q_ASSERT(m_cpVSAPI);
-    m_cpVSAPI->freeFrame(m_cpFrameRef);
-    m_cpFrameRef = nullptr;
+    m_cpVSAPI->freeFrame(m_cpFrame);
+    m_cpFrame = nullptr;
   }
 
-  if(m_cpPreviewFrameRef)
-  {
+  if (m_cpPreviewFrame) {
     Q_ASSERT(m_cpVSAPI);
-    m_cpVSAPI->freeFrame(m_cpPreviewFrameRef);
-    m_cpPreviewFrameRef = nullptr;
+    m_cpVSAPI->freeFrame(m_cpPreviewFrame);
+    m_cpPreviewFrame = nullptr;
   }
 
   VSScriptProcessorDialog::stopAndCleanUp();
+#ifdef Q_OS_WIN  // AUDIO
+  m_audioCache.clear();
+#endif
 }
 
 // END OF void PreviewDialog::stopAndCleanUp()
 //==============================================================================
 
-void PreviewDialog::moveEvent(QMoveEvent * a_pEvent)
+void PreviewDialog::moveEvent(QMoveEvent *a_pEvent)
 {
   QDialog::moveEvent(a_pEvent);
   saveGeometryDelayed();
@@ -316,7 +408,7 @@ void PreviewDialog::moveEvent(QMoveEvent * a_pEvent)
 // END OF void PreviewDialog::moveEvent(QMoveEvent * a_pEvent)
 //==============================================================================
 
-void PreviewDialog::resizeEvent(QResizeEvent * a_pEvent)
+void PreviewDialog::resizeEvent(QResizeEvent *a_pEvent)
 {
   QDialog::resizeEvent(a_pEvent);
   saveGeometryDelayed();
@@ -325,12 +417,11 @@ void PreviewDialog::resizeEvent(QResizeEvent * a_pEvent)
 // END OF void PreviewDialog::resizeEvent(QResizeEvent * a_pEvent)
 //==============================================================================
 
-void PreviewDialog::changeEvent(QEvent * a_pEvent)
+void PreviewDialog::changeEvent(QEvent *a_pEvent)
 {
   QDialog::changeEvent(a_pEvent);
-  if(a_pEvent->type() == QEvent::WindowStateChange)
-  {
-    if(isMaximized())
+  if (a_pEvent->type() == QEvent::WindowStateChange) {
+    if (isMaximized())
       m_pSettingsManager->setPreviewDialogMaximized(true);
     else
       m_pSettingsManager->setPreviewDialogMaximized(false);
@@ -340,44 +431,60 @@ void PreviewDialog::changeEvent(QEvent * a_pEvent)
 // END OF void PreviewDialog::changeEvent(QEvent * a_pEvent)
 //==============================================================================
 
-void PreviewDialog::keyPressEvent(QKeyEvent * a_pEvent)
+void PreviewDialog::closeEvent(QCloseEvent *a_pEvent)
+{
+  m_pFramePropsPanel->setVisible(false);
+  if (m_inPreviewer) {
+    slotSaveGeometry();
+    bool rememberLastPreviewFrame = m_inPreviewer || m_pSettingsManager->getRememberLastPreviewFrame();
+    if (rememberLastPreviewFrame && (m_frameExpected > -1)) {
+      m_pSettingsManager->setLastPreviewFrame(m_frameExpected, m_inPreviewer);
+      m_pSettingsManager->setLastPreviewTimestamp(m_frameTimestampExpected, m_inPreviewer);
+    }
+    saveLastScrollBarPositions();
+
+    reject();
+  }
+  VSScriptProcessorDialog::closeEvent(a_pEvent);
+}
+
+// END OF void PreviewDialog::closeEvent(QCloseEvent * a_pEvent)
+//==============================================================================
+
+void PreviewDialog::keyPressEvent(QKeyEvent *a_pEvent)
 {
   Qt::KeyboardModifiers modifiers = a_pEvent->modifiers();
 
-  if(modifiers != Qt::NoModifier)
-  {
+  if (modifiers != Qt::NoModifier) {
     QDialog::keyPressEvent(a_pEvent);
     return;
   }
 
-  if(!m_pVapourSynthScriptProcessor->isInitialized())
-  {
+  if (!m_pVapourSynthScriptProcessor->isInitialized()) {
     QDialog::keyPressEvent(a_pEvent);
     return;
   }
-  Q_ASSERT(m_cpVideoInfo);
+#ifdef Q_OS_WIN  // AUDIO
+#else
+  if (!m_nodeInfo[m_outputIndex].isVideo()) return;
+#endif
 
   int key = a_pEvent->key();
 
-  if(((key == Qt::Key_Left) || (key == Qt::Key_Down)) &&
-    (m_frameExpected > 0))
-    slotShowFrame(m_frameExpected - 1);
-  else if(((key == Qt::Key_Right) || (key == Qt::Key_Up)) &&
-    (m_frameExpected < (m_cpVideoInfo->numFrames - 1)))
-    slotShowFrame(m_frameExpected + 1);
-  else if((key == Qt::Key_PageDown) && (m_frameExpected > 0))
-    slotShowFrame(std::max(0, m_frameExpected - m_bigFrameStep));
-  else if((key == Qt::Key_PageUp) &&
-    (m_frameExpected < (m_cpVideoInfo->numFrames - 1)))
-  {
-    slotShowFrame(std::min(m_cpVideoInfo->numFrames - 1,
-      m_frameExpected + m_bigFrameStep));
+  if (((key == Qt::Key_Left) || (key == Qt::Key_Down)) && (m_frameExpected > 0))
+    slotShowFrame(m_frameExpected - 1, false);
+  else if (((key == Qt::Key_Right) || (key == Qt::Key_Up)) && (m_frameExpected < (m_nodeInfo[m_outputIndex].numFrames() - 1)))
+    slotShowFrame(m_frameExpected + 1, false);
+  else if ((key == Qt::Key_PageDown) && (m_frameExpected > 0))
+    slotShowFrame(std::max(0, m_frameExpected - m_bigFrameStep), true);
+  else if ((key == Qt::Key_PageUp) && (m_frameExpected < (m_nodeInfo[m_outputIndex].numFrames() - 1))) {
+    slotShowFrame(std::min(m_nodeInfo[m_outputIndex].numFrames() - 1, m_frameExpected + m_bigFrameStep), true);
   }
-  else if(key == Qt::Key_Home)
-    slotShowFrame(0);
-  else if(key == Qt::Key_End)
-    slotShowFrame(m_cpVideoInfo->numFrames - 1);
-  else if(key == Qt::Key_Escape)
+  else if (key == Qt::Key_Home)
+    slotShowFrame(0, true);
+  else if (key == Qt::Key_End)
+    slotShowFrame(m_nodeInfo[m_outputIndex].numFrames() - 1, true);
+  else if (key == Qt::Key_Escape)
     close();
   else
     QDialog::keyPressEvent(a_pEvent);
@@ -386,71 +493,71 @@ void PreviewDialog::keyPressEvent(QKeyEvent * a_pEvent)
 // END OF void PreviewDialog::keyPressEvent(QKeyEvent * a_pEvent)
 //==============================================================================
 
-void PreviewDialog::slotReceiveFrame(int a_frameNumber, int a_outputIndex,
-  const VSFrameRef * a_cpOutputFrameRef,
-  const VSFrameRef * a_cpPreviewFrameRef)
+void PreviewDialog::slotScriptTextChanged()
 {
-  if(!a_cpOutputFrameRef)
-    return;
+  m_scriptTextChanged = true;
+  setTitle();
+}
+
+void PreviewDialog::slotReceiveFrame(int a_frameNumber, int a_outputIndex, const VSFrame *a_cpOutputFrame, const VSFrame *a_cpPreviewFrame)
+{
+  if (!a_cpOutputFrame) return;
 
   Q_ASSERT(m_cpVSAPI);
-  const VSFrameRef * cpOutputFrameRef =
-    m_cpVSAPI->cloneFrameRef(a_cpOutputFrameRef);
-  const VSFrameRef * cpPreviewFrameRef =
-    m_cpVSAPI->cloneFrameRef(a_cpPreviewFrameRef);
+  const VSFrame *cpOutputFrame = m_cpVSAPI->addFrameRef(a_cpOutputFrame);
+  const VSFrame *cpPreviewFrame = m_cpVSAPI->addFrameRef(a_cpPreviewFrame);
 
-  if(m_playing)
-  {
-    Frame newFrame(a_frameNumber, a_outputIndex,
-      cpOutputFrameRef, cpPreviewFrameRef);
-    m_framesCache.push_back(newFrame);
+  if (m_playing) {
+    Frame newFrame(a_frameNumber, a_outputIndex, cpOutputFrame, cpPreviewFrame);
+    m_framesCache[m_outputIndex].push_back(newFrame);
+#ifdef Q_OS_WIN  // AUDIO
+    if (m_currentIsAudio && m_pAudioSink) {
+      QByteArray audioData = readAudioFrame(a_cpOutputFrame);
+      AudioFrame newAudioFrame(a_frameNumber, a_outputIndex, audioData);
+      m_audioCache[a_frameNumber] = newAudioFrame;
+      slotProcessAudioPlayQueue();
+    }
+    else
+      slotProcessPlayQueue();
+#else
     slotProcessPlayQueue();
+#endif
   }
-  else
-  {
-    setCurrentFrame(cpOutputFrameRef, cpPreviewFrameRef);
+  else {
+    setCurrentFrame(cpOutputFrame, cpPreviewFrame);
     m_frameShown = a_frameNumber;
-    if(m_frameShown == m_frameExpected)
-      m_ui.frameStatusLabel->setPixmap(m_readyPixmap);
+    if (m_frameShown == m_frameExpected) m_ui.frameStatusLabel->setPixmap(m_readyPixmap);
   }
 }
 
 // END OF void PreviewDialog::slotReceiveFrame(int a_frameNumber,
-//		int a_outputIndex, const VSFrameRef * a_cpOutputFrameRef,
-//		const VSFrameRef * a_cpPreviewFrameRef)
+//		int a_outputIndex, const VSFrame * a_cpOutputFrame,
+//		const VSFrame * a_cpPreviewFrame)
 //==============================================================================
 
-void PreviewDialog::slotFrameRequestDiscarded(int a_frameNumber,
-  int a_outputIndex, const QString & a_reason)
+void PreviewDialog::slotFrameRequestDiscarded(int a_frameNumber, int a_outputIndex, const QString &a_reason)
 {
   (void)a_outputIndex;
   (void)a_reason;
 
-  if(m_playing)
-  {
-    slotPlay(false);
-  }
-  else
-  {
-    if(a_frameNumber != m_frameExpected)
-      return;
+  if (m_playing) { slotPlay(false); }
+  else {
+    if (a_frameNumber != m_frameExpected) return;
 
-    if(m_frameShown == -1)
-    {
-      if(m_frameExpected == 0)
-      {
+    if (m_frameShown == -1) {
+      if (m_frameExpected == 0) {
         // Nowhere to roll back
-        m_ui.frameNumberSlider->setFrame(0);
+        m_ui.frameNumberSlider->setFrame(0, false);
         m_ui.frameNumberSpinBox->setValue(0);
         m_ui.frameStatusLabel->setPixmap(m_errorPixmap);
       }
       else
-        slotShowFrame(0);
+        slotShowFrame(0, false);
       return;
     }
 
-    m_frameExpected = m_frameShown;
-    m_ui.frameNumberSlider->setFrame(m_frameShown);
+    setExpectedFrame(m_frameShown);
+    m_ui.frameNumberSlider->setFrame(m_frameShown, false);
     m_ui.frameNumberSpinBox->setValue(m_frameShown);
     m_ui.frameStatusLabel->setPixmap(m_readyPixmap);
   }
@@ -460,47 +567,50 @@ void PreviewDialog::slotFrameRequestDiscarded(int a_frameNumber,
 //		int a_outputIndex, const QString & a_reason)
 //==============================================================================
 
-void PreviewDialog::slotShowFrame(int a_frameNumber)
+void PreviewDialog::slotShowFrame(int a_frameNumber, bool a_refreshCache)
 {
-  if((m_frameShown == a_frameNumber) && (!m_framePixmap.isNull()))
-    return;
+  if ((m_frameShown == a_frameNumber) && (!m_framePixmap.isNull())) return;
 
-  if(m_playing)
-    return;
+  if (m_playing) return;
 
   static bool requestingFrame = false;
-  if(requestingFrame)
-    return;
+  if (requestingFrame) return;
   requestingFrame = true;
 
+  if (a_refreshCache) {
+    int frameDiff = m_frameShown - a_frameNumber;
+    if (frameDiff < 0) frameDiff = -frameDiff;
+    if (frameDiff > 10 && m_usedCacheRatio > 0.75) { m_pVapourSynthScriptProcessor->clearCoreCaches(); }
+  }
+
   m_ui.frameNumberSpinBox->setValue(a_frameNumber);
-  m_ui.frameNumberSlider->setFrame(a_frameNumber);
+  m_ui.frameNumberSlider->setFrame(a_frameNumber, a_refreshCache);
 
   bool requested = requestShowFrame(a_frameNumber);
-  if(requested)
-  {
-    m_frameExpected = a_frameNumber;
+  if (requested) {
+    setExpectedFrame(a_frameNumber);
     m_ui.frameStatusLabel->setPixmap(m_busyPixmap);
   }
-  else
-  {
+  else {
     m_ui.frameNumberSpinBox->setValue(m_frameExpected);
-    m_ui.frameNumberSlider->setFrame(m_frameExpected);
+    m_ui.frameNumberSlider->setFrame(m_frameExpected, a_refreshCache);
   }
 
   requestingFrame = false;
 }
-// END OF void PreviewDialog::slotShowFrame(int a_frameNumber)
+// END OF void PreviewDialog::slotShowFrame(int a_frameNumber, bool a_refreshCache)
 //==============================================================================
 
 void PreviewDialog::slotSaveSnapshot()
 {
-  if((m_frameShown < 0) || m_framePixmap.isNull())
-    return;
+  if ((m_frameShown < 0) || m_framePixmap.isNull()) return;
 
-  std::map<QString, QString> extensionToFilterMap =
-  {
-    {"png", tr("PNG image (*.png)")},
+  if (!m_nodeInfo[m_outputIndex].isVideo()) return;
+
+  static std::map<QString, QString> extensionToFilterMap = {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {"png",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 "PNG image (*.png)")},
   };
 
   QString fileExtension = m_pSettingsManager->getLastSnapshotExtension();
@@ -508,48 +618,152 @@ void PreviewDialog::slotSaveSnapshot()
   QList<QByteArray> supportedFormats = QImageWriter::supportedImageFormats();
   bool webpSupported = (supportedFormats.indexOf("webp") > -1);
 
-  if(webpSupported)
-    extensionToFilterMap["webp"] = tr("WebP image (*.webp)");
+  if (webpSupported) extensionToFilterMap["webp"] = tr("WebP image (*.webp)");
 
-  QString snapshotFilePath = scriptName();
-  if(snapshotFilePath.isEmpty())
-  {
-    snapshotFilePath =
-      QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-    snapshotFilePath += QString("/%1.").arg(m_frameShown);
+  QString currScriptName = scriptName();
+  bool currScriptNotSaved = currScriptName.isEmpty();
+
+  // Parse the template
+  QString snapshotTemplate = m_pSettingsManager->getSnapshotTemplate();
+  if (!currScriptNotSaved) {
+    std::
+      vector<vsedit::VariableToken>
+        variables = {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{f}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "script file path"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return currScriptName;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{d}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "script file directory"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       QFileInfo
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         file(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           currScriptName);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return QDir::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         toNativeSeparators(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           file
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             .path());
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{n}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "script file name"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       QFileInfo
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         file(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           currScriptName);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return file
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         .completeBaseName();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{o}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "output index"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return QString::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         number(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           m_outputIndex);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{i}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "frame number"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return QString::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         number(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           m_frameShown);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{t}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "timestamp"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       if (
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         m_fpsDen
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           == 0
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         || m_fpsNum
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              == 0)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         return QString();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       QString
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         timeStr
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         = vsedit::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             timeToString(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               (double)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   m_frameShown
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 / m_fpsNum
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 * m_fpsDen,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               true)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               .replace(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ":",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ".");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return timeStr;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{nm}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "clip name"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return m_clipName;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {"{sc}",
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     tr(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       "scene name"),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     [&]()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       return m_sceneName;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }},
+        };
+
+    for (const vsedit::VariableToken &var : variables) { snapshotTemplate = snapshotTemplate.replace(var.token, var.evaluate()); }
   }
-  else
-    snapshotFilePath += QString(" - %1.").arg(m_frameShown);
-  snapshotFilePath += fileExtension;
+
+  bool silentSnapshot = m_pSettingsManager->getSilentSnapshot();
+
+  QString snapshotFilePath = snapshotTemplate;
+  if (snapshotFilePath.isEmpty()) silentSnapshot = false;
+  if (currScriptNotSaved || snapshotFilePath.isEmpty()) {
+    snapshotFilePath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    snapshotFilePath += QString("/%1-%2").arg(QString::number(m_frameShown), QString::number(m_outputIndex));
+    snapshotFilePath += fileExtension;
+  }
 
   QStringList saveFormatsList;
-  for(const std::pair<QString, QString> & pair : extensionToFilterMap)
-    saveFormatsList << pair.second;
+  for (const std::pair<const QString, QString> &pair : extensionToFilterMap) saveFormatsList << pair.second;
 
   QString selectedFilter = extensionToFilterMap[fileExtension];
 
-  snapshotFilePath = QFileDialog::getSaveFileName(this,
-    tr("Save frame as image"), snapshotFilePath,
-    saveFormatsList.join(";;"), &selectedFilter);
+  if (currScriptNotSaved || !silentSnapshot) {
+    snapshotFilePath
+      = QFileDialog::getSaveFileName(this, tr("Save frame as image"), snapshotFilePath, saveFormatsList.join(";;"), &selectedFilter);
+  }
 
   QFileInfo fileInfo(snapshotFilePath);
   QString suffix = fileInfo.suffix().toLower();
 
   QByteArray format("png");
-  if((suffix == "webp") && webpSupported)
+  if ((suffix == "webp") && webpSupported)
     format = "webp";
-
-  if(!snapshotFilePath.isEmpty())
-  {
-    bool success = m_framePixmap.save(snapshotFilePath, format,
-      format == "webp" ? 100 :
-      m_pSettingsManager->getPNGSnapshotCompressionLevel());
-    if(success)
+  else if (silentSnapshot && suffix != "png")
+    snapshotFilePath += ".png";
+  if (!snapshotFilePath.isEmpty()) {
+    bool success = m_framePixmap
+                     .save(snapshotFilePath, format, format == "webp" ? 100 : m_pSettingsManager->getPNGSnapshotCompressionLevel());
+    if (success)
       m_pSettingsManager->setLastSnapshotExtension(suffix);
-    else
-    {
-      QMessageBox::critical(this, tr("Image save error"),
-        tr("Error while saving image ") + snapshotFilePath);
+    else {
+      QMessageBox::critical(this, tr("Image save error"), tr("Error while saving image ") + snapshotFilePath);
     }
   }
 }
@@ -570,31 +784,24 @@ void PreviewDialog::slotToggleZoomPanelVisible(bool a_zoomPanelVisible)
 void PreviewDialog::slotZoomModeChanged()
 {
   static bool changingZoomMode = false;
-  if(changingZoomMode)
-    return;
+  if (changingZoomMode) return;
   changingZoomMode = true;
 
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
 
-  QObject * pSender = sender();
-  if(pSender == m_ui.zoomModeComboBox)
-  {
-
-    for(QAction * pAction : m_pActionGroupZoomModes->actions())
-    {
-      ZoomMode actionZoomMode =
-        m_actionIDToZoomModeMap[pAction->data().toString()];
-      if(actionZoomMode == zoomMode)
-      {
+  QObject *pSender = sender();
+  if (pSender == m_ui.zoomModeComboBox) {
+    for (QAction *pAction : m_pActionGroupZoomModes->actions()) {
+      ZoomMode actionZoomMode = m_actionIDToZoomModeMap[pAction->data().toString()];
+      if (actionZoomMode == zoomMode) {
         pAction->setChecked(true);
         break;
       }
     }
   }
-  else
-  {
+  else {
     // If signal wasn't sent by combo box - presume it was sent by action.
-    QAction * pSenderAction = qobject_cast<QAction *>(pSender);
+    QAction *pSenderAction = qobject_cast<QAction *>(pSender);
     zoomMode = m_actionIDToZoomModeMap[pSenderAction->data().toString()];
     int zoomModeIndex = m_ui.zoomModeComboBox->findData((int)zoomMode);
     m_ui.zoomModeComboBox->setCurrentIndex(zoomModeIndex);
@@ -626,37 +833,30 @@ void PreviewDialog::slotZoomRatioChanged(double a_zoomRatio)
 void PreviewDialog::slotScaleModeChanged()
 {
   static bool changingScaleMode = false;
-  if(changingScaleMode)
-    return;
+  if (changingScaleMode) return;
   changingScaleMode = true;
 
-  Qt::TransformationMode scaleMode = (Qt::TransformationMode)
-    m_ui.scaleModeComboBox->currentData().toInt();
+  Qt::TransformationMode scaleMode = (Qt::TransformationMode)m_ui.scaleModeComboBox->currentData().toInt();
 
-  QObject * pSender = sender();
-  if(pSender == m_ui.scaleModeComboBox)
-  {
-    for(QAction * pAction : m_pActionGroupZoomScaleModes->actions())
-    {
-      Qt::TransformationMode actionScaleMode =
-        m_actionIDToZoomScaleModeMap[pAction->data().toString()];
-      if(actionScaleMode == scaleMode)
-      {
+  QObject *pSender = sender();
+  if (pSender == m_ui.scaleModeComboBox) {
+    for (QAction *pAction : m_pActionGroupZoomScaleModes->actions()) {
+      Qt::TransformationMode actionScaleMode = m_actionIDToZoomScaleModeMap[pAction->data().toString()];
+      if (actionScaleMode == scaleMode) {
         pAction->setChecked(true);
         break;
       }
     }
   }
-  else
-  {
+  else {
     // If signal wasn't sent by combo box - presume it was sent by action.
-    QAction * pSenderAction = qobject_cast<QAction *>(pSender);
-    scaleMode =
-      m_actionIDToZoomScaleModeMap[pSenderAction->data().toString()];
+    QAction *pSenderAction = qobject_cast<QAction *>(pSender);
+    scaleMode = m_actionIDToZoomScaleModeMap[pSenderAction->data().toString()];
     int scaleModeIndex = m_ui.scaleModeComboBox->findData((int)scaleMode);
     m_ui.scaleModeComboBox->setCurrentIndex(scaleModeIndex);
   }
 
+  m_ui.zoomRatioSpinBox->setScaleMode(scaleMode);
   setPreviewPixmap();
   m_pSettingsManager->setScaleMode(scaleMode);
 
@@ -679,15 +879,13 @@ void PreviewDialog::slotToggleCropPanelVisible(bool a_cropPanelVisible)
 void PreviewDialog::slotCropModeChanged()
 {
   CropMode cropMode = (CropMode)m_ui.cropModeComboBox->currentData().toInt();
-  if(cropMode == CropMode::Absolute)
-  {
+  if (cropMode == CropMode::Absolute) {
     m_ui.cropWidthSpinBox->setEnabled(true);
     m_ui.cropHeightSpinBox->setEnabled(true);
     m_ui.cropRightSpinBox->setEnabled(false);
     m_ui.cropBottomSpinBox->setEnabled(false);
   }
-  else
-  {
+  else {
     m_ui.cropWidthSpinBox->setEnabled(false);
     m_ui.cropHeightSpinBox->setEnabled(false);
     m_ui.cropRightSpinBox->setEnabled(true);
@@ -704,24 +902,24 @@ void PreviewDialog::slotCropLeftValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
 
-  int remainder = m_cpVideoInfo->width - a_value;
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) {
+    END_CROP_VALUES_CHANGE
+    return;
+  }
+
+  int remainder = vi->width - a_value;
   m_ui.cropWidthSpinBox->setMaximum(remainder);
   m_ui.cropRightSpinBox->setMaximum(remainder - 1);
 
   CropMode cropMode = (CropMode)m_ui.cropModeComboBox->currentData().toInt();
-  if(cropMode == CropMode::Absolute)
-  {
-    if(m_ui.cropWidthSpinBox->value() > remainder)
-      m_ui.cropWidthSpinBox->setValue(remainder);
-    m_ui.cropRightSpinBox->setValue(remainder -
-      m_ui.cropWidthSpinBox->value());
+  if (cropMode == CropMode::Absolute) {
+    if (m_ui.cropWidthSpinBox->value() > remainder) m_ui.cropWidthSpinBox->setValue(remainder);
+    m_ui.cropRightSpinBox->setValue(remainder - m_ui.cropWidthSpinBox->value());
   }
-  else
-  {
-    if(m_ui.cropRightSpinBox->value() > remainder - 1)
-      m_ui.cropRightSpinBox->setValue(remainder - 1);
-    m_ui.cropWidthSpinBox->setValue(remainder -
-      m_ui.cropRightSpinBox->value());
+  else {
+    if (m_ui.cropRightSpinBox->value() > remainder - 1) m_ui.cropRightSpinBox->setValue(remainder - 1);
+    m_ui.cropWidthSpinBox->setValue(remainder - m_ui.cropRightSpinBox->value());
   }
 
   recalculateCropMods();
@@ -740,24 +938,24 @@ void PreviewDialog::slotCropTopValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
 
-  int remainder = m_cpVideoInfo->height - a_value;
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) {
+    END_CROP_VALUES_CHANGE
+    return;
+  }
+
+  int remainder = vi->height - a_value;
   m_ui.cropHeightSpinBox->setMaximum(remainder);
   m_ui.cropBottomSpinBox->setMaximum(remainder - 1);
 
   CropMode cropMode = (CropMode)m_ui.cropModeComboBox->currentData().toInt();
-  if(cropMode == CropMode::Absolute)
-  {
-    if(m_ui.cropHeightSpinBox->value() > remainder)
-      m_ui.cropHeightSpinBox->setValue(remainder);
-    m_ui.cropBottomSpinBox->setValue(remainder -
-      m_ui.cropHeightSpinBox->value());
+  if (cropMode == CropMode::Absolute) {
+    if (m_ui.cropHeightSpinBox->value() > remainder) m_ui.cropHeightSpinBox->setValue(remainder);
+    m_ui.cropBottomSpinBox->setValue(remainder - m_ui.cropHeightSpinBox->value());
   }
-  else
-  {
-    if(m_ui.cropBottomSpinBox->value() > remainder - 1)
-      m_ui.cropBottomSpinBox->setValue(remainder - 1);
-    m_ui.cropHeightSpinBox->setValue(remainder -
-      m_ui.cropBottomSpinBox->value());
+  else {
+    if (m_ui.cropBottomSpinBox->value() > remainder - 1) m_ui.cropBottomSpinBox->setValue(remainder - 1);
+    m_ui.cropHeightSpinBox->setValue(remainder - m_ui.cropBottomSpinBox->value());
   }
 
   recalculateCropMods();
@@ -776,8 +974,13 @@ void PreviewDialog::slotCropWidthValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
 
-  m_ui.cropRightSpinBox->setValue(m_cpVideoInfo->width -
-    m_ui.cropLeftSpinBox->value() - a_value);
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) {
+    END_CROP_VALUES_CHANGE
+    return;
+  }
+
+  m_ui.cropRightSpinBox->setValue(vi->width - m_ui.cropLeftSpinBox->value() - a_value);
 
   recalculateCropMods();
 
@@ -795,8 +998,13 @@ void PreviewDialog::slotCropHeightValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
 
-  m_ui.cropBottomSpinBox->setValue(m_cpVideoInfo->height -
-    m_ui.cropTopSpinBox->value() - a_value);
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) {
+    END_CROP_VALUES_CHANGE
+    return;
+  }
+
+  m_ui.cropBottomSpinBox->setValue(vi->height - m_ui.cropTopSpinBox->value() - a_value);
 
   recalculateCropMods();
 
@@ -814,8 +1022,13 @@ void PreviewDialog::slotCropRightValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
 
-  m_ui.cropWidthSpinBox->setValue(m_cpVideoInfo->width -
-    m_ui.cropLeftSpinBox->value() - a_value);
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) {
+    END_CROP_VALUES_CHANGE
+    return;
+  }
+
+  m_ui.cropWidthSpinBox->setValue(vi->width - m_ui.cropLeftSpinBox->value() - a_value);
 
   recalculateCropMods();
 
@@ -833,8 +1046,13 @@ void PreviewDialog::slotCropBottomValueChanged(int a_value)
 {
   BEGIN_CROP_VALUES_CHANGE
 
-  m_ui.cropHeightSpinBox->setValue(m_cpVideoInfo->height -
-    m_ui.cropTopSpinBox->value() - a_value);
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) {
+    END_CROP_VALUES_CHANGE
+    return;
+  }
+
+  m_ui.cropHeightSpinBox->setValue(vi->height - m_ui.cropTopSpinBox->value() - a_value);
 
   recalculateCropMods();
 
@@ -859,29 +1077,29 @@ void PreviewDialog::slotCropZoomRatioValueChanged(int a_cropZoomRatio)
 
 void PreviewDialog::slotPasteCropSnippetIntoScript()
 {
-  if(!m_ui.cropPanel->isVisible())
-    return;
+  if (m_inPreviewer) return;
+  if (!m_ui.cropPanel->isVisible()) return;
 
   CropMode cropMode = (CropMode)m_ui.cropModeComboBox->currentData().toInt();
   QString cropString;
 
-  if(cropMode == CropMode::Absolute)
-  {
-    cropString = QString("***CLIP*** = core.std.CropAbs"
-      "(***CLIP***, x=%1, y=%2, width=%3, height=%4)")
-      .arg(m_ui.cropLeftSpinBox->value())
-      .arg(m_ui.cropTopSpinBox->value())
-      .arg(m_ui.cropWidthSpinBox->value())
-      .arg(m_ui.cropHeightSpinBox->value());
+  if (cropMode == CropMode::Absolute) {
+    cropString = QString(
+                   "***CLIP*** = core.std.CropAbs"
+                   "(***CLIP***, x=%1, y=%2, width=%3, height=%4)")
+                   .arg(m_ui.cropLeftSpinBox->value())
+                   .arg(m_ui.cropTopSpinBox->value())
+                   .arg(m_ui.cropWidthSpinBox->value())
+                   .arg(m_ui.cropHeightSpinBox->value());
   }
-  else
-  {
-    cropString = QString("***CLIP*** = core.std.CropRel"
-      "(***CLIP***, left=%1, top=%2, right=%3, bottom=%4)")
-      .arg(m_ui.cropLeftSpinBox->value())
-      .arg(m_ui.cropTopSpinBox->value())
-      .arg(m_ui.cropRightSpinBox->value())
-      .arg(m_ui.cropBottomSpinBox->value());
+  else {
+    cropString = QString(
+                   "***CLIP*** = core.std.CropRel"
+                   "(***CLIP***, left=%1, top=%2, right=%3, bottom=%4)")
+                   .arg(m_ui.cropLeftSpinBox->value())
+                   .arg(m_ui.cropTopSpinBox->value())
+                   .arg(m_ui.cropRightSpinBox->value())
+                   .arg(m_ui.cropBottomSpinBox->value());
   }
 
   emit signalPasteIntoScriptAtNewLine(cropString);
@@ -890,10 +1108,7 @@ void PreviewDialog::slotPasteCropSnippetIntoScript()
 // END OF void PreviewDialog::slotPasteCropSnippetIntoScript()
 //==============================================================================
 
-void PreviewDialog::slotCallAdvancedSettingsDialog()
-{
-  m_pAdvancedSettingsDialog->slotCall();
-}
+void PreviewDialog::slotCallAdvancedSettingsDialog() { m_pAdvancedSettingsDialog->slotCall(); }
 
 // END OF void PreviewDialog::slotCallAdvancedSettingsDialog()
 //==============================================================================
@@ -911,35 +1126,26 @@ void PreviewDialog::slotToggleTimeLinePanelVisible(bool a_timeLinePanelVisible)
 void PreviewDialog::slotTimeLineModeChanged()
 {
   static bool changingTimeLineMode = false;
-  if(changingTimeLineMode)
-    return;
+  if (changingTimeLineMode) return;
   changingTimeLineMode = true;
 
-  TimeLineSlider::DisplayMode timeLineMode = (TimeLineSlider::DisplayMode)
-    m_ui.timeLineModeComboBox->currentData().toInt();
+  TimeLineSlider::DisplayMode timeLineMode = (TimeLineSlider::DisplayMode)m_ui.timeLineModeComboBox->currentData().toInt();
 
-  QObject * pSender = sender();
-  if(pSender == m_ui.timeLineModeComboBox)
-  {
-    for(QAction * pAction : m_pActionGroupTimeLineModes->actions())
-    {
-      TimeLineSlider::DisplayMode actionTimeLineMode =
-        m_actionIDToTimeLineModeMap[pAction->data().toString()];
-      if(actionTimeLineMode == timeLineMode)
-      {
+  QObject *pSender = sender();
+  if (pSender == m_ui.timeLineModeComboBox) {
+    for (QAction *pAction : m_pActionGroupTimeLineModes->actions()) {
+      TimeLineSlider::DisplayMode actionTimeLineMode = m_actionIDToTimeLineModeMap[pAction->data().toString()];
+      if (actionTimeLineMode == timeLineMode) {
         pAction->setChecked(true);
         break;
       }
     }
   }
-  else
-  {
+  else {
     // If signal wasn't sent by combo box - presume it was sent by action.
-    QAction * pSenderAction = qobject_cast<QAction *>(pSender);
-    timeLineMode =
-      m_actionIDToTimeLineModeMap[pSenderAction->data().toString()];
-    int timeLineModeIndex = m_ui.timeLineModeComboBox->findData(
-      (int)timeLineMode);
+    QAction *pSenderAction = qobject_cast<QAction *>(pSender);
+    timeLineMode = m_actionIDToTimeLineModeMap[pSenderAction->data().toString()];
+    int timeLineModeIndex = m_ui.timeLineModeComboBox->findData((int)timeLineMode);
     m_ui.timeLineModeComboBox->setCurrentIndex(timeLineModeIndex);
   }
 
@@ -952,10 +1158,7 @@ void PreviewDialog::slotTimeLineModeChanged()
 // END OF void PreviewDialog::slotTimeLineModeChanged()
 //==============================================================================
 
-void PreviewDialog::slotTimeStepChanged(const QTime & a_time)
-{
-  m_pSettingsManager->setTimeStep(vsedit::qtimeToSeconds(a_time));
-}
+void PreviewDialog::slotTimeStepChanged(const QTime &a_time) { m_pSettingsManager->setTimeStep(vsedit::qtimeToSeconds(a_time)); }
 
 // END OF void PreviewDialog::slotTimeStepChanged(const QTime & a_time)
 //==============================================================================
@@ -981,8 +1184,7 @@ void PreviewDialog::slotTimeStepBack()
 void PreviewDialog::slotSettingsChanged()
 {
   QKeySequence hotkey;
-  for(QAction * pAction : m_settableActionsList)
-  {
+  for (QAction *pAction : m_settableActionsList) {
     hotkey = m_pSettingsManager->getHotkey(pAction->data().toString());
     pAction->setShortcut(hotkey);
   }
@@ -991,12 +1193,10 @@ void PreviewDialog::slotSettingsChanged()
 
   m_ui.frameNumberSlider->setUpdatesEnabled(false);
 
-  QFont sliderLabelsFont =
-    m_pSettingsManager->getTextFormat(TEXT_FORMAT_ID_TIMELINE).font();
+  QFont sliderLabelsFont = m_pSettingsManager->getTextFormat(TEXT_FORMAT_ID_TIMELINE).font();
   m_ui.frameNumberSlider->setLabelsFont(sliderLabelsFont);
 
-  QColor bookmarksColor =
-    m_pSettingsManager->getColor(COLOR_ID_TIMELINE_BOOKMARKS);
+  QColor bookmarksColor = m_pSettingsManager->getColor(COLOR_ID_TIMELINE_BOOKMARKS);
   m_ui.frameNumberSlider->setColor(TimeLineSlider::Bookmark, bookmarksColor);
 
   m_ui.frameNumberSlider->setUpdatesEnabled(true);
@@ -1008,8 +1208,7 @@ void PreviewDialog::slotSettingsChanged()
 void PreviewDialog::slotPreviewAreaSizeChanged()
 {
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
-  if(zoomMode == ZoomMode::FitToFrame)
-    setPreviewPixmap();
+  if (zoomMode == ZoomMode::FitToFrame) setPreviewPixmap();
 }
 
 // END OF void PreviewDialog::slotPreviewAreaSizeChanged()
@@ -1017,21 +1216,34 @@ void PreviewDialog::slotPreviewAreaSizeChanged()
 
 void PreviewDialog::slotPreviewAreaCtrlWheel(QPoint a_angleDelta)
 {
+#ifdef Q_OS_WIN  // AUDIO
+  if (m_currentIsAudio && m_pAudioSink) {
+    int deltaY = a_angleDelta.y();
+    m_audioVolume = m_pAudioSink->volume();
+    if (deltaY > 0) {
+      m_audioVolume += 0.1;
+      m_pAudioSink->setVolume(m_audioVolume);
+    }
+    else if (deltaY < 0) {
+      m_audioVolume -= 0.1;
+      m_pAudioSink->setVolume(m_audioVolume);
+    }
+    return;
+  }
+#endif
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
   int deltaY = a_angleDelta.y();
 
-  if(m_ui.cropCheckButton->isChecked())
-  {
-    if(deltaY > 0)
+  if (m_ui.cropCheckButton->isChecked()) {
+    if (deltaY > 0)
       m_ui.cropZoomRatioSpinBox->stepBy(1);
-    else if(deltaY < 0)
+    else if (deltaY < 0)
       m_ui.cropZoomRatioSpinBox->stepBy(-1);
   }
-  else if(zoomMode == ZoomMode::FixedRatio)
-  {
-    if(deltaY > 0)
+  else if (zoomMode == ZoomMode::FixedRatio) {
+    if (deltaY > 0)
       m_ui.zoomRatioSpinBox->stepBy(1);
-    else if(deltaY < 0)
+    else if (deltaY < 0)
       m_ui.zoomRatioSpinBox->stepBy(-1);
   }
 }
@@ -1041,73 +1253,27 @@ void PreviewDialog::slotPreviewAreaCtrlWheel(QPoint a_angleDelta)
 
 void PreviewDialog::slotPreviewAreaMouseMiddleButtonReleased()
 {
-  if(m_ui.cropCheckButton->isChecked())
-    return;
+  if (m_ui.cropCheckButton->isChecked()) return;
 
   int zoomModeIndex = m_ui.zoomModeComboBox->currentIndex();
   zoomModeIndex++;
-  if(zoomModeIndex >= m_ui.zoomModeComboBox->count())
-    zoomModeIndex = 0;
+  if (zoomModeIndex >= m_ui.zoomModeComboBox->count()) zoomModeIndex = 0;
   m_ui.zoomModeComboBox->setCurrentIndex(zoomModeIndex);
 }
 
 // END OF void PreviewDialog::slotPreviewAreaMouseMiddleButtonReleased()
 //==============================================================================
 
-void PreviewDialog::slotPreviewAreaMouseRightButtonReleased()
-{
-  m_pPreviewContextMenu->popup(QCursor::pos());
-}
+void PreviewDialog::slotPreviewAreaMouseRightButtonReleased() { m_pPreviewContextMenu->popup(QCursor::pos()); }
 
 // END OF void PreviewDialog::slotPreviewAreaMouseRightButtonReleased()
 //==============================================================================
 
-std::array<double, 3> PreviewDialog::rgb_to_hsv(double r, double g, double b) const
+void PreviewDialog::slotPreviewAreaMouseOverPoint(double a_pX, double a_pY)
 {
-  // R, G, B values are divided by 255
-  // to change the range from 0..255 to 0..1
-  r = r / 255.0;
-  g = g / 255.0;
-  b = b / 255.0;
+  if (!m_cpFrame) return;
 
-  // h, s, v = hue, saturation, value
-  double cmax = qMax(r, qMax(g, b));  // maximum of r, g, b
-  double cmin = qMin(r, qMin(g, b));  // minimum of r, g, b
-  double diff = cmax - cmin;          // diff of cmax and cmin.
-  double h = -1, s = -1;
-
-  // if cmax and cmax are equal then h = 0
-  if (cmax == cmin) h = 0;
-
-  // if cmax equal r then compute h
-  else if (cmax == r)
-    h = fmod(60 * ((g - b) / diff) + 360, 360);
-
-  // if cmax equal g then compute h
-  else if (cmax == g)
-    h = fmod(60 * ((b - r) / diff) + 120, 360);
-
-  // if cmax equal b then compute h
-  else if (cmax == b)
-    h = fmod(60 * ((r - g) / diff) + 240, 360);
-
-  // if cmax equal zero
-  if (cmax == 0)
-    s = 0;
-  else
-    s = (diff / cmax) * 100;
-
-  // compute v
-  double v = cmax * 100;
-  std::array<double, 3> hsv;
-  hsv[0] = h;
-  hsv[1] = s;
-  hsv[2] = v;
-  return hsv;
-}
-void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
-{
-  if (!m_cpFrameRef) return;
+  if (m_cpVSAPI->getFrameType(m_cpFrame) == mtAudio) return;
 
   if (!m_pStatusBarWidget->colorPickerVisible()) return;
 
@@ -1119,44 +1285,50 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
   size_t frameX = 0;
   size_t frameY = 0;
 
-  frameX = (size_t)((float)m_framePixmap.width() * a_normX);
-  frameY = (size_t)((float)m_framePixmap.height() * a_normY);
+  double zoomRatio;
 
-  int width = m_cpVSAPI->getFrameWidth(m_cpFrameRef, 0);
-  int height = m_cpVSAPI->getFrameHeight(m_cpFrameRef, 0);
-  const VSFormat *cpFormat = m_cpVSAPI->getFrameFormat(m_cpFrameRef);
+  int width = m_cpVSAPI->getFrameWidth(m_cpFrame, 0);
+  int height = m_cpVSAPI->getFrameHeight(m_cpFrame, 0);
+  const VSVideoFormat *cpFormat = m_cpVSAPI->getVideoFrameFormat(m_cpFrame);
 
-  if ((frameX >= (size_t)width) || (frameY >= (size_t)height)) return;
-
-  if (cpFormat->id == pfCompatBGR32) {
-    const uint8_t *cpData = m_cpVSAPI->getReadPtr(m_cpFrameRef, 0);
-    int stride = m_cpVSAPI->getStride(m_cpFrameRef, 0);
-    const uint32_t *cpLine = (const uint32_t *)(cpData + (height - 1 - frameY) * stride);
-    uint32_t packedValue = cpLine[frameX];
-    value3 = (double)(packedValue & 0xFF);
-    value2 = (double)((packedValue >> 8) & 0xFF);
-    value1 = (double)((packedValue >> 16) & 0xFF);
-  }
-  else if (cpFormat->id == pfCompatYUY2) {
-    size_t x = frameX >> 1;
-    size_t rem = frameX & 0x1;
-    const uint8_t *cpData = m_cpVSAPI->getReadPtr(m_cpFrameRef, 0);
-    int stride = m_cpVSAPI->getStride(m_cpFrameRef, 0);
-    const uint32_t *cpLine = (const uint32_t *)(cpData + frameY * stride);
-    uint32_t packedValue = cpLine[x];
-
-    if (rem == 0)
-      value1 = (double)(packedValue & 0xFF);
-    else
-      value1 = (double)((packedValue >> 16) & 0xFF);
-    value2 = (double)((packedValue >> 8) & 0xFF);
-    value3 = (double)((packedValue >> 24) & 0xFF);
+  if (m_ui.cropPanel->isVisible()) {
+    zoomRatio = m_ui.cropZoomRatioSpinBox->value();
+    int cropLeft = m_ui.cropLeftSpinBox->value();
+    int cropTop = m_ui.cropTopSpinBox->value();
+    int cropWidth = m_ui.cropWidthSpinBox->value();
+    int cropHeight = m_ui.cropHeightSpinBox->value();
+    frameX = (size_t)(a_pX * m_devicePixelRatio / zoomRatio + cropLeft);
+    frameY = (size_t)(a_pY * m_devicePixelRatio / zoomRatio + cropTop);
+    if (frameX >= (size_t)(cropLeft + cropWidth) || frameY >= (size_t)(cropTop + cropHeight)) return;
   }
   else {
-    value1 = valueAtPoint(frameX, frameY, 0);
-    if (cpFormat->numPlanes > 1) value2 = valueAtPoint(frameX, frameY, 1);
-    if (cpFormat->numPlanes > 2) value3 = valueAtPoint(frameX, frameY, 2);
+    ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
+    if (zoomMode == ZoomMode::NoZoom) { zoomRatio = 1.0; }
+    else if (zoomMode == ZoomMode::FixedRatio) {
+      zoomRatio = m_ui.zoomRatioSpinBox->value();
+    }
+    else {
+      if (m_framePixmap.isNull()) {
+        m_pStatusBarWidget->setColorPickerString(QString());
+        return;
+      }
+      QRect previewRect = m_ui.previewArea->geometry();
+      int cropSize = m_ui.previewArea->frameWidth() * 2;
+      int frameWidth = previewRect.width() * m_devicePixelRatio - cropSize;
+      int frameHeight = previewRect.height() * m_devicePixelRatio - cropSize;
+      double scaleW = (double)frameWidth / m_framePixmap.width();
+      double scaleH = (double)frameHeight / m_framePixmap.height();
+      zoomRatio = scaleW < scaleH ? scaleW : scaleH;
+    }
+    if (zoomRatio <= 0) return;
+    frameX = (size_t)(a_pX * m_devicePixelRatio / zoomRatio);
+    frameY = (size_t)(a_pY * m_devicePixelRatio / zoomRatio);
+    if ((frameX >= (size_t)width) || (frameY >= (size_t)height)) return;
   }
+
+  value1 = valueAtPoint(frameX, frameY, 0);
+  if (cpFormat->numPlanes > 1) value2 = valueAtPoint(frameX, frameY, 1);
+  if (cpFormat->numPlanes > 2) value3 = valueAtPoint(frameX, frameY, 2);
 
   previewValueAtPoint(frameX, frameY, preview_values);
 
@@ -1164,28 +1336,22 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
   QString l2("2");
   QString l3("3");
 
-  int colorFamily = m_cpVideoInfo->format->colorFamily;
-  int formatID = m_cpVideoInfo->format->id;
+  int colorFamily = m_nodeInfo[m_outputIndex].getAsVideo()->format.colorFamily;
 
-  if ((colorFamily == cmYUV) || (formatID == pfCompatYUY2)) {
+  if (colorFamily == cfYUV) {
     l1 = "Y";
     l2 = "U";
     l3 = "V";
   }
-  else if ((colorFamily == cmRGB) || (formatID == pfCompatBGR32)) {
+  else if (colorFamily == cfRGB) {
     l1 = "R";
     l2 = "G";
     l3 = "B";
   }
-  else if (colorFamily == cmYCoCg) {
-    l1 = "Y";
-    l2 = "Co";
-    l3 = "Cg";
-  }
 
   QString colorString;
 
-  if (colorFamily == cmGray)
+  if (colorFamily == cfGray)
     colorString = QString("Video: G:%1").arg(value1);
   else {
     colorString = QString("Video: %1:%2|%3:%4|%5:%6").arg(l1).arg(value1).arg(l2).arg(value2).arg(l3).arg(value3);
@@ -1194,12 +1360,8 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX, float a_normY)
   QString coordString = QString("    Position: X:%1|Y:%2").arg(frameX).arg(frameY);
 
   QString dispString = QString("    Display: R:%1|G:%2|B:%3").arg(preview_values[0]).arg(preview_values[1]).arg(preview_values[2]);
-  std::array<double, 3> hsv;
-  hsv = this->rgb_to_hsv(preview_values[0] * 1.0, preview_values[1] * 1.0, preview_values[2] * 1.0);
-  qApp->processEvents();
-  QString hsvString = QString("    H:%1|S:%2|V:%3").arg(hsv[0]).arg(hsv[1]).arg(hsv[2]);
 
-  m_pStatusBarWidget->setColorPickerString(colorString + coordString + dispString + hsvString);
+  m_pStatusBarWidget->setColorPickerString(colorString + coordString + dispString);
 }
 
 // END OF void PreviewDialog::slotPreviewAreaMouseOverPoint(float a_normX,
@@ -1238,24 +1400,33 @@ void PreviewDialog::slotToggleColorPicker(bool a_colorPickerVisible)
 void PreviewDialog::slotSetPlayFPSLimit()
 {
   double limit = m_ui.playFpsLimitSpinBox->value();
-
-  PlayFPSLimitMode mode = (PlayFPSLimitMode)m_ui.playFpsLimitModeComboBox->currentData().toInt();
+  if (limit < 1e-3) limit = 1e-3;
+  m_nativePlaybackRate = false;
+#ifdef Q_OS_WIN  // AUDIO
+  PlayFPSLimitMode mode = m_currentIsAudio ? PlayFPSLimitMode::FromVideo :
+#else
+  PlayFPSLimitMode mode =
+#endif
+                                           (PlayFPSLimitMode)m_ui.playFpsLimitModeComboBox->currentData().toInt();
   if (mode == PlayFPSLimitMode::NoLimit)
     m_secondsBetweenFrames = 0.0;
   else if (mode == PlayFPSLimitMode::Custom)
     m_secondsBetweenFrames = 1.0 / limit;
   else if (mode == PlayFPSLimitMode::FromVideo) {
-    if (!m_cpVideoInfo)
+    if (m_fpsDen == 0 || m_fpsNum == 0) {
+      m_nativePlaybackRate = true;
       m_secondsBetweenFrames = 0.0;
-    else if (m_cpVideoInfo->fpsNum == 0ll)
-      m_secondsBetweenFrames = 0.0;
+    }
     else {
-      m_secondsBetweenFrames = (double)m_cpVideoInfo->fpsDen / (double)m_cpVideoInfo->fpsNum;
+      m_secondsBetweenFrames = 1.0 / m_fpsNum * m_fpsDen;
     }
   }
   else
     Q_ASSERT(false);
 
+#ifdef Q_OS_WIN  // AUDIO
+  if (m_currentIsAudio) return;
+#endif
   m_pSettingsManager->setPlayFPSLimitMode(mode);
   m_pSettingsManager->setPlayFPSLimit(limit);
 }
@@ -1271,14 +1442,27 @@ void PreviewDialog::slotPlay(bool a_play)
   m_pActionPlay->setChecked(m_playing);
 
   if (m_playing) {
+    m_ui.outputIndexComboBox->setEnabled(false);
     m_pActionPlay->setIcon(m_iconPause);
     m_lastFrameRequestedForPlay = m_frameShown;
+#ifdef Q_OS_WIN  // AUDIO
+    if (m_currentIsAudio && m_pAudioSink)
+      slotProcessAudioPlayQueue();
+    else
+      slotProcessPlayQueue();
+#else
     slotProcessPlayQueue();
+#endif
   }
   else {
     clearFramesCache();
+#ifdef Q_OS_WIN  // AUDIO
+    m_audioCache.clear();
+#endif
     m_pVapourSynthScriptProcessor->flushFrameTicketsQueue();
+    m_ui.outputIndexComboBox->setEnabled(true);
     m_pActionPlay->setIcon(m_iconPlay);
+    setTitle();
   }
 }
 
@@ -1292,14 +1476,33 @@ void PreviewDialog::slotProcessPlayQueue()
   if (m_processingPlayQueue) return;
   m_processingPlayQueue = true;
 
-  int nextFrame = (m_frameShown + 1) % m_cpVideoInfo->numFrames;
-  Frame referenceFrame(nextFrame, 0, nullptr);
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) return;
 
-  while (!m_framesCache.empty()) {
-    std::list<Frame>::const_iterator it = std::find(m_framesCache.begin(), m_framesCache.end(), referenceFrame);
+  int nextFrame = (m_frameShown + 1) % vi->numFrames;
+  Frame referenceFrame(nextFrame, m_outputIndex, nullptr);
 
-    if (it == m_framesCache.end()) break;
+  while (!m_framesCache[m_outputIndex].empty()) {
+    std::list<Frame>::const_iterator it
+      = std::find(m_framesCache[m_outputIndex].begin(), m_framesCache[m_outputIndex].end(), referenceFrame);
 
+    if (it == m_framesCache[m_outputIndex].end()) break;
+
+    if (m_nativePlaybackRate) {
+      Q_ASSERT(m_cpVSAPI);
+      const VSMap *frameProps = m_cpVSAPI->getFramePropertiesRO(it->cpOutputFrame);
+      int err_num, err_den;
+      int64_t durNum = m_cpVSAPI->mapGetInt(frameProps, "_DurationNum", 0, &err_num);
+      int64_t durDen = m_cpVSAPI->mapGetInt(frameProps, "_DurationDen", 0, &err_den);
+      if (err_num || err_den || durNum <= 0 || durDen <= 0) {
+        // Fallback to custom
+        double limit = m_ui.playFpsLimitSpinBox->value();
+        if (limit < 1e-3) limit = 1e-3;
+        m_secondsBetweenFrames = 1.0 / limit;
+      }
+      else
+        m_secondsBetweenFrames = (double)durNum / (double)durDen;
+    }
     hr_time_point now = hr_clock::now();
     double passed = duration_to_double(now - m_lastFrameShowTime);
     double secondsToNextFrame = m_secondsBetweenFrames - passed;
@@ -1309,24 +1512,26 @@ void PreviewDialog::slotProcessPlayQueue()
       break;
     }
 
-    setCurrentFrame(it->cpOutputFrameRef, it->cpPreviewFrameRef);
+    setCurrentFrame(it->cpOutputFrame, it->cpPreviewFrame);
     m_lastFrameShowTime = hr_clock::now();
 
     m_frameShown = nextFrame;
-    m_frameExpected = m_frameShown;
+    setExpectedFrame(m_frameShown);
     m_ui.frameNumberSpinBox->setValue(m_frameExpected);
-    m_ui.frameNumberSlider->setFrame(m_frameExpected);
-    m_framesCache.erase(it);
-    nextFrame = (m_frameShown + 1) % m_cpVideoInfo->numFrames;
+    m_ui.frameNumberSlider->setFrame(m_frameExpected, false);
+    m_framesCache[m_outputIndex].erase(it);
+    nextFrame = (m_frameShown + 1) % vi->numFrames;
     referenceFrame.number = nextFrame;
   }
 
-  nextFrame = (m_lastFrameRequestedForPlay + 1) % m_cpVideoInfo->numFrames;
+  nextFrame = (m_lastFrameRequestedForPlay + 1) % vi->numFrames;
 
-  while (((m_framesInQueue + m_framesInProcess) < m_maxThreads) && (m_framesCache.size() <= m_cachedFramesLimit)) {
-    m_pVapourSynthScriptProcessor->requestFrameAsync(nextFrame, 0, true);
+  while (((m_framesInQueue[m_outputIndex] + m_framesInProcess[m_outputIndex]) < m_maxThreads)
+         && (m_framesCache[m_outputIndex].size() <= m_cachedFramesLimit))
+  {
+    m_pVapourSynthScriptProcessor->requestFrameAsync(nextFrame, m_outputIndex, true);
     m_lastFrameRequestedForPlay = nextFrame;
-    nextFrame = (nextFrame + 1) % m_cpVideoInfo->numFrames;
+    nextFrame = (nextFrame + 1) % vi->numFrames;
   }
 
   m_processingPlayQueue = false;
@@ -1335,9 +1540,83 @@ void PreviewDialog::slotProcessPlayQueue()
 // END OF void PreviewDialog::slotProcessPlayQueue()
 //==============================================================================
 
+#ifdef Q_OS_WIN  // AUDIO
+void PreviewDialog::slotProcessAudioPlayQueue()
+{
+  if (!m_playing) return;
+
+  if (m_processingPlayQueue) return;
+  m_processingPlayQueue = true;
+
+  int numFrames = m_nodeInfo[m_outputIndex].numFrames();
+  int nextFrame = (m_frameShown + 1) % numFrames;
+
+  static double delay_estimate = 0.0;
+
+  while (!m_framesCache[m_outputIndex].empty()) {
+    auto ait = m_audioCache.find(nextFrame);
+    if (ait == m_audioCache.end()) break;
+    auto af = m_audioCache[nextFrame];
+
+    double ms_offset = 0.0;
+    hr_time_point now = hr_clock::now();
+    double passed = duration_to_double(now - m_lastFrameShowTime);
+    double secondsToNextFrame = m_secondsBetweenFrames - passed - delay_estimate;
+    if (secondsToNextFrame > 0) {
+      int millisecondsToNextFrame = std::round(secondsToNextFrame * 1000);
+      ms_offset = secondsToNextFrame - millisecondsToNextFrame / 1000.0;
+      m_pAudioPlayTimer->start(millisecondsToNextFrame);
+      break;
+    }
+
+    m_lastFrameShowTime = hr_clock::now();
+    m_pAudioIODevice->write(af.data);
+    auto time_post = hr_clock::now();
+    delay_estimate = duration_to_double(time_post - m_lastFrameShowTime) - ms_offset;
+    m_audioCache.erase(nextFrame);
+
+    Frame referenceFrame(nextFrame, m_outputIndex, nullptr);
+    std::list<Frame>::const_iterator it
+      = std::find(m_framesCache[m_outputIndex].begin(), m_framesCache[m_outputIndex].end(), referenceFrame);
+
+    // caches are synced so this won't happen...
+    if (it == m_framesCache[m_outputIndex].end()) break;
+
+    setCurrentFrame(it->cpOutputFrame, it->cpPreviewFrame);
+    m_frameShown = nextFrame;
+    setExpectedFrame(m_frameShown);
+    m_ui.frameNumberSpinBox->setValue(m_frameExpected);
+    m_ui.frameNumberSlider->setFrame(m_frameExpected, false);
+    m_framesCache[m_outputIndex].erase(it);
+    nextFrame = (m_frameShown + 1) % numFrames;
+    referenceFrame.number = nextFrame;
+  }
+
+  nextFrame = (m_lastFrameRequestedForPlay + 1) % numFrames;
+
+  while (((m_framesInQueue[m_outputIndex] + m_framesInProcess[m_outputIndex]) < m_maxThreads)
+         && (m_framesCache[m_outputIndex].size() <= m_cachedFramesLimit))
+  {
+    m_pVapourSynthScriptProcessor->requestFrameAsync(nextFrame, m_outputIndex, true);
+    m_lastFrameRequestedForPlay = nextFrame;
+    nextFrame = (nextFrame + 1) % numFrames;
+  }
+
+  if (m_framesCache[m_outputIndex].empty()) m_audioCache.clear();
+
+  m_processingPlayQueue = false;
+}
+#endif
+
 void PreviewDialog::slotLoadChapters()
 {
   if (m_playing) return;
+
+  if (m_fpsDen == 0) {
+    QString infoString = tr("Warning: Load chapters requires clip having constant frame rate. Skipped");
+    emit signalWriteLogMessage(mtWarning, infoString);
+    return;
+  }
 
   const QString lastUsedPath = m_pSettingsManager->getLastUsedPath();
   const QString filePath
@@ -1345,43 +1624,34 @@ void PreviewDialog::slotLoadChapters()
   QFile chaptersFile(filePath);
   if (!chaptersFile.open(QIODevice::ReadOnly | QIODevice::Text)) return;
 
-  const VSVideoInfo *cpVideoInfo = m_pVapourSynthScriptProcessor->videoInfo();
-  if (cpVideoInfo->fpsDen == 0) {
-    QString infoString = tr("Warning: Load chapters requires clip having constant frame rate. Skipped");
-    emit signalWriteLogMessage(mtWarning, infoString);
-    return;
-  }
-  const double fps = (double)cpVideoInfo->fpsNum / (double)cpVideoInfo->fpsDen;
-#if(QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   static const QRegExp regExp(R"((\d{2}):(\d{2}):(\d{2})[\.:](\d{3})?)");
-  while(!chaptersFile.atEnd())
-  {
+  while (!chaptersFile.atEnd()) {
     const QByteArray line = chaptersFile.readLine();
-    if(regExp.indexIn(line) < 0)
-      continue;
+    if (regExp.indexIn(line) < 0) continue;
 
     const QStringList timecodes = regExp.capturedTexts();
 
-    const double timecode = timecodes.at(1).toDouble() * 3600.0 +
-      timecodes.at(2).toDouble() * 60.0 + timecodes.at(3).toDouble() +
-      timecodes.at(4).toDouble() / 1000;
-    const int frameIndex = round(timecode * fps);
+    const double timecode = timecodes.at(1).toDouble() * 3600.0
+                            + timecodes.at(2).toDouble() * 60.0
+                            + timecodes.at(3).toDouble()
+                            + timecodes.at(4).toDouble() / 1000;
+    const int frameIndex = round(timecode * m_fpsNum / m_fpsDen);
     m_ui.frameNumberSlider->addBookmark(frameIndex);
   }
 #else
   QRegularExpression regExp(R"((\d{2}):(\d{2}):(\d{2})[\.:](\d{3})?)");
-  while(!chaptersFile.atEnd())
-  {
+  while (!chaptersFile.atEnd()) {
     const QByteArray line = chaptersFile.readLine();
     QRegularExpressionMatch match = regExp.match(line);
-    if(!match.hasMatch())
-      continue;
+    if (!match.hasMatch()) continue;
     const QStringList timecodes = match.capturedTexts();
 
-    const double timecode = timecodes.at(1).toDouble() * 3600.0 +
-      timecodes.at(2).toDouble() * 60.0 + timecodes.at(3).toDouble() +
-      timecodes.at(4).toDouble() / 1000;
-    const int frameIndex = round(timecode * fps);
+    const double timecode = timecodes.at(1).toDouble() * 3600.0
+                            + timecodes.at(2).toDouble() * 60.0
+                            + timecodes.at(3).toDouble()
+                            + timecodes.at(4).toDouble() / 1000;
+    const int frameIndex = round(timecode * m_fpsNum / m_fpsDen);
     m_ui.frameNumberSlider->addBookmark(frameIndex);
   }
 
@@ -1395,16 +1665,16 @@ void PreviewDialog::slotLoadChapters()
 
 void PreviewDialog::slotClearBookmarks()
 {
-  if(m_playing)
-    return;
+  if (m_playing) return;
 
-  QMessageBox::StandardButton result = QMessageBox::question(this,
-    tr("Clear bookmards"), tr("Do you really want to clear "
-    "timeline bookmarks?"),
-    QMessageBox::StandardButtons(QMessageBox::Yes | QMessageBox::No),
-    QMessageBox::No);
-  if(result == QMessageBox::No)
-    return;
+  QMessageBox quesBox(this);
+  vsedit::disableFontKerning(&quesBox);
+  quesBox.setWindowTitle(tr("Clear Bookmarks"));
+  quesBox.setText(tr("Do you really want to clear timeline bookmarks?"));
+  quesBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+  quesBox.setDefaultButton(QMessageBox::No);
+  int result = quesBox.exec();
+  if (result == QMessageBox::No) return;
 
   m_ui.frameNumberSlider->clearBookmarks();
   saveTimelineBookmarks();
@@ -1415,8 +1685,7 @@ void PreviewDialog::slotClearBookmarks()
 
 void PreviewDialog::slotBookmarkCurrentFrame()
 {
-  if(m_playing)
-    return;
+  if (m_playing) return;
 
   m_ui.frameNumberSlider->slotBookmarkCurrentFrame();
   saveTimelineBookmarks();
@@ -1427,8 +1696,7 @@ void PreviewDialog::slotBookmarkCurrentFrame()
 
 void PreviewDialog::slotUnbookmarkCurrentFrame()
 {
-  if(m_playing)
-    return;
+  if (m_playing) return;
 
   m_ui.frameNumberSlider->slotUnbookmarkCurrentFrame();
   saveTimelineBookmarks();
@@ -1439,8 +1707,7 @@ void PreviewDialog::slotUnbookmarkCurrentFrame()
 
 void PreviewDialog::slotGoToPreviousBookmark()
 {
-  if(m_playing)
-    return;
+  if (m_playing) return;
 
   m_ui.frameNumberSlider->slotGoToPreviousBookmark();
 }
@@ -1450,8 +1717,7 @@ void PreviewDialog::slotGoToPreviousBookmark()
 
 void PreviewDialog::slotGoToNextBookmark()
 {
-  if(m_playing)
-    return;
+  if (m_playing) return;
 
   m_ui.frameNumberSlider->slotGoToNextBookmark();
 }
@@ -1459,10 +1725,7 @@ void PreviewDialog::slotGoToNextBookmark()
 // END OF void PreviewDialog::slotGoToNextBookmark()
 //==============================================================================
 
-void PreviewDialog::slotPasteShownFrameNumberIntoScript()
-{
-  emit signalPasteIntoScriptAtCursor(QString::number(m_frameShown));
-}
+void PreviewDialog::slotPasteShownFrameNumberIntoScript() { emit signalPasteIntoScriptAtCursor(QString::number(m_frameShown)); }
 
 // END OF void PreviewDialog::slotPasteShownFrameNumberIntoScript()
 //==============================================================================
@@ -1473,101 +1736,462 @@ void PreviewDialog::slotSaveGeometry()
   m_pSettingsManager->setPreviewDialogGeometry(m_windowGeometry);
 }
 
+void PreviewDialog::slotJumpToFrame()
+{
+  if (m_playing) return;
+
+  if (busy()) return;
+
+  int currFrameNumber = m_frameExpected;
+  int lastFrameNumber = m_nodeInfo[m_outputIndex].numFrames() - 1;
+  int frame = QInputDialog::getInt(this, "Jump to...", "Jump to frame...", currFrameNumber);
+  if (frame < 0)  // Allowing -1, for example
+    frame = lastFrameNumber + frame + 1;
+  if (frame < 0) frame = 0;
+  if (frame > lastFrameNumber) frame = lastFrameNumber;
+  if (frame != currFrameNumber) { slotShowFrame(frame, true); }
+}
+
+QPoint PreviewDialog::loadLastScrollBarPositions() const { return m_pSettingsManager->getLastPreviewScrollBarPositions(); }
+
+void PreviewDialog::saveLastScrollBarPositions()
+{
+  QPoint pos = m_ui.previewArea->getScrollBarPositions();
+  m_pSettingsManager->setLastPreviewScrollBarPositions(pos);
+}
+
 // END OF void PreviewDialog::slotSaveGeometry()
 //==============================================================================
 
+#ifdef Q_OS_WIN  // AUDIO
+void PreviewDialog::setAudioOutput()
+{
+  const VSAudioInfo *pAI = m_nodeInfo[m_outputIndex].getAsAudio();
+  QAudioFormat af;
+  int numChannels = pAI->format.numChannels;
+  int bytesPerSample = pAI->format.bytesPerSample;
+  af.setChannelCount(numChannels);
+  af.setSampleRate(pAI->sampleRate);
+
+  // Always convert to int16
+  bytesPerSample = 2;
+  af.setSampleFormat(QAudioFormat::Int16);
+
+  stopAudioOutput();
+  QAudioDevice device = QMediaDevices::defaultAudioOutput();
+  if (numChannels <= 2 && device.isFormatSupported(af)) {
+    m_pAudioSink = new QAudioSink(device, af);
+    m_pAudioSink->setVolume(m_audioVolume);
+    m_pAudioSink->setBufferSize(numChannels * bytesPerSample * VS_AUDIO_FRAME_SAMPLES * 3);
+    m_pAudioIODevice = m_pAudioSink->start();
+  }
+  else {
+    qWarning() << QString("Audio format of node #%1 is not yet supported for playback.").arg(m_outputIndex).toStdString().c_str();
+  }
+}
+
+void PreviewDialog::stopAudioOutput()
+{
+  if (m_pAudioSink) {
+    if (m_pAudioIODevice) m_pAudioIODevice->close();
+    m_pAudioSink->stop();
+    delete m_pAudioSink;
+    m_pAudioSink = nullptr;
+    m_pAudioIODevice = nullptr;
+  }
+  m_audioCache.clear();
+}
+
+void PreviewDialog::playAudioFrame()
+{
+  QByteArray frameData = readAudioFrame(m_cpFrame);
+  if (frameData.size() > 0 && m_pAudioSink) { m_pAudioIODevice->write(frameData); }
+}
+
+QByteArray PreviewDialog::readAudioFrame(const VSFrame *a_cpFrame)
+{
+  if (!a_cpFrame) return QByteArray();
+  if (m_cpVSAPI->getFrameType(a_cpFrame) != mtAudio) return QByteArray();
+  if (!m_pAudioSink) return QByteArray();
+
+  int numChannels = m_nodeInfo[m_outputIndex].getAsAudio()->format.numChannels;
+  int bytesPerSample = m_nodeInfo[m_outputIndex].getAsAudio()->format.bytesPerSample;
+  auto sampleType = m_nodeInfo[m_outputIndex].getAsAudio()->format.sampleType;
+  if (numChannels == 1) {
+    if (bytesPerSample == 2)
+      return QByteArray::fromRawData(reinterpret_cast<const char *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0)),
+                                     bytesPerSample * VS_AUDIO_FRAME_SAMPLES);
+    else if (sampleType == stFloat) {
+      std::vector<int16_t> cache;
+      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
+      auto ptr0 = reinterpret_cast<const float *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
+      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
+      for (ptrdiff_t i = 0; i < stride; ++i) cache[i] = dither32Fto16(ptr0[i]);
+      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+    }
+    else {
+      std::vector<uint16_t> cache;
+      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
+      auto ptr0 = reinterpret_cast<const uint32_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
+      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
+      for (ptrdiff_t i = 0; i < stride; ++i) cache[i] = dither32to16(ptr0[i]);
+      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+    }
+  }
+  else {
+    if (sampleType == stFloat) {
+      std::vector<int16_t> cache;
+      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
+      auto ptr0 = reinterpret_cast<const float *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
+      auto ptr1 = reinterpret_cast<const float *>(m_cpVSAPI->getReadPtr(a_cpFrame, 1));
+      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
+      for (ptrdiff_t i = 0; i < stride; ++i) {
+        cache[2 * i] = dither32Fto16(ptr0[i]);
+        cache[2 * i + 1] = dither32Fto16(ptr1[i]);
+      }
+      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+    }
+    else if (bytesPerSample == 2) {
+      std::vector<uint16_t> cache;
+      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
+      auto ptr0 = reinterpret_cast<const uint16_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
+      auto ptr1 = reinterpret_cast<const uint16_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 1));
+      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
+      for (ptrdiff_t i = 0; i < stride; ++i) {
+        cache[2 * i] = ptr0[i];
+        cache[2 * i + 1] = ptr1[i];
+      }
+      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+    }
+    else {
+      std::vector<uint16_t> cache;
+      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
+      auto ptr0 = reinterpret_cast<const uint32_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
+      auto ptr1 = reinterpret_cast<const uint32_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 1));
+      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
+      for (ptrdiff_t i = 0; i < stride; ++i) {
+        cache[2 * i] = dither32to16(ptr0[i]);
+        cache[2 * i + 1] = dither32to16(ptr1[i]);
+      }
+      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+    }
+  }
+}
+#endif
+
+void PreviewDialog::slotToggleFrameProps()
+{
+  if (m_pFramePropsPanel->isVisible()) { m_pFramePropsPanel->setVisible(false); }
+  else {
+    updateFrameProps(true);
+    m_pFramePropsPanel->setVisible(true);
+  }
+}
+// END OF void PreviewDialog::slotToggleFrameProps()
+//==============================================================================
+
+void PreviewDialog::slotSwitchOutputIndex(int a_outputIndex)
+{
+  // Assuming there's a change
+  if (a_outputIndex == m_outputIndex) return;
+
+  // Assuming already initialized
+  if (!m_pVapourSynthScriptProcessor->isInitialized()) return;
+
+  // Don't switch when playing (avoiding big troubles ahead)
+  if (m_playing) return;
+
+  // Don't switch when busy processing the current frame
+  if (busy()) return;
+
+  // Check if output index is available
+  VSNodeInfo ni = m_pVapourSynthScriptProcessor->nodeInfo(a_outputIndex);
+  if (ni.isInvalid()) return;
+#ifdef Q_OS_WIN  // AUDIO
+  stopAudioOutput();
+  m_currentIsAudio = ni.mediaType() == mtAudio;
+#else
+  if (ni.isAudio()) {
+    QString errorString = tr(
+                            "Output node #%1 is audio. "
+                            "Previewing and encoding audio are not supported.")
+                            .arg(a_outputIndex);
+    emit signalWriteLogMessage(a_outputIndex == 0 ? mtCritical : mtWarning, errorString);
+    return;
+  }
+#endif
+  m_outputIndex = a_outputIndex;
+
+  // Update stuff
+  m_clipName = "";
+  m_sceneName = "";
+  m_toChangeTitle = true;
+
+  m_nodeInfo[m_outputIndex] = ni;
+  int lastFrameNumber = m_nodeInfo[m_outputIndex].numFrames() - 1;
+  m_ui.frameNumberSpinBox->setMaximum(lastFrameNumber);
+  m_ui.frameNumberSlider->setFramesNumber(m_nodeInfo[m_outputIndex].numFrames(), false);
+  auto fpsPair = m_nodeInfo[m_outputIndex].fpsPair();
+  m_fpsNum = fpsPair.first;
+  m_fpsDen = fpsPair.second;
+  m_ui.frameNumberSlider->setFPS(m_fpsDen == 0 ? 0.0 : (double)m_fpsNum / (double)m_fpsDen);
+
+  m_pStatusBarWidget->setNodeInfo(m_nodeInfo[m_outputIndex], m_cpVSAPI);
+
+  bool setFrameFromTimestamps = false;
+  SyncOutputNodesMode syncMode = m_pSettingsManager->getSyncOutputMode();
+  if (syncMode == SyncOutputNodesMode::Time)
+    setFrameFromTimestamps = true;
+  else if (syncMode == SyncOutputNodesMode::FromTimeLine) {
+    TimeLineSlider::DisplayMode timeLineMode = (TimeLineSlider::DisplayMode)m_ui.timeLineModeComboBox->currentData().toInt();
+    if (timeLineMode == TimeLineSlider::DisplayMode::Time) setFrameFromTimestamps = true;
+  }
+  if (setFrameFromTimestamps) m_frameExpected = timestampToFrame(m_frameTimestampExpected);
+
+  if (m_frameExpected > lastFrameNumber)
+    setExpectedFrame(lastFrameNumber);
+  else if (m_frameExpected < 0)
+    setExpectedFrame(0);
+
+#ifdef Q_OS_WIN  // AUDIO
+  if (m_currentIsAudio) {
+    if (m_ui.cropCheckButton->isChecked()) m_ui.cropCheckButton->click();
+    m_ui.cropCheckButton->setEnabled(false);
+    m_pActionToggleCropPanel->setEnabled(false);
+    m_ui.saveSnapshotButton->setEnabled(false);
+    m_pActionSaveSnapshot->setEnabled(false);
+    m_pStatusBarWidget->setColorPickerString("");
+    m_ui.playFpsLimitSpinBox->setEnabled(false);
+    m_ui.playFpsLimitModeComboBox->setEnabled(false);
+    int comboIndex = m_ui.playFpsLimitModeComboBox->findData((int)PlayFPSLimitMode::FromVideo);
+    if (comboIndex != -1) m_ui.playFpsLimitModeComboBox->setCurrentIndex(comboIndex);
+
+    setAudioOutput();
+  }
+  else {
+    resetCropSpinBoxes();
+    m_ui.cropCheckButton->setEnabled(true);
+    m_pActionToggleCropPanel->setEnabled(true);
+    m_ui.saveSnapshotButton->setEnabled(true);
+    m_pActionSaveSnapshot->setEnabled(true);
+    m_ui.playFpsLimitSpinBox->setEnabled(true);
+    m_ui.playFpsLimitModeComboBox->setEnabled(true);
+  }
+#else
+  resetCropSpinBoxes();
+#endif
+  slotSetPlayFPSLimit();
+
+  resetCropSpinBoxes();
+
+  m_pVapourSynthScriptProcessor->requestFrameAsync(m_frameExpected, m_outputIndex, true);
+
+  slotShowFrame(m_frameExpected, false);
+}
+
+// END OF void PreviewDialog::slotSwitchOutputIndex(int a_outputIndex)
+//==============================================================================
+
+void PreviewDialog::slotEnableSwitchOutputIndex(bool a_idle)
+{
+  if (m_playing) {
+    m_ui.outputIndexComboBox->setEnabled(false);
+    return;
+  }
+  m_ui.outputIndexComboBox->setEnabled(a_idle);
+}
+
+void PreviewDialog::setOutputIndex(int a_index)
+{
+  if (!m_ui.outputIndexComboBox->isEnabled()) return;
+
+  if (m_playing) return;
+
+  if (a_index == m_outputIndex) return;
+
+  if (m_outputIndices.size() == 0) return slotSwitchOutputIndex(a_index);
+
+  if (vsedit::contains(m_outputIndices, a_index)) { m_ui.outputIndexComboBox->setCurrentText(QString::number(a_index)); }
+  else {
+    emit signalWriteLogMessage(mtWarning, QString("Couldn't resolve output node #%1.").arg(a_index));
+  }
+}
+
+void PreviewDialog::slotSwitchToPreviousOutputIndex()
+{
+  size_t num = m_outputIndices.size();
+  if (num <= 1) return;
+
+  if (m_outputIndex == m_outputIndices[0]) return setOutputIndex(m_outputIndices[num - 1]);
+
+  auto idx = std::upper_bound(m_outputIndices.begin(), m_outputIndices.end(), m_outputIndex - 1);
+  if (idx == m_outputIndices.end())
+    return setOutputIndex(m_outputIndices[num - 1]);
+  else
+    return setOutputIndex(*(idx - 1));
+}
+
+void PreviewDialog::slotSwitchToNextOutputIndex()
+{
+  size_t num = m_outputIndices.size();
+  if (num <= 1) return;
+
+  if (m_outputIndex == m_outputIndices[num - 1]) return setOutputIndex(m_outputIndices[0]);
+
+  auto idx = std::lower_bound(m_outputIndices.begin(), m_outputIndices.end(), m_outputIndex + 1);
+  if (idx == m_outputIndices.end())
+    return setOutputIndex(m_outputIndices[0]);
+  else
+    return setOutputIndex(*idx);
+}
+
 void PreviewDialog::createActionsAndMenus()
 {
-  struct ActionToCreate
-  {
-    QAction ** ppAction;
-    const char * id;
-    bool checkable;
-    const char * slotToConnect;
+  struct ActionToCreate {
+      QAction **ppAction;
+      const char *id;
+      bool checkable;
+      const char *slotToConnect;
   };
 
-  ActionToCreate actionsToCreate[] =
-  {
-    {&m_pActionFrameToClipboard, ACTION_ID_FRAME_TO_CLIPBOARD,
-      false, SLOT(slotFrameToClipboard())},
-    {&m_pActionSaveSnapshot, ACTION_ID_SAVE_SNAPSHOT,
-      false, SLOT(slotSaveSnapshot())},
-    {&m_pActionToggleZoomPanel, ACTION_ID_TOGGLE_ZOOM_PANEL,
-      true, SLOT(slotToggleZoomPanelVisible(bool))},
-    {&m_pActionSetZoomModeNoZoom, ACTION_ID_SET_ZOOM_MODE_NO_ZOOM,
-      true, SLOT(slotZoomModeChanged())},
-    {&m_pActionSetZoomModeFixedRatio, ACTION_ID_SET_ZOOM_MODE_FIXED_RATIO,
-      true, SLOT(slotZoomModeChanged())},
-    {&m_pActionSetZoomModeFitToFrame, ACTION_ID_SET_ZOOM_MODE_FIT_TO_FRAME,
-      true, SLOT(slotZoomModeChanged())},
-    {&m_pActionSetZoomScaleModeNearest,
-      ACTION_ID_SET_ZOOM_SCALE_MODE_NEAREST,
-      true, SLOT(slotScaleModeChanged())},
-    {&m_pActionSetZoomScaleModeBilinear,
-      ACTION_ID_SET_ZOOM_SCALE_MODE_BILINEAR,
-      true, SLOT(slotScaleModeChanged())},
-    {&m_pActionToggleCropPanel, ACTION_ID_TOGGLE_CROP_PANEL,
-      true, SLOT(slotToggleCropPanelVisible(bool))},
-    {&m_pActionToggleTimeLinePanel, ACTION_ID_TOGGLE_TIMELINE_PANEL,
-      true, SLOT(slotToggleTimeLinePanelVisible(bool))},
-    {&m_pActionSetTimeLineModeTime, ACTION_ID_SET_TIMELINE_MODE_TIME,
-      true, SLOT(slotTimeLineModeChanged())},
-    {&m_pActionSetTimeLineModeFrames, ACTION_ID_SET_TIMELINE_MODE_FRAMES,
-      true, SLOT(slotTimeLineModeChanged())},
-    {&m_pActionTimeStepForward, ACTION_ID_TIME_STEP_FORWARD,
-      false, SLOT(slotTimeStepForward())},
-    {&m_pActionTimeStepBack, ACTION_ID_TIME_STEP_BACK,
-      false, SLOT(slotTimeStepBack())},
-    {&m_pActionPasteCropSnippetIntoScript,
-      ACTION_ID_PASTE_CROP_SNIPPET_INTO_SCRIPT,
-      false, SLOT(slotPasteCropSnippetIntoScript())},
-    {&m_pActionAdvancedSettingsDialog, ACTION_ID_ADVANCED_PREVIEW_SETTINGS,
-      false, SLOT(slotCallAdvancedSettingsDialog())},
-    {&m_pActionToggleColorPicker, ACTION_ID_TOGGLE_COLOR_PICKER,
-      true, SLOT(slotToggleColorPicker(bool))},
-    {&m_pActionPlay, ACTION_ID_PLAY,
-      true, SLOT(slotPlay(bool))},
-    {&m_pActionLoadChapters, ACTION_ID_TIMELINE_LOAD_CHAPTERS,
-      false, SLOT(slotLoadChapters())},
-    {&m_pActionClearBookmarks, ACTION_ID_TIMELINE_CLEAR_BOOKMARKS,
-      false, SLOT(slotClearBookmarks())},
-    {&m_pActionBookmarkCurrentFrame,
-      ACTION_ID_TIMELINE_BOOKMARK_CURRENT_FRAME,
-      false, SLOT(slotBookmarkCurrentFrame())},
-    {&m_pActionUnbookmarkCurrentFrame,
-      ACTION_ID_TIMELINE_UNBOOKMARK_CURRENT_FRAME,
-      false, SLOT(slotUnbookmarkCurrentFrame())},
-    {&m_pActionGoToPreviousBookmark,
-      ACTION_ID_TIMELINE_GO_TO_PREVIOUS_BOOKMARK,
-      false, SLOT(slotGoToPreviousBookmark())},
-    {&m_pActionGoToNextBookmark, ACTION_ID_TIMELINE_GO_TO_NEXT_BOOKMARK,
-      false, SLOT(slotGoToNextBookmark())},
-    {&m_pActionPasteShownFrameNumberIntoScript,
-      ACTION_ID_PASTE_SHOWN_FRAME_NUMBER_INTO_SCRIPT,
-      false, SLOT(slotPasteShownFrameNumberIntoScript())},
+  ActionToCreate actionsToCreate[] = {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionFrameToClipboard,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_FRAME_TO_CLIPBOARD, false, SLOT(slotFrameToClipboard())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSaveSnapshot,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SAVE_SNAPSHOT, false,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 slotSaveSnapshot())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionToggleZoomPanel,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TOGGLE_ZOOM_PANEL, true, SLOT(slotToggleZoomPanelVisible(bool))},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSetZoomModeNoZoom, ACTION_ID_SET_ZOOM_MODE_NO_ZOOM, true, SLOT(slotZoomModeChanged())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSetZoomModeFixedRatio,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_ZOOM_MODE_FIXED_RATIO, true, SLOT(slotZoomModeChanged())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSetZoomModeFitToFrame, ACTION_ID_SET_ZOOM_MODE_FIT_TO_FRAME, true,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 slotZoomModeChanged())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSetZoomScaleModeNearest,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_ZOOM_SCALE_MODE_NEAREST, true, SLOT(slotScaleModeChanged())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSetZoomScaleModeBilinear,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_ZOOM_SCALE_MODE_BILINEAR, true, SLOT(slotScaleModeChanged())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionToggleCropPanel,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TOGGLE_CROP_PANEL,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               true,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(slotToggleCropPanelVisible(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 bool))},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionToggleTimeLinePanel,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TOGGLE_TIMELINE_PANEL,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               true,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(slotToggleTimeLinePanelVisible(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 bool))},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSetTimeLineModeTime,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_TIMELINE_MODE_TIME,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               true, SLOT(slotTimeLineModeChanged())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSetTimeLineModeFrames,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_TIMELINE_MODE_FRAMES,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               true,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 slotTimeLineModeChanged())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionTimeStepForward,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TIME_STEP_FORWARD, false, SLOT(slotTimeStepForward())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionTimeStepBack, ACTION_ID_TIME_STEP_BACK, false, SLOT(slotTimeStepBack())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionPasteCropSnippetIntoScript,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_PASTE_CROP_SNIPPET_INTO_SCRIPT, false, SLOT(slotPasteCropSnippetIntoScript())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionAdvancedSettingsDialog,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_ADVANCED_PREVIEW_SETTINGS, false, SLOT(slotCallAdvancedSettingsDialog())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionToggleColorPicker, ACTION_ID_TOGGLE_COLOR_PICKER, true, SLOT(slotToggleColorPicker(bool))},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionPlay, ACTION_ID_PLAY, true, SLOT(slotPlay(bool))},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionLoadChapters, ACTION_ID_TIMELINE_LOAD_CHAPTERS, false, SLOT(slotLoadChapters())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionClearBookmarks, ACTION_ID_TIMELINE_CLEAR_BOOKMARKS, false, SLOT(slotClearBookmarks())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionBookmarkCurrentFrame,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TIMELINE_BOOKMARK_CURRENT_FRAME, false, SLOT(slotBookmarkCurrentFrame())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionUnbookmarkCurrentFrame,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TIMELINE_UNBOOKMARK_CURRENT_FRAME, false, SLOT(slotUnbookmarkCurrentFrame())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionGoToPreviousBookmark,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TIMELINE_GO_TO_PREVIOUS_BOOKMARK, false, SLOT(slotGoToPreviousBookmark())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionGoToNextBookmark,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_TIMELINE_GO_TO_NEXT_BOOKMARK, false, SLOT(slotGoToNextBookmark())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionPasteShownFrameNumberIntoScript,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_PASTE_SHOWN_FRAME_NUMBER_INTO_SCRIPT, false, SLOT(slotPasteShownFrameNumberIntoScript())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionJumpToFrame,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_JUMP_TO_FRAME, false, SLOT(slotJumpToFrame())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionToggleFramePropsPanel, ACTION_ID_TOGGLE_FRAME_PROPS, false, SLOT(slotToggleFrameProps())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex0,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_0, false, SLOT(slotSwitchOutputIndex0())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex1, ACTION_ID_SET_OUTPUT_INDEX_1, false, SLOT(slotSwitchOutputIndex1())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex2,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_2, false, SLOT(slotSwitchOutputIndex2())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex3, ACTION_ID_SET_OUTPUT_INDEX_3, false, SLOT(slotSwitchOutputIndex3())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex4,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_4, false, SLOT(slotSwitchOutputIndex4())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex5, ACTION_ID_SET_OUTPUT_INDEX_5, false, SLOT(slotSwitchOutputIndex5())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex6,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_6, false, SLOT(slotSwitchOutputIndex6())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex7, ACTION_ID_SET_OUTPUT_INDEX_7, false, SLOT(slotSwitchOutputIndex7())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex8,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_8, false, SLOT(slotSwitchOutputIndex8())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex9, ACTION_ID_SET_OUTPUT_INDEX_9, false, SLOT(slotSwitchOutputIndex9())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex10,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_10, false, SLOT(slotSwitchOutputIndex10())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex11, ACTION_ID_SET_OUTPUT_INDEX_11, false, SLOT(slotSwitchOutputIndex11())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex12,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_12, false, SLOT(slotSwitchOutputIndex12())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex13, ACTION_ID_SET_OUTPUT_INDEX_13, false, SLOT(slotSwitchOutputIndex13())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex14,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_14,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false, SLOT(slotSwitchOutputIndex14())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex15,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_15,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 slotSwitchOutputIndex15())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex16,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_16,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false, SLOT(slotSwitchOutputIndex16())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex17,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_17,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(slotSwitchOutputIndex17())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex18,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_18,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false, SLOT(slotSwitchOutputIndex18())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToOutputIndex19,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_SET_OUTPUT_INDEX_19,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 slotSwitchOutputIndex19())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToPreviousOutputIndex,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_PREVIOUS_OUTPUT_INDEX,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(slotSwitchToPreviousOutputIndex())},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {&m_pActionSwitchToNextOutputIndex,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ACTION_ID_NEXT_OUTPUT_INDEX,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               false,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               SLOT(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 slotSwitchToNextOutputIndex())},
   };
 
-  for(ActionToCreate & item : actionsToCreate)
-  {
-    QAction * pAction =
-      m_pSettingsManager->createStandardAction(item.id, this);
+  for (ActionToCreate &item : actionsToCreate) {
+    QAction *pAction = m_pSettingsManager->createStandardAction(item.id, this);
     *item.ppAction = pAction;
     pAction->setCheckable(item.checkable);
     m_settableActionsList.push_back(pAction);
   }
 
-//------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------
 
   m_pPreviewContextMenu = new QMenu(this);
+  vsedit::disableFontKerning(m_pPreviewContextMenu);
+  m_pPreviewContextMenu->addAction(m_pActionJumpToFrame);
   m_pPreviewContextMenu->addAction(m_pActionFrameToClipboard);
   m_pPreviewContextMenu->addAction(m_pActionSaveSnapshot);
-  m_pActionToggleZoomPanel->setChecked(
-    m_pSettingsManager->getZoomPanelVisible());
+  m_pPreviewContextMenu->addAction(m_pActionToggleFramePropsPanel);
+  m_pActionToggleZoomPanel->setChecked(m_pSettingsManager->getZoomPanelVisible());
   m_pPreviewContextMenu->addAction(m_pActionToggleZoomPanel);
 
-//------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------
 
   m_pMenuZoomModes = new QMenu(m_pPreviewContextMenu);
+  vsedit::disableFontKerning(m_pMenuZoomModes);
   m_pMenuZoomModes->setTitle(tr("Zoom mode"));
   m_pPreviewContextMenu->addMenu(m_pMenuZoomModes);
 
@@ -1575,33 +2199,34 @@ void PreviewDialog::createActionsAndMenus()
 
   ZoomMode zoomMode = m_pSettingsManager->getZoomMode();
 
-  struct ZoomModeAction
-  {
-    QAction * pAction;
-    ZoomMode zoomMode;
+  struct ZoomModeAction {
+      QAction *pAction;
+      ZoomMode zoomMode;
   };
 
-  ZoomModeAction zoomModeActions[] =
-  {
-    {m_pActionSetZoomModeNoZoom, ZoomMode::NoZoom},
-    {m_pActionSetZoomModeFixedRatio, ZoomMode::FixedRatio},
-    {m_pActionSetZoomModeFitToFrame, ZoomMode::FitToFrame},
+  ZoomModeAction zoomModeActions[] = {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {m_pActionSetZoomModeNoZoom,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ZoomMode::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 NoZoom},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {m_pActionSetZoomModeFixedRatio, ZoomMode::FixedRatio},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {m_pActionSetZoomModeFitToFrame,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ZoomMode::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 FitToFrame},
   };
 
-  for(ZoomModeAction & action : zoomModeActions)
-  {
+  for (ZoomModeAction &action : zoomModeActions) {
     QString id = action.pAction->data().toString();
     action.pAction->setActionGroup(m_pActionGroupZoomModes);
     m_pMenuZoomModes->addAction(action.pAction);
     m_actionIDToZoomModeMap[id] = action.zoomMode;
     addAction(action.pAction);
-    if(zoomMode == action.zoomMode)
-      action.pAction->setChecked(true);
+    if (zoomMode == action.zoomMode) action.pAction->setChecked(true);
   }
 
-//------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------
 
   m_pMenuZoomScaleModes = new QMenu(m_pPreviewContextMenu);
+  vsedit::disableFontKerning(m_pMenuZoomScaleModes);
   m_pMenuZoomScaleModes->setTitle(tr("Zoom scale mode"));
   m_pPreviewContextMenu->addMenu(m_pMenuZoomScaleModes);
 
@@ -1609,80 +2234,79 @@ void PreviewDialog::createActionsAndMenus()
 
   Qt::TransformationMode scaleMode = m_pSettingsManager->getScaleMode();
 
-  struct ScaleModeAction
-  {
-    QAction * pAction;
-    Qt::TransformationMode scaleMode;
+  struct ScaleModeAction {
+      QAction *pAction;
+      Qt::TransformationMode scaleMode;
   };
 
-  ScaleModeAction scaleModeActions[] =
-  {
-    {m_pActionSetZoomScaleModeNearest, Qt::FastTransformation},
-    {m_pActionSetZoomScaleModeBilinear, Qt::SmoothTransformation},
+  ScaleModeAction scaleModeActions[] = {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {m_pActionSetZoomScaleModeNearest,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               Qt::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 FastTransformation},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {m_pActionSetZoomScaleModeBilinear,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               Qt::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 SmoothTransformation},
   };
 
-  for(ScaleModeAction & action : scaleModeActions)
-  {
+  for (ScaleModeAction &action : scaleModeActions) {
     QString id = action.pAction->data().toString();
     action.pAction->setActionGroup(m_pActionGroupZoomScaleModes);
     m_pMenuZoomScaleModes->addAction(action.pAction);
     m_actionIDToZoomScaleModeMap[id] = action.scaleMode;
     addAction(action.pAction);
-    if(scaleMode == action.scaleMode)
-      action.pAction->setChecked(true);
+    if (scaleMode == action.scaleMode) action.pAction->setChecked(true);
   }
 
   bool noZoom = (zoomMode == ZoomMode::NoZoom);
   m_pMenuZoomScaleModes->setEnabled(!noZoom);
 
-//------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------
 
   m_pPreviewContextMenu->addAction(m_pActionToggleCropPanel);
   m_pPreviewContextMenu->addAction(m_pActionToggleTimeLinePanel);
-  m_pActionToggleTimeLinePanel->setChecked(
-    m_pSettingsManager->getTimeLinePanelVisible());
+  m_pActionToggleTimeLinePanel->setChecked(m_pSettingsManager->getTimeLinePanelVisible());
 
-//------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------
 
-  m_pMenuTimeLineModes= new QMenu(m_pPreviewContextMenu);
+  m_pMenuTimeLineModes = new QMenu(m_pPreviewContextMenu);
+  vsedit::disableFontKerning(m_pMenuTimeLineModes);
   m_pMenuTimeLineModes->setTitle(tr("Timeline display mode"));
   m_pPreviewContextMenu->addMenu(m_pMenuTimeLineModes);
 
   m_pActionGroupTimeLineModes = new QActionGroup(this);
 
-  TimeLineSlider::DisplayMode timeLineMode =
-    m_pSettingsManager->getTimeLineMode();
+  TimeLineSlider::DisplayMode timeLineMode = m_pSettingsManager->getTimeLineMode();
 
-  struct TimeLineModeAction
-  {
-    QAction * pAction;
-    TimeLineSlider::DisplayMode timeLineMode;
+  struct TimeLineModeAction {
+      QAction *pAction;
+      TimeLineSlider::DisplayMode timeLineMode;
   };
 
-  TimeLineModeAction timeLineModeAction[] =
-  {
-    {m_pActionSetTimeLineModeTime, TimeLineSlider::DisplayMode::Time},
-    {m_pActionSetTimeLineModeFrames, TimeLineSlider::DisplayMode::Frames},
+  TimeLineModeAction timeLineModeAction[] = {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {m_pActionSetTimeLineModeTime,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               TimeLineSlider::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 DisplayMode::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   Time},
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              {m_pActionSetTimeLineModeFrames, TimeLineSlider::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 DisplayMode::
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   Frames},
   };
 
-  for(TimeLineModeAction & action : timeLineModeAction)
-  {
+  for (TimeLineModeAction &action : timeLineModeAction) {
     QString id = action.pAction->data().toString();
     action.pAction->setActionGroup(m_pActionGroupTimeLineModes);
     m_pMenuTimeLineModes->addAction(action.pAction);
     m_actionIDToTimeLineModeMap[id] = action.timeLineMode;
     addAction(action.pAction);
-    if(timeLineMode == action.timeLineMode)
-      action.pAction->setChecked(true);
+    if (timeLineMode == action.timeLineMode) action.pAction->setChecked(true);
   }
 
-//------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------
 
   addAction(m_pActionTimeStepForward);
   addAction(m_pActionTimeStepBack);
 
-  m_pActionToggleColorPicker->setChecked(
-    m_pSettingsManager->getColorPickerVisible());
+  m_pActionToggleColorPicker->setChecked(m_pSettingsManager->getColorPickerVisible());
   m_pPreviewContextMenu->addAction(m_pActionToggleColorPicker);
 
   m_pActionPlay->setChecked(false);
@@ -1698,12 +2322,37 @@ void PreviewDialog::createActionsAndMenus()
   addAction(m_pActionPasteShownFrameNumberIntoScript);
   m_pPreviewContextMenu->addAction(m_pActionPasteShownFrameNumberIntoScript);
 
-//------------------------------------------------------------------------------
+  addAction(m_pActionJumpToFrame);
+  addAction(m_pActionToggleFramePropsPanel);
+  //------------------------------------------------------------------------------
 
-  for(ActionToCreate & item : actionsToCreate)
-  {
-    const char * signal =
-      item.checkable ? SIGNAL(toggled(bool)) : SIGNAL(triggered());
+  addAction(m_pActionSwitchToOutputIndex0);
+  addAction(m_pActionSwitchToOutputIndex1);
+  addAction(m_pActionSwitchToOutputIndex2);
+  addAction(m_pActionSwitchToOutputIndex3);
+  addAction(m_pActionSwitchToOutputIndex4);
+  addAction(m_pActionSwitchToOutputIndex5);
+  addAction(m_pActionSwitchToOutputIndex6);
+  addAction(m_pActionSwitchToOutputIndex7);
+  addAction(m_pActionSwitchToOutputIndex8);
+  addAction(m_pActionSwitchToOutputIndex9);
+  addAction(m_pActionSwitchToOutputIndex10);
+  addAction(m_pActionSwitchToOutputIndex11);
+  addAction(m_pActionSwitchToOutputIndex12);
+  addAction(m_pActionSwitchToOutputIndex13);
+  addAction(m_pActionSwitchToOutputIndex14);
+  addAction(m_pActionSwitchToOutputIndex15);
+  addAction(m_pActionSwitchToOutputIndex16);
+  addAction(m_pActionSwitchToOutputIndex17);
+  addAction(m_pActionSwitchToOutputIndex18);
+  addAction(m_pActionSwitchToOutputIndex19);
+  addAction(m_pActionSwitchToPreviousOutputIndex);
+  addAction(m_pActionSwitchToNextOutputIndex);
+
+  //------------------------------------------------------------------------------
+
+  for (ActionToCreate &item : actionsToCreate) {
+    const char *signal = item.checkable ? SIGNAL(toggled(bool)) : SIGNAL(triggered());
     connect(*item.ppAction, signal, this, item.slotToConnect);
   }
 }
@@ -1719,41 +2368,32 @@ void PreviewDialog::setUpZoomPanel()
 
   m_ui.zoomCheckButton->setDefaultAction(m_pActionToggleZoomPanel);
 
-  m_ui.zoomModeComboBox->addItem(QIcon(":zoom_no_zoom.png"),
-    tr("No zoom"), (int)ZoomMode::NoZoom);
-  m_ui.zoomModeComboBox->addItem(QIcon(":zoom_fixed_ratio.png"),
-    tr("Fixed ratio"), (int)ZoomMode::FixedRatio);
-  m_ui.zoomModeComboBox->addItem(QIcon(":zoom_fit_to_frame.png"),
-    tr("Fit to frame"), (int)ZoomMode::FitToFrame);
+  m_ui.zoomModeComboBox->addItem(QIcon(":zoom_no_zoom.png"), tr("No zoom"), (int)ZoomMode::NoZoom);
+  m_ui.zoomModeComboBox->addItem(QIcon(":zoom_fixed_ratio.png"), tr("Fixed ratio"), (int)ZoomMode::FixedRatio);
+  m_ui.zoomModeComboBox->addItem(QIcon(":zoom_fit_to_frame.png"), tr("Fit to frame"), (int)ZoomMode::FitToFrame);
 
   ZoomMode zoomMode = m_pSettingsManager->getZoomMode();
   int comboIndex = m_ui.zoomModeComboBox->findData((int)zoomMode);
-  if(comboIndex != -1)
-    m_ui.zoomModeComboBox->setCurrentIndex(comboIndex);
+  if (comboIndex != -1) m_ui.zoomModeComboBox->setCurrentIndex(comboIndex);
   bool fixedRatio(zoomMode == ZoomMode::FixedRatio);
   m_ui.zoomRatioSpinBox->setEnabled(fixedRatio);
 
   double zoomRatio = m_pSettingsManager->getZoomRatio();
   m_ui.zoomRatioSpinBox->setValue(zoomRatio);
 
-  m_ui.scaleModeComboBox->addItem(tr("Nearest"),
-    (int)Qt::FastTransformation);
-  m_ui.scaleModeComboBox->addItem(tr("Bilinear"),
-    (int)Qt::SmoothTransformation);
+  m_ui.scaleModeComboBox->addItem(tr("Nearest"), (int)Qt::FastTransformation);
+  m_ui.scaleModeComboBox->addItem(tr("Bilinear"), (int)Qt::SmoothTransformation);
   bool noZoom = (zoomMode == ZoomMode::NoZoom);
   m_ui.scaleModeComboBox->setEnabled(!noZoom);
 
   Qt::TransformationMode scaleMode = m_pSettingsManager->getScaleMode();
+  m_ui.zoomRatioSpinBox->setScaleMode(scaleMode);
   comboIndex = m_ui.scaleModeComboBox->findData((int)scaleMode);
-  if(comboIndex != -1)
-    m_ui.scaleModeComboBox->setCurrentIndex(comboIndex);
+  if (comboIndex != -1) m_ui.scaleModeComboBox->setCurrentIndex(comboIndex);
 
-  connect(m_ui.zoomModeComboBox, SIGNAL(currentIndexChanged(int)),
-    this, SLOT(slotZoomModeChanged()));
-  connect(m_ui.zoomRatioSpinBox, SIGNAL(valueChanged(double)),
-    this, SLOT(slotZoomRatioChanged(double)));
-  connect(m_ui.scaleModeComboBox, SIGNAL(currentIndexChanged(int)),
-    this, SLOT(slotScaleModeChanged()));
+  connect(m_ui.zoomModeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slotZoomModeChanged()));
+  connect(m_ui.zoomRatioSpinBox, SIGNAL(valueChanged(double)), this, SLOT(slotZoomRatioChanged(double)));
+  connect(m_ui.scaleModeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slotScaleModeChanged()));
 }
 
 // END OF void PreviewDialog::setUpZoomPanel()
@@ -1761,27 +2401,20 @@ void PreviewDialog::setUpZoomPanel()
 
 void PreviewDialog::setUpTimeLinePanel()
 {
-    m_ui.timeLinePanel->setVisible(
-    m_pSettingsManager->getTimeLinePanelVisible());
+  m_ui.timeLinePanel->setVisible(m_pSettingsManager->getTimeLinePanelVisible());
 
-    m_ui.playButton->setDefaultAction(m_pActionPlay);
-    m_ui.timeLineCheckButton->setDefaultAction(m_pActionToggleTimeLinePanel);
-    m_ui.timeStepForwardButton->setDefaultAction(m_pActionTimeStepForward);
-    m_ui.timeStepBackButton->setDefaultAction(m_pActionTimeStepBack);
+  m_ui.playButton->setDefaultAction(m_pActionPlay);
+  m_ui.timeLineCheckButton->setDefaultAction(m_pActionToggleTimeLinePanel);
+  m_ui.timeStepForwardButton->setDefaultAction(m_pActionTimeStepForward);
+  m_ui.timeStepBackButton->setDefaultAction(m_pActionTimeStepBack);
 
-    m_ui.playFpsLimitModeComboBox->addItem(tr("From video"),
-    (int)PlayFPSLimitMode::FromVideo);
-    m_ui.playFpsLimitModeComboBox->addItem(tr("No limit"),
-    (int)PlayFPSLimitMode::NoLimit);
-    m_ui.playFpsLimitModeComboBox->addItem(tr("Custom"),
-    (int)PlayFPSLimitMode::Custom);
+  m_ui.playFpsLimitModeComboBox->addItem(tr("From script"), (int)PlayFPSLimitMode::FromVideo);
+  m_ui.playFpsLimitModeComboBox->addItem(tr("No limit"), (int)PlayFPSLimitMode::NoLimit);
+  m_ui.playFpsLimitModeComboBox->addItem(tr("Custom"), (int)PlayFPSLimitMode::Custom);
 
-  PlayFPSLimitMode playFpsLimitMode =
-    m_pSettingsManager->getPlayFPSLimitMode();
-  int comboIndex = m_ui.playFpsLimitModeComboBox->findData(
-    (int)playFpsLimitMode);
-  if(comboIndex != -1)
-    m_ui.playFpsLimitModeComboBox->setCurrentIndex(comboIndex);
+  PlayFPSLimitMode playFpsLimitMode = m_pSettingsManager->getPlayFPSLimitMode();
+  int comboIndex = m_ui.playFpsLimitModeComboBox->findData((int)playFpsLimitMode);
+  if (comboIndex != -1) m_ui.playFpsLimitModeComboBox->setCurrentIndex(comboIndex);
 
   m_ui.playFpsLimitSpinBox->setLocale(QLocale("C"));
   double customFPS = m_pSettingsManager->getPlayFPSLimit();
@@ -1791,37 +2424,25 @@ void PreviewDialog::setUpTimeLinePanel()
 
   m_ui.loadChaptersButton->setDefaultAction(m_pActionLoadChapters);
   m_ui.clearBookmarksButton->setDefaultAction(m_pActionClearBookmarks);
-  m_ui.bookmarkCurrentFrameButton->setDefaultAction(
-    m_pActionBookmarkCurrentFrame);
-  m_ui.unbookmarkCurrentFrameButton->setDefaultAction(
-    m_pActionUnbookmarkCurrentFrame);
-  m_ui.goToPreviousBookmarkButton->setDefaultAction(
-    m_pActionGoToPreviousBookmark);
-  m_ui.goToNextBookmarkButton->setDefaultAction(
-    m_pActionGoToNextBookmark);
+  m_ui.bookmarkCurrentFrameButton->setDefaultAction(m_pActionBookmarkCurrentFrame);
+  m_ui.unbookmarkCurrentFrameButton->setDefaultAction(m_pActionUnbookmarkCurrentFrame);
+  m_ui.goToPreviousBookmarkButton->setDefaultAction(m_pActionGoToPreviousBookmark);
+  m_ui.goToNextBookmarkButton->setDefaultAction(m_pActionGoToNextBookmark);
 
-    double timeStep = m_pSettingsManager->getTimeStep();
-    m_ui.timeStepEdit->setTime(vsedit::secondsToQTime(timeStep));
+  double timeStep = m_pSettingsManager->getTimeStep();
+  m_ui.timeStepEdit->setTime(vsedit::secondsToQTime(timeStep));
 
-    m_ui.timeLineModeComboBox->addItem(QIcon(":timeline.png"), tr("Time"),
-    (int)TimeLineSlider::DisplayMode::Time);
-    m_ui.timeLineModeComboBox->addItem(QIcon(":timeline_frames.png"),
-    tr("Frames"), (int)TimeLineSlider::DisplayMode::Frames);
+  m_ui.timeLineModeComboBox->addItem(QIcon(":timeline.png"), tr("Time"), (int)TimeLineSlider::DisplayMode::Time);
+  m_ui.timeLineModeComboBox->addItem(QIcon(":timeline_frames.png"), tr("Frames"), (int)TimeLineSlider::DisplayMode::Frames);
 
-  TimeLineSlider::DisplayMode timeLineMode =
-    m_pSettingsManager->getTimeLineMode();
+  TimeLineSlider::DisplayMode timeLineMode = m_pSettingsManager->getTimeLineMode();
   comboIndex = m_ui.timeLineModeComboBox->findData((int)timeLineMode);
-  if(comboIndex != -1)
-    m_ui.timeLineModeComboBox->setCurrentIndex(comboIndex);
+  if (comboIndex != -1) m_ui.timeLineModeComboBox->setCurrentIndex(comboIndex);
 
-  connect(m_ui.timeStepEdit, SIGNAL(timeChanged(const QTime &)),
-    this, SLOT(slotTimeStepChanged(const QTime &)));
-  connect(m_ui.timeLineModeComboBox, SIGNAL(currentIndexChanged(int)),
-    this, SLOT(slotTimeLineModeChanged()));
-  connect(m_ui.playFpsLimitModeComboBox, SIGNAL(currentIndexChanged(int)),
-    this, SLOT(slotSetPlayFPSLimit()));
-  connect(m_ui.playFpsLimitSpinBox, SIGNAL(valueChanged(double)),
-    this, SLOT(slotSetPlayFPSLimit()));
+  connect(m_ui.timeStepEdit, SIGNAL(timeChanged(const QTime &)), this, SLOT(slotTimeStepChanged(const QTime &)));
+  connect(m_ui.timeLineModeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slotTimeLineModeChanged()));
+  connect(m_ui.playFpsLimitModeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slotSetPlayFPSLimit()));
+  connect(m_ui.playFpsLimitSpinBox, SIGNAL(valueChanged(double)), this, SLOT(slotSetPlayFPSLimit()));
 }
 
 // END OF void PreviewDialog::setUpTimeLinePanel()
@@ -1839,26 +2460,17 @@ void PreviewDialog::setUpCropPanel()
   slotCropModeChanged();
 
   m_ui.cropZoomRatioSpinBox->setValue(m_pSettingsManager->getCropZoomRatio());
-  m_ui.cropPasteToScriptButton->setDefaultAction(
-    m_pActionPasteCropSnippetIntoScript);
+  m_ui.cropPasteToScriptButton->setDefaultAction(m_pActionPasteCropSnippetIntoScript);
   m_ui.cropPanel->setVisible(false);
 
-  connect(m_ui.cropModeComboBox, SIGNAL(currentIndexChanged(int)),
-    this, SLOT(slotCropModeChanged()));
-  connect(m_ui.cropLeftSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotCropLeftValueChanged(int)));
-  connect(m_ui.cropTopSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotCropTopValueChanged(int)));
-  connect(m_ui.cropWidthSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotCropWidthValueChanged(int)));
-  connect(m_ui.cropHeightSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotCropHeightValueChanged(int)));
-  connect(m_ui.cropRightSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotCropRightValueChanged(int)));
-  connect(m_ui.cropBottomSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotCropBottomValueChanged(int)));
-  connect(m_ui.cropZoomRatioSpinBox, SIGNAL(valueChanged(int)),
-    this, SLOT(slotCropZoomRatioValueChanged(int)));
+  connect(m_ui.cropModeComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slotCropModeChanged()));
+  connect(m_ui.cropLeftSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropLeftValueChanged(int)));
+  connect(m_ui.cropTopSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropTopValueChanged(int)));
+  connect(m_ui.cropWidthSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropWidthValueChanged(int)));
+  connect(m_ui.cropHeightSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropHeightValueChanged(int)));
+  connect(m_ui.cropRightSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropRightValueChanged(int)));
+  connect(m_ui.cropBottomSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropBottomValueChanged(int)));
+  connect(m_ui.cropZoomRatioSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotCropZoomRatioValueChanged(int)));
 }
 
 // END OF void PreviewDialog::setUpCropPanel()
@@ -1866,13 +2478,11 @@ void PreviewDialog::setUpCropPanel()
 
 bool PreviewDialog::requestShowFrame(int a_frameNumber)
 {
-  if(!m_pVapourSynthScriptProcessor->isInitialized())
-    return false;
+  if (!m_pVapourSynthScriptProcessor->isInitialized()) return false;
 
-  if((m_frameShown != -1) && (m_frameShown != m_frameExpected))
-    return false;
+  if ((m_frameShown != -1) && (m_frameShown != m_frameExpected)) return false;
 
-  m_pVapourSynthScriptProcessor->requestFrameAsync(a_frameNumber, 0, true);
+  m_pVapourSynthScriptProcessor->requestFrameAsync(a_frameNumber, m_outputIndex, true);
   return true;
 }
 
@@ -1881,22 +2491,9 @@ bool PreviewDialog::requestShowFrame(int a_frameNumber)
 
 void PreviewDialog::setPreviewPixmap()
 {
-#if QT_VERSION_MAJOR < 6
-  m_devicePixelRatio = 1;
-#else
-  if(m_devicePixelRatio < 0 || m_devicePixelNeedsInit) {
-    QWindow* win = window()->windowHandle();
-    if (win != nullptr) {
-      m_devicePixelRatio = win->screen()->devicePixelRatio();
-      m_devicePixelNeedsInit = false;
-    } else {
-      m_devicePixelNeedsInit = true;
-    }
-  }
-#endif
-
-  if(m_ui.cropPanel->isVisible())
-  {
+  m_devicePixelRatio = window()->devicePixelRatioF();
+  if (!m_framePixmap.isNull()) m_framePixmap.setDevicePixelRatio(m_devicePixelRatio);
+  if (m_ui.cropPanel->isVisible()) {
     int cropLeft = m_ui.cropLeftSpinBox->value();
     int cropTop = m_ui.cropTopSpinBox->value();
     int cropWidth = m_ui.cropWidthSpinBox->value();
@@ -1904,45 +2501,35 @@ void PreviewDialog::setPreviewPixmap()
     QPixmap croppedPixmap = m_framePixmap.copy(cropLeft, cropTop, cropWidth, cropHeight);
     int ratio = m_ui.cropZoomRatioSpinBox->value();
 
-    if(ratio == 1)
-    {
-      m_devicePixelRatio = window()->windowHandle()->screen()->devicePixelRatio();
-      m_ui.previewArea->setPixmap(croppedPixmap, m_devicePixelRatio);
+    if (abs(ratio * m_devicePixelRatio - 1) < 1e-7) {
+      m_ui.previewArea->setPixmap(croppedPixmap);
       return;
     }
 
-    QPixmap zoomedPixmap = croppedPixmap.scaled(
-      croppedPixmap.width() * ratio, croppedPixmap.height() * ratio,
-      Qt::KeepAspectRatio, Qt::FastTransformation);
-    zoomedPixmap.setDevicePixelRatio(m_devicePixelRatio);
-    m_ui.previewArea->setPixmap(zoomedPixmap, m_devicePixelRatio);
+    QPixmap zoomedPixmap
+      = croppedPixmap.scaled(croppedPixmap.width() * ratio, croppedPixmap.height() * ratio, Qt::KeepAspectRatio, Qt::FastTransformation);
+    m_ui.previewArea->setPixmap(zoomedPixmap);
     return;
   }
 
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
-  if(zoomMode == ZoomMode::NoZoom)
-  {
-    if(!m_framePixmap.isNull()) {
-      m_framePixmap.setDevicePixelRatio(m_devicePixelRatio);
-    }
-    m_ui.previewArea->setPixmap(m_framePixmap, m_devicePixelRatio);
+  if (zoomMode == ZoomMode::NoZoom) {
+    m_ui.previewArea->setPixmap(m_framePixmap, true);
     return;
   }
 
   QPixmap previewPixmap;
   int frameWidth = 0;
   int frameHeight = 0;
-  Qt::TransformationMode scaleMode = (Qt::TransformationMode)
-    m_ui.scaleModeComboBox->currentData().toInt();
+  Qt::TransformationMode scaleMode = (Qt::TransformationMode)m_ui.scaleModeComboBox->currentData().toInt();
 
-  if(zoomMode == ZoomMode::FixedRatio)
-  {
+  if (zoomMode == ZoomMode::FixedRatio) {
     double ratio = m_ui.zoomRatioSpinBox->value();
     frameWidth = m_framePixmap.width() * ratio;
     frameHeight = m_framePixmap.height() * ratio;
   }
-  else
-  {
+  else {
+    if (m_framePixmap.isNull()) return;
     QRect previewRect = m_ui.previewArea->geometry();
     int cropSize = m_ui.previewArea->frameWidth() * 2;
     frameWidth = previewRect.width() * m_devicePixelRatio - cropSize;
@@ -1950,8 +2537,8 @@ void PreviewDialog::setPreviewPixmap()
   }
 
   previewPixmap = m_framePixmap.scaled(frameWidth, frameHeight, Qt::KeepAspectRatio, scaleMode);
-  previewPixmap.setDevicePixelRatio(m_devicePixelRatio);
-  m_ui.previewArea->setPixmap(previewPixmap, m_devicePixelRatio);
+
+  m_ui.previewArea->setPixmap(previewPixmap, true);
 }
 
 // END OF bool void PreviewDialog::setPreviewPixmap()
@@ -1959,17 +2546,14 @@ void PreviewDialog::setPreviewPixmap()
 
 void PreviewDialog::recalculateCropMods()
 {
-  QSpinBox * cropSpinBoxes[] = {m_ui.cropLeftSpinBox, m_ui.cropTopSpinBox,
-    m_ui.cropWidthSpinBox, m_ui.cropHeightSpinBox, m_ui.cropRightSpinBox,
-    m_ui.cropBottomSpinBox};
+  QSpinBox *cropSpinBoxes[] = {m_ui.cropLeftSpinBox,   m_ui.cropTopSpinBox,   m_ui.cropWidthSpinBox,
+                               m_ui.cropHeightSpinBox, m_ui.cropRightSpinBox, m_ui.cropBottomSpinBox};
 
-  for(QSpinBox * pSpinBox : cropSpinBoxes)
-  {
+  for (QSpinBox *pSpinBox : cropSpinBoxes) {
     int value = pSpinBox->value();
-    if(value == 0)
+    if (value == 0)
       pSpinBox->setSuffix("");
-    else
-    {
+    else {
       int sizeMod = vsedit::mod(value);
       pSpinBox->setSuffix(QString(" |%1|").arg(sizeMod));
     }
@@ -1983,19 +2567,25 @@ void PreviewDialog::resetCropSpinBoxes()
 {
   BEGIN_CROP_VALUES_CHANGE
 
-  m_ui.cropLeftSpinBox->setMaximum(m_cpVideoInfo->width - 1);
+  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+  if (!vi) {
+    END_CROP_VALUES_CHANGE
+    return;
+  }
+
+  m_ui.cropLeftSpinBox->setMaximum(vi->width - 1);
   m_ui.cropLeftSpinBox->setValue(0);
-  m_ui.cropTopSpinBox->setMaximum(m_cpVideoInfo->height - 1);
+  m_ui.cropTopSpinBox->setMaximum(vi->height - 1);
   m_ui.cropTopSpinBox->setValue(0);
 
-  m_ui.cropWidthSpinBox->setMaximum(m_cpVideoInfo->width);
-  m_ui.cropWidthSpinBox->setValue(m_cpVideoInfo->width);
-  m_ui.cropHeightSpinBox->setMaximum(m_cpVideoInfo->height);
-  m_ui.cropHeightSpinBox->setValue(m_cpVideoInfo->height);
+  m_ui.cropWidthSpinBox->setMaximum(vi->width);
+  m_ui.cropWidthSpinBox->setValue(vi->width);
+  m_ui.cropHeightSpinBox->setMaximum(vi->height);
+  m_ui.cropHeightSpinBox->setValue(vi->height);
 
-  m_ui.cropRightSpinBox->setMaximum(m_cpVideoInfo->width - 1);
+  m_ui.cropRightSpinBox->setMaximum(vi->width - 1);
   m_ui.cropRightSpinBox->setValue(0);
-  m_ui.cropBottomSpinBox->setMaximum(m_cpVideoInfo->height - 1);
+  m_ui.cropBottomSpinBox->setMaximum(vi->height - 1);
   m_ui.cropBottomSpinBox->setValue(0);
 
   recalculateCropMods();
@@ -2006,74 +2596,111 @@ void PreviewDialog::resetCropSpinBoxes()
 // END OF void PreviewDialog::resetCropSpinBoxes()
 //==============================================================================
 
-void PreviewDialog::setCurrentFrame(const VSFrameRef * a_cpOutputFrameRef,
-  const VSFrameRef * a_cpPreviewFrameRef)
+void PreviewDialog::setCurrentFrame(const VSFrame *a_cpOutputFrame, const VSFrame *a_cpPreviewFrame)
 {
   Q_ASSERT(m_cpVSAPI);
-  m_cpVSAPI->freeFrame(m_cpFrameRef);
-  m_cpFrameRef = a_cpOutputFrameRef;
-  if (m_cpPreviewFrameRef)
+  m_cpVSAPI->freeFrame(m_cpFrame);
+  m_cpFrame = a_cpOutputFrame;
+  // Copy clip and scene names
+  const VSMap *props = m_cpVSAPI->getFramePropertiesRO(m_cpFrame);
+  int err;
+  bool toChangeTitle = m_toChangeTitle;
+  const char *clipName = m_cpVSAPI->mapGetData(props, "Name", 0, &err);
+  if (m_clipName != clipName)  // can be nullptr?
   {
-    m_cpVSAPI->freeFrame(m_cpPreviewFrameRef);
-    m_cpPreviewFrameRef = nullptr;
+    m_clipName = QString(clipName ? clipName : "");
+    toChangeTitle = true;
   }
-  m_framePixmap = pixmapFromRGB(a_cpPreviewFrameRef);
-  m_cpPreviewFrameRef = a_cpPreviewFrameRef;
+  const char *sceneName = m_cpVSAPI->mapGetData(props, "SceneName", 0, &err);
+  if (m_sceneName != sceneName) {
+    m_sceneName = QString(sceneName ? sceneName : "");
+    toChangeTitle = true;
+  }
+  double absoluteTime = m_cpVSAPI->mapGetFloat(props, "_AbsoluteTime", 0, &err);
+  if (!err) {
+    QString absTimeStr = vsedit::timeToString(absoluteTime);
+    if (m_absoluteTime != absTimeStr) {
+      m_absoluteTime = absTimeStr;
+      toChangeTitle = true;
+    }
+  }
+  else {
+    if (!m_absoluteTime.isEmpty()) m_toChangeTitle = true;
+    m_absoluteTime = "";
+  }
+  if (toChangeTitle) {
+    m_toChangeTitle = false;
+    setTitle();
+  }
+  if (m_cpPreviewFrame) {
+    m_cpVSAPI->freeFrame(m_cpPreviewFrame);
+    m_cpPreviewFrame = nullptr;
+  }
+  m_framePixmap = pixmapFromRGB(a_cpPreviewFrame);
+  m_cpPreviewFrame = a_cpPreviewFrame;
   setPreviewPixmap();
-  m_ui.previewArea->checkMouseOverPreview(QCursor::pos());
+  QPointF pixelPos = m_ui.previewArea->pixelPosition();
+  m_ui.previewArea->checkMouseOverPreview(pixelPos);
+  updateFrameProps(false);
 }
 
 // END OF void PreviewDialog::setCurrentFrame(
-//		const VSFrameRef * a_cpOutputFrameRef,
-//		const VSFrameRef * a_cpPreviewFrameRef)
+//		const VSFrame * a_cpOutputFrame,
+//		const VSFrame * a_cpPreviewFrame)
+//==============================================================================
+
+void PreviewDialog::updateFrameProps(bool a_forced)
+{
+  if (a_forced || (isVisible() && m_cpFrame)) {
+    QString props = m_pVapourSynthScriptProcessor->framePropsString(m_cpFrame);
+    QString info = QString("Index %1 | Frame %2 \n\n").arg(m_outputIndex).arg(m_frameExpected);
+    m_pFramePropsPanel->setText(info + props + QString("\n"));
+  }
+}
+
+// END OF void PreviewDialog::updateFrameProps(bool a_forced)
 //==============================================================================
 
 double PreviewDialog::valueAtPoint(size_t a_x, size_t a_y, int a_plane)
 {
   Q_ASSERT(m_cpVSAPI);
 
-  if(!m_cpFrameRef)
-    return 0.0;
+  if (!m_cpFrame) return 0.0;
 
-  const VSFormat * cpFormat = m_cpVSAPI->getFrameFormat(m_cpFrameRef);
+  const VSVideoFormat *cpFormat = m_cpVSAPI->getVideoFrameFormat(m_cpFrame);
 
   Q_ASSERT((a_plane >= 0) && (a_plane < cpFormat->numPlanes));
 
-    const uint8_t * cpPlane =
-    m_cpVSAPI->getReadPtr(m_cpFrameRef, a_plane);
+  const uint8_t *cpPlane = m_cpVSAPI->getReadPtr(m_cpFrame, a_plane);
 
   size_t x = a_x;
   size_t y = a_y;
 
-  if(a_plane != 0)
-  {
+  if (a_plane != 0) {
     x = (a_x >> cpFormat->subSamplingW);
     y = (a_y >> cpFormat->subSamplingH);
   }
-  int stride = m_cpVSAPI->getStride(m_cpFrameRef, a_plane);
-  const uint8_t * cpLine = cpPlane + y * stride;
+  int stride = m_cpVSAPI->getStride(m_cpFrame, a_plane);
+  const uint8_t *cpLine = cpPlane + y * stride;
 
   double value = 0.0;
 
-  if(cpFormat->sampleType == stInteger)
-  {
-    if(cpFormat->bytesPerSample == 1)
+  if (cpFormat->sampleType == stInteger) {
+    if (cpFormat->bytesPerSample == 1)
       value = (double)cpLine[x];
-    else if(cpFormat->bytesPerSample == 2)
+    else if (cpFormat->bytesPerSample == 2)
       value = (double)((uint16_t *)cpLine)[x];
-    else if(cpFormat->bytesPerSample == 4)
+    else if (cpFormat->bytesPerSample == 4)
       value = (double)((uint32_t *)cpLine)[x];
   }
-  else if(cpFormat->sampleType == stFloat)
-  {
-    if(cpFormat->bytesPerSample == 2)
-    {
+  else if (cpFormat->sampleType == stFloat) {
+    if (cpFormat->bytesPerSample == 2) {
       vsedit::FP16 half;
       half.u = ((uint16_t *)cpLine)[x];
       vsedit::FP32 single = vsedit::halfToSingle(half);
       value = (double)single.f;
     }
-    else if(cpFormat->bytesPerSample == 4)
+    else if (cpFormat->bytesPerSample == 4)
       value = (double)((float *)cpLine)[x];
   }
 
@@ -2088,26 +2715,20 @@ void PreviewDialog::previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[])
 {
   // Read RGB values on screen from packed Gray8
 
-  if(!m_cpPreviewFrameRef)
-    return;
+  if (!m_cpPreviewFrame) return;
 
-  const VSMap *props = m_cpVSAPI->getFramePropsRO(m_cpPreviewFrameRef);
-  enum p2p_packing packing_fmt =
-    static_cast<p2p_packing>(m_cpVSAPI->propGetInt(props, "PackingFormat",
-    0, nullptr));
+  const VSMap *props = m_cpVSAPI->getFramePropertiesRO(m_cpPreviewFrame);
+  enum p2p_packing packing_fmt = static_cast<p2p_packing>(m_cpVSAPI->mapGetInt(props, "PackingFormat", 0, nullptr));
   bool is_10_bits = (packing_fmt == p2p_rgb30);
-  if (!is_10_bits)
-  {
-    Q_ASSERT(packing_fmt == p2p_argb32);
-  }
+  if (!is_10_bits) { Q_ASSERT(packing_fmt == p2p_argb32); }
 
-    const uint8_t * cpPlane = m_cpVSAPI->getReadPtr(m_cpPreviewFrameRef, 0);
+  const uint8_t *cpPlane = m_cpVSAPI->getReadPtr(m_cpPreviewFrame, 0);
 
   size_t x = a_x;
   size_t y = a_y;
 
-  int stride = m_cpVSAPI->getStride(m_cpPreviewFrameRef, 0);
-  const uint8_t * cpLoc = cpPlane + y * stride + x * 4;
+  int stride = m_cpVSAPI->getStride(m_cpPreviewFrame, 0);
+  const uint8_t *cpLoc = cpPlane + y * stride + x * 4;
 
   // libp2p will handle endianness
   p2p_buffer_param p = {};
@@ -2116,33 +2737,23 @@ void PreviewDialog::previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[])
   p.packing = packing_fmt;
   p.src[0] = cpLoc;
   p.src_stride[0] = 1;
-  if (is_10_bits)
-  {
+  if (is_10_bits) {
     uint16_t unpacked[3];
-    for (int plane = 0; plane < 3; ++plane)
-    {
+    for (int plane = 0; plane < 3; ++plane) {
       p.dst[plane] = &unpacked[plane];
       p.dst_stride[plane] = 1;
     }
     p2p_unpack_frame(&p, 0);
-    for (int plane = 0; plane < 3; ++plane)
-    {
-      a_ret[plane] = static_cast<int>(unpacked[plane]);
-    }
+    for (int plane = 0; plane < 3; ++plane) { a_ret[plane] = static_cast<int>(unpacked[plane]); }
   }
-  else
-  {
+  else {
     uint8_t unpacked[3];
-    for (int plane = 0; plane < 3; ++plane)
-    {
+    for (int plane = 0; plane < 3; ++plane) {
       p.dst[plane] = &unpacked[plane];
       p.dst_stride[plane] = 1;
     }
     p2p_unpack_frame(&p, 0);
-    for (int plane = 0; plane < 3; ++plane)
-    {
-      a_ret[plane] = static_cast<int>(unpacked[plane]);
-    }
+    for (int plane = 0; plane < 3; ++plane) { a_ret[plane] = static_cast<int>(unpacked[plane]); }
   }
 }
 
@@ -2150,89 +2761,98 @@ void PreviewDialog::previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[])
 //		int a_ret[])
 //==============================================================================
 
-QPixmap PreviewDialog::pixmapFromRGB(
-  const VSFrameRef * a_cpFrameRef)
+QPixmap PreviewDialog::pixmapFromRGB(const VSFrame *a_cpFrame)
 {
-  if((!m_cpVSAPI) || (!a_cpFrameRef))
-    return QPixmap();
+  if ((!m_cpVSAPI) || (!a_cpFrame)) return QPixmap();
 
-  const VSFormat * cpFormat = m_cpVSAPI->getFrameFormat(a_cpFrameRef);
+  const VSVideoFormat *cpFormat = m_cpVSAPI->getVideoFrameFormat(a_cpFrame);
   Q_ASSERT(cpFormat);
-  int wwidth = m_cpVSAPI->getFrameWidth(a_cpFrameRef, 0);
+  int wwidth = m_cpVSAPI->getFrameWidth(a_cpFrame, 0);
 
-  if((cpFormat->id != pfGray8) || (wwidth % 4) )
-  {
-    QString errorString = tr("Error forming pixmap from frame. "
-      "Expected format Gray8 with width divisible by 4. Instead got \'%1\'.")
-      .arg(cpFormat->name);
+  if ((cpFormat->colorFamily != cfGray) || (cpFormat->bitsPerSample != 8) || (wwidth % 4)) {
+    QString errorString = tr(
+      "Error forming pixmap from frame. "
+      "Expected format Gray8 with width divisible by 4. ");
     emit signalWriteLogMessage(mtCritical, errorString);
     return QPixmap();
   }
 
-  const VSMap *props = m_cpVSAPI->getFramePropsRO(a_cpFrameRef);
-  enum p2p_packing packing_fmt = static_cast<p2p_packing>(
-    m_cpVSAPI->propGetInt(props, "PackingFormat", 0, nullptr));
+  const VSMap *props = m_cpVSAPI->getFramePropertiesRO(a_cpFrame);
+  enum p2p_packing packing_fmt = static_cast<p2p_packing>(m_cpVSAPI->mapGetInt(props, "PackingFormat", 0, nullptr));
   bool is_10_bits;
-  if (packing_fmt == p2p_rgb30)
-  {
-    is_10_bits = true;
-  }
-  else if (packing_fmt == p2p_argb32)
-  {
+  if (packing_fmt == p2p_rgb30) { is_10_bits = true; }
+  else if (packing_fmt == p2p_argb32) {
     is_10_bits = false;
   }
-  else
-  {
-    QString errorString = tr("Error forming pixmap from frame. "
+  else {
+    QString errorString = tr(
+      "Error forming pixmap from frame. "
       "Expected frame being packed from RGB24 or RGB30.");
     emit signalWriteLogMessage(mtCritical, errorString);
     return QPixmap();
   }
 
   int width = wwidth / 4;
-  int height = m_cpVSAPI->getFrameHeight(a_cpFrameRef, 0);
-  int stride = m_cpVSAPI->getStride(a_cpFrameRef, 0);
+  int height = m_cpVSAPI->getFrameHeight(a_cpFrame, 0);
+  int stride = m_cpVSAPI->getStride(a_cpFrame, 0);
 
-  const uint8_t * pData = m_cpVSAPI->getReadPtr(a_cpFrameRef, 0);
-  QImage frameImage(reinterpret_cast<const uchar *>(pData),
-    width, height, stride, is_10_bits ?
-    QImage::Format_RGB30 : QImage::Format_RGB32);
+  const uint8_t *pData = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
+  QImage frameImage(reinterpret_cast<const uchar *>(pData), width, height, stride,
+                    is_10_bits ? QImage::Format_RGB30 : QImage::Format_ARGB32);
   QPixmap framePixmap = QPixmap::fromImage(frameImage, Qt::NoFormatConversion);
   return framePixmap;
 }
 
 // END OF QPixmap PreviewDialog::pixmapFromRGB(
-//		const VSFrameRef * a_cpFrameRef)
+//		const VSFrame * a_cpFrame)
 //==============================================================================
 
 void PreviewDialog::setTitle()
 {
   QString l_scriptName = scriptName();
-  QString scriptNameTitle =
-    l_scriptName.isEmpty() ? tr("(Untitled)") : l_scriptName;
-  QString title = tr("Preview - ") + scriptNameTitle;
+  QString scriptNameTitle = l_scriptName.isEmpty() ? tr("(Untitled)") : l_scriptName;
+  if (m_scriptTextChanged) scriptNameTitle = scriptNameTitle + "*";
+  QString title = tr("Preview - Index %1 | ").arg(m_outputIndex);
+  if (!m_clipName.isEmpty()) title = title + tr("Name: %1 | ").arg(m_clipName);
+  if (!m_sceneName.isEmpty()) title = title + tr("Scene: %1 | ").arg(m_sceneName);
+  if (!m_absoluteTime.isEmpty()) title = title + tr("Abs Time: %1 | ").arg(m_absoluteTime);
+  title = title + scriptNameTitle;
   setWindowTitle(title);
 }
 
 // END OF void PreviewDialog::setTitle()
 //==============================================================================
 
+qlonglong PreviewDialog::frameToTimestamp(int a_frame)
+{
+  if (m_fpsDen == 0 || m_fpsNum == 0) return 0;
+  return a_frame * m_fpsDen * 1000 / m_fpsNum;
+}
+
+int PreviewDialog::timestampToFrame(qlonglong a_timestamp)
+{
+  if (m_fpsDen == 0 || m_fpsNum == 0) return 0;
+  return std::round((double)a_timestamp * m_fpsNum / m_fpsDen / 1000);
+}
+
+void PreviewDialog::setExpectedFrame(int a_frame)
+{
+  m_frameExpected = a_frame;
+  m_frameTimestampExpected = frameToTimestamp(m_frameExpected);
+}
+
 void PreviewDialog::saveTimelineBookmarks()
 {
   QString l_scriptName = scriptName();
-  if(l_scriptName.isEmpty())
-    return;
+  if (l_scriptName.isEmpty()) return;
 
-  QString bookmarksFilePath = l_scriptName +
-    QString(TIMELINE_BOOKMARKS_FILE_SUFFIX);
+  QString bookmarksFilePath = l_scriptName + QString(TIMELINE_BOOKMARKS_FILE_SUFFIX);
   QFile bookmarksFile(bookmarksFilePath);
-  if(!bookmarksFile.open(QIODevice::WriteOnly))
-    return;
+  if (!bookmarksFile.open(QIODevice::WriteOnly)) return;
 
   std::set<int> bookmarks = m_ui.frameNumberSlider->bookmarks();
   QStringList bookmarksStringList;
-  for(int i : bookmarks)
-    bookmarksStringList += QString::number(i);
+  for (int i : bookmarks) bookmarksStringList += QString::number(i);
 
   QString bookmarksString = bookmarksStringList.join(", ");
   bookmarksFile.write(bookmarksString.toUtf8());
@@ -2247,17 +2867,14 @@ void PreviewDialog::loadTimelineBookmarks()
   std::set<int> bookmarks;
 
   QString l_scriptName = scriptName();
-  if(l_scriptName.isEmpty())
-  {
+  if (l_scriptName.isEmpty()) {
     m_ui.frameNumberSlider->setBookmarks(bookmarks);
     return;
   }
 
-  QString bookmarksFilePath = l_scriptName +
-    QString(TIMELINE_BOOKMARKS_FILE_SUFFIX);
+  QString bookmarksFilePath = l_scriptName + QString(TIMELINE_BOOKMARKS_FILE_SUFFIX);
   QFile bookmarksFile(bookmarksFilePath);
-  if(!bookmarksFile.open(QIODevice::ReadOnly))
-  {
+  if (!bookmarksFile.open(QIODevice::ReadOnly)) {
     m_ui.frameNumberSlider->setBookmarks(bookmarks);
     return;
   }
@@ -2266,12 +2883,10 @@ void PreviewDialog::loadTimelineBookmarks()
   bookmarksFile.close();
 
   QStringList bookmarksStringList = bookmarksString.split(",");
-  for(const QString & string : bookmarksStringList)
-  {
+  for (const QString &string : bookmarksStringList) {
     bool converted = false;
     int i = string.simplified().toInt(&converted);
-    if(converted)
-      bookmarks.insert(i);
+    if (converted) bookmarks.insert(i);
   }
 
   m_ui.frameNumberSlider->setBookmarks(bookmarks);
@@ -2283,8 +2898,7 @@ void PreviewDialog::loadTimelineBookmarks()
 void PreviewDialog::saveGeometryDelayed()
 {
   QApplication::processEvents();
-  if(!isMaximized())
-  {
+  if (!isMaximized()) {
     m_windowGeometry = saveGeometry();
     m_pGeometrySaveTimer->start();
   }
@@ -2293,19 +2907,56 @@ void PreviewDialog::saveGeometryDelayed()
 // END OF void PreviewDialog::saveGeometryDelayed()
 //==============================================================================
 
+FramePropsPanel::FramePropsPanel(SettingsManager *a_pSettingsManager, PreviewDialog *a_pFakeParent)
+{
+  m_pFakeParent = a_pFakeParent;
 
-void PreviewDialog::ipcAdjustCrop(const QString& cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom)
+  setWindowModality(Qt::NonModal);
+  setWindowTitle(QString("Frame Properties"));
+  QFont font = a_pSettingsManager->getTextFormat(TEXT_FORMAT_ID_COMMON_SCRIPT_TEXT).font();
+  setFont(font);
+  vsedit::disableFontKerning(this);
+  setAlignment(Qt::AlignmentFlag::AlignTop);
+  setTextInteractionFlags(Qt::TextSelectableByMouse);
+  setCursor(QCursor(Qt::IBeamCursor));
+
+  setVisible(false);
+
+  setHideAction(a_pSettingsManager);
+}
+
+void FramePropsPanel::keyPressEvent(QKeyEvent *a_pEvent)
+{
+  if (a_pEvent->modifiers() != Qt::NoModifier)
+    QTextEdit::keyPressEvent(a_pEvent);
+  else if (a_pEvent->key() == Qt::Key_Escape)
+    setVisible(false);
+  else
+    m_pFakeParent->keyPressEvent(a_pEvent);
+}
+
+void FramePropsPanel::setHideAction(SettingsManager *a_pSettingsManager)
+{
+  m_pActionHide = a_pSettingsManager->createStandardAction(ACTION_ID_TOGGLE_FRAME_PROPS, this);
+  m_pActionHide->setCheckable(false);
+  QKeySequence hotkey = a_pSettingsManager->getHotkey(m_pActionHide->data().toString());
+  m_pActionHide->setShortcut(hotkey);
+  connect(m_pActionHide, SIGNAL(triggered()), this, SLOT(slotHide()));
+  addAction(m_pActionHide);
+}
+
+void PreviewDialog::ipcAdjustCrop(const QString &cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom)
 {
   BEGIN_CROP_VALUES_CHANGE
   bool crop = cropping == "on";
   m_ui.cropCheckButton->setChecked(crop);
   this->slotToggleCropPanelVisible(crop);
   m_ui.cropCheckButton->setEnabled(!crop);
-  if (!crop) {
-    this->resetCropSpinBoxes();
-  } else {
-    int width = m_cpVideoInfo->width;
-    int height = m_cpVideoInfo->height;
+  if (!crop) { this->resetCropSpinBoxes(); }
+  else {
+    const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
+    int width = vi->width;
+    int height = vi->height;
     m_ui.cropLeftSpinBox->setMaximum(width - 1);
     m_ui.cropLeftSpinBox->setValue(cropLeft);
     m_ui.cropTopSpinBox->setMaximum(height - 1);
@@ -2315,7 +2966,7 @@ void PreviewDialog::ipcAdjustCrop(const QString& cropping, const int cropLeft, c
     m_ui.cropBottomSpinBox->setMaximum(height - 1);
     m_ui.cropBottomSpinBox->setValue(cropBottom);
 
-    m_ui.cropWidthSpinBox->setMaximum(width -1);
+    m_ui.cropWidthSpinBox->setMaximum(width - 1);
     m_ui.cropWidthSpinBox->setValue(width - cropLeft - cropRight);
     m_ui.cropHeightSpinBox->setMaximum(height);
     m_ui.cropHeightSpinBox->setValue(height - cropTop - cropBottom);
@@ -2325,12 +2976,17 @@ void PreviewDialog::ipcAdjustCrop(const QString& cropping, const int cropLeft, c
   END_CROP_VALUES_CHANGE
 }
 
-int PreviewDialog::getScrollX() const
-{
-  return m_ui.previewArea->horizontalScrollBar()->value();
-}
+int PreviewDialog::getScrollX() const { return m_ui.previewArea->horizontalScrollBar()->value(); }
 
-int PreviewDialog::getScrollY() const
+int PreviewDialog::getScrollY() const { return m_ui.previewArea->verticalScrollBar()->value(); }
+
+void FramePropsPanel::setVisible(bool visible)
 {
-  return m_ui.previewArea->verticalScrollBar()->value();
+  if (visible)
+    resize(m_widgetWidth, m_widgetHeight);
+  else {
+    m_widgetWidth = width();
+    m_widgetHeight = height();
+  }
+  QWidget::setVisible(visible);
 }

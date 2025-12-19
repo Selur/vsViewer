@@ -4,158 +4,171 @@ CONFIG += qt
 QT += widgets
 QT += network
 
+win32 {
+  QT += multimedia
+}
 
 QT_VERSION_WARNING = "WARNING: Linking against Qt version lower than 5.6.1 is likely to cause CLI tools video encoding to crash due to I/O but in Qt."
 
+# ----------------------
+# Qt version check
+# ----------------------
 win32 {
- equals(QT_MAJOR_VERSION, 5) {
-  equals(QT_MINOR_VERSION, 6):lessThan(QT_PATCH_VERSION, 1)) {
-   message($$QT_VERSION_WARNING)
-  }
-  lessThan(QT_MINOR_VERSION, 6) {
-   message($$QT_VERSION_WARNING)
-  }
- }
+    equals(QT_MAJOR_VERSION, 5) {
+        lessThan(QT_MINOR_VERSION, 6) {
+            message($$QT_VERSION_WARNING)
+        }
+        equals(QT_MINOR_VERSION, 6) {
+            lessThan(QT_PATCH_VERSION, 1) {
+                message($$QT_VERSION_WARNING)
+            }
+        }
+    }
 }
 
-HOST_64_BIT = contains(QMAKE_HOST.arch, "x86_64")
-TARGET_64_BIT = contains(QMAKE_TARGET.arch, "x86_64")
-ARCHITECTURE_64_BIT = $$HOST_64_BIT | $$TARGET_64_BIT
+# ----------------------
+# Architecture detection
+# ----------------------
+# Detect host architecture
+HOST_64_BIT = false
+contains(QMAKE_HOST.arch, x86_64|amd64|x64|arm64) { HOST_64_BIT = true }
+
+# Detect target architecture
+TARGET_64_BIT = false
+contains(QMAKE_TARGET.arch, x86_64|amd64|x64|arm64) { TARGET_64_BIT = true }
+
+# Set final flag
+ARCHITECTURE_64_BIT = false
+contains(QMAKE_HOST.arch, x86_64|amd64|x64|arm64) { ARCHITECTURE_64_BIT = true }
+contains(QMAKE_TARGET.arch, x86_64|amd64|x64|arm64) { ARCHITECTURE_64_BIT = true }
+
+message("HOST_64_BIT: $$HOST_64_BIT")
+message("TARGET_64_BIT: $$TARGET_64_BIT")
+message("ARCHITECTURE_64_BIT: $$ARCHITECTURE_64_BIT")
+
 TARGET = vsViewer
 
+# ----------------------
+# Build configuration
+# ----------------------
 CONFIG(debug, debug|release) {
 
- contains(QMAKE_COMPILER, gcc) {
-  if($$ARCHITECTURE_64_BIT) {
-   DESTDIR = build/debug-64bit-gcc
-   OBJECTS_DIR = generated/obj-debug-64bit-gcc
-  } else {
-   DESTDIR = build/debug-32bit-gcc
-   TARGET = vsViewer-debug-32bit-gcc
-   OBJECTS_DIR = generated/obj-debug-32bit-gcc
-  }
+    contains(QMAKE_COMPILER, gcc) {
+        contains(ARCHITECTURE_64_BIT, true) {
+            DESTDIR = build/debug-64bit-gcc
+            OBJECTS_DIR = generated/obj-debug-64bit-gcc
+        } else {
+            DESTDIR = build/debug-32bit-gcc
+            TARGET = vsViewer-debug-32bit-gcc
+            OBJECTS_DIR = generated/obj-debug-32bit-gcc
+        }
 
-  QMAKE_CXXFLAGS += -O0
-  QMAKE_CXXFLAGS += -g
-  QMAKE_CXXFLAGS += -ggdb3
- }
+        QMAKE_CXXFLAGS += -O0 -g -ggdb3
+    }
 
- contains(QMAKE_COMPILER, msvc) {
-  if($$ARCHITECTURE_64_BIT) {
-   DESTDIR = build/debug-64bit-msvc
-   OBJECTS_DIR = generated/obj-debug-64bit-msvc
-  } else {
-   DESTDIR = build/debug-32bit-msvc
-   OBJECTS_DIR = generated/obj-debug-32bit-msvc
-  }
- }
+    contains(QMAKE_COMPILER, msvc) {
+        contains(ARCHITECTURE_64_BIT, true) {
+            DESTDIR = build/debug-64bit-msvc
+            OBJECTS_DIR = generated/obj-debug-64bit-msvc
+        } else {
+            DESTDIR = build/debug-32bit-msvc
+            OBJECTS_DIR = generated/obj-debug-32bit-msvc
+        }
+    }
 
 } else {
 
- contains(QMAKE_COMPILER, gcc) {
-  if($$ARCHITECTURE_64_BIT) {
-   DESTDIR = build/release-64bit-gcc
-   OBJECTS_DIR = generated/obj-release-64bit-gcc
-  } else {
-   DESTDIR = build/release-32bit-gcc
-   OBJECTS_DIR = generated/obj-release-32bit-gcc
-  }
+    contains(QMAKE_COMPILER, gcc) {
+        contains(ARCHITECTURE_64_BIT, true) {
+            DESTDIR = build/release-64bit-gcc
+            OBJECTS_DIR = generated/obj-release-64bit-gcc
+        } else {
+            DESTDIR = build/release-32bit-gcc
+            OBJECTS_DIR = generated/obj-release-32bit-gcc
+        }
 
-  QMAKE_CXXFLAGS += -O2
-  QMAKE_CXXFLAGS += -fexpensive-optimizations
-  QMAKE_CXXFLAGS += -funit-at-a-time
- }
+        QMAKE_CXXFLAGS += -O2 -fexpensive-optimizations -funit-at-a-time
+    }
 
- macx {
-  QMAKE_CXXFLAGS -= -fexpensive-optimizations
- }
+    macx {
+        QMAKE_CXXFLAGS -= -fexpensive-optimizations
+    }
 
- contains(QMAKE_COMPILER, msvc) {
-  if($$ARCHITECTURE_64_BIT) {
-   DESTDIR = build/release-64bit-msvc
-  } else {
-   DESTDIR = build/release-32bit-msvc
-  }
- }
+    contains(QMAKE_COMPILER, msvc) {
+        contains(ARCHITECTURE_64_BIT, true) {
+            DESTDIR = build/release-64bit-msvc
+        } else {
+            DESTDIR = build/release-32bit-msvc
+        }
+    }
 
- DEFINES += NDEBUG
-
+    DEFINES += NDEBUG
 }
 
+# ----------------------
+# Path and directory settings
+# ----------------------
 S = $${DIR_SEPARATOR}
 
 D = $$DESTDIR
-#D = $$replace(D, $$escape_expand(\\), $$S)
 D = $$replace(D, /, $$S)
 
 SC =
-#SC = $$replace(SC, $$escape_expand(\\), $$S)
 SC = $$replace(SC, /, $$S)
 
 E = $$escape_expand(\n\t)
 
-#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}resources$${S}vsViewer.ico $${D}$${S}vsViewer.ico $${E}
-#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}resources$${S}vsViewer.svg $${D}$${S}vsViewer.svg $${E}
-#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}README $${D}$${S}README $${E}
-#QMAKE_POST_LINK += $${QMAKE_COPY} $${SC}$${S}LICENSE $${D}$${S}LICENSE $${E}
-
+# ----------------------
+# Platform-specific includes
+# ----------------------
 macx {
- INCLUDEPATH += /usr/local/include
- ICON = resources/vsViewer.icns
+    INCLUDEPATH += /usr/local/include
+    ICON = resources/vsViewer.icns
 }
 
 win32 {
+    lessThan(QT_MAJOR_VERSION, 6) {
+        QT += winextras
+    } else {
+        QMAKE_LFLAGS += -ENTRY:mainCRTStartup
+    }
 
-lessThan(QT_MAJOR_VERSION, 6) {
-  QT += winextras
-} else {
-  QMAKE_LFLAGS += -ENTRY:mainCRTStartup
-}
- #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
- INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/vapoursynth'
+    #INCLUDEPATH += 'F:/workspace/VapourSynth/include'
+    #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
+    INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/vapoursynth'
 
- #DEPLOY_COMMAND = windeployqt
- #DEPLOY_TARGET = $$shell_quote($$shell_path($${D}/$${TARGET}.exe))
- #QMAKE_POST_LINK += $${DEPLOY_COMMAND} --no-translations $${DEPLOY_TARGET} $${E}
 
- if($$ARCHITECTURE_64_BIT) {
-  message("x86_64 build")
- } else {
-  message("x86 build")
-  contains(QMAKE_COMPILER, gcc) {
-   QMAKE_LFLAGS += -Wl,--large-address-aware
-  }
-  contains(QMAKE_COMPILER, msvc) {
-   QMAKE_LFLAGS += /LARGEADDRESSAWARE
-  }
- }
+    contains(ARCHITECTURE_64_BIT, true) {
+        message("x86_64 build")
+    } else {
+        message("x86 build")
+        contains(QMAKE_COMPILER, gcc) { QMAKE_LFLAGS += -Wl,--large-address-aware }
+        contains(QMAKE_COMPILER, msvc) { QMAKE_LFLAGS += /LARGEADDRESSAWARE }
+    }
 }
 
 contains(QMAKE_COMPILER, clang) {
- INCLUDEPATH += /opt/homebrew/include/vapoursynth
- QMAKE_CXXFLAGS += -stdlib=libc++
+    INCLUDEPATH += /opt/homebrew/include/vapoursynth
+    QMAKE_CXXFLAGS += -stdlib=libc++
 }
 
 contains(QMAKE_COMPILER, gcc) {
- INCLUDEPATH += /usr/local/include/vapoursynth
- QMAKE_CXXFLAGS += -std=c++17
- QMAKE_CXXFLAGS += -Wall
- QMAKE_CXXFLAGS += -Wextra
- QMAKE_CXXFLAGS += -Wredundant-decls
- QMAKE_CXXFLAGS += -Wshadow
- #QMAKE_CXXFLAGS += -Weffc++
- QMAKE_CXXFLAGS += -pedantic
-
- LIBS += -L$$[QT_INSTALL_LIBS]
+    INCLUDEPATH += /usr/local/include/vapoursynth
+    QMAKE_CXXFLAGS += -std=c++17 -Wall -Wextra -Wredundant-decls -Wshadow -pedantic
+    LIBS += -L$$[QT_INSTALL_LIBS]
 } else {
- CONFIG += c++17
+    CONFIG += c++17
 }
 
+# ----------------------
+# General project settings
+# ----------------------
 TEMPLATE = app
-
 RC_ICONS = resources/vsViewer.ico
 QMAKE_TARGET_PRODUCT = 'VapourSynth Viewer'
 QMAKE_TARGET_DESCRIPTION = 'VapourSynth Viewer based on Vapoursynth script editor'
+
+RESOURCES = resources/vsViewer.qrc
 
 #SUBDIRS
 
@@ -179,10 +192,13 @@ FORMS += frame_consumers/encode_dialog.ui
 FORMS += script_templates/templates_dialog.ui
 FORMS += main_window.ui
 
-HEADERS +=  \
+HEADERS += \
   ipc/LocalSocketIpcClient.h \
   ipc/LocalSocketIpcServer.h \
   common-src/helpers.h \
+  common-src/helpers_vs.h \
+  common-src/version_info.h \
+  common-src/win32_console.h \
   common-src/ipc_defines.h \
   common-src/aligned_vector.h \
   common-src/chrono.h \
@@ -197,6 +213,7 @@ HEADERS +=  \
   common-src/log/styled_log_view.h \
   common-src/log/vs_editor_log_definitions.h \
   common-src/log/vs_editor_log.h \
+  common-src/vapoursynth/vs_set_matrix.h \
   common-src/vapoursynth/vs_script_library.h \
   common-src/vapoursynth/vs_script_processor_structures.h \
   common-src/vapoursynth/vapoursynth_script_processor.h \
@@ -217,6 +234,7 @@ HEADERS +=  \
   settings/settings_dialog.h \
   script_status_bar_widget/script_status_bar_widget.h \
   preview/scroll_navigator.h \
+  preview/zoom_ratio_spinbox.h \
   preview/preview_area.h \
   preview/preview_advanced_settings_dialog.h \
   preview/preview_dialog.h \
@@ -233,67 +251,15 @@ HEADERS +=  \
   frame_consumers/encode_dialog.h \
   script_templates/drop_file_category_model.h \
   script_templates/templates_dialog.h \
-  main_window.h \
-  common-src/aligned_vector.h \
-  common-src/chrono.h \
-  common-src/frame_header_writers/frame_header_writer.h \
-  common-src/frame_header_writers/frame_header_writer_null.h \
-  common-src/frame_header_writers/frame_header_writer_y4m.h \
-  common-src/helpers.h \
-  common-src/jobs/job.h \
-  common-src/jobs/job_variables.h \
-  common-src/libp2p/p2p.h \
-  common-src/libp2p/p2p_api.h \
-  common-src/libp2p/simd/cpuinfo_x86.h \
-  common-src/libp2p/simd/p2p_simd.h \
-  common-src/log/log_styles_model.h \
-  common-src/log/styled_log_view.h \
-  common-src/log/styled_log_view_core.h \
-  common-src/log/styled_log_view_settings_dialog.h \
-  common-src/log/styled_log_view_structures.h \
-  common-src/log/vs_editor_log.h \
-  common-src/log/vs_editor_log_definitions.h \
-  common-src/settings/settings_definitions.h \
-  common-src/settings/settings_definitions_core.h \
-  common-src/settings/settings_manager.h \
-  common-src/settings/settings_manager_core.h \
-  common-src/timeline_slider/timeline_slider.h \
-  common-src/vapoursynth/vapoursynth_script_processor.h \
-  common-src/vapoursynth/vs_pack_rgb.h \
-  common-src/vapoursynth/vs_script_library.h \
-  common-src/vapoursynth/vs_script_processor_structures.h \
-  frame_consumers/benchmark_dialog.h \
-  frame_consumers/encode_dialog.h \
-  ipc/LocalSocketIpcClient.h \
-  ipc/LocalSocketIpcServer.h \
-  job_server_watcher_socket.h \
-  main_window.h \
-  preview/preview_advanced_settings_dialog.h \
-  preview/preview_area.h \
-  preview/preview_dialog.h \
-  preview/scroll_navigator.h \
-  script_editor/number_matcher.h \
-  script_editor/script_completer.h \
-  script_editor/script_completer_model.h \
-  script_editor/script_editor.h \
-  script_editor/syntax_highlighter.h \
-  script_status_bar_widget/script_status_bar_widget.h \
-  script_templates/drop_file_category_model.h \
-  script_templates/templates_dialog.h \
-  settings/actions_hotkey_edit_model.h \
-  settings/clearable_key_sequence_editor.h \
-  settings/item_delegate_for_hotkey.h \
-  settings/settings_dialog.h \
-  settings/theme_elements_model.h \
-  vapoursynth/vapoursynth_plugins_manager.h \
-  vapoursynth/vs_plugin_data.h \
-  vapoursynth/vs_script_processor_dialog.h
+  main_window.h
 
 SOURCES +=  \
   common-src/frame_header_writers/frame_header_writer.cpp \
   common-src/frame_header_writers/frame_header_writer_null.cpp \
   common-src/frame_header_writers/frame_header_writer_y4m.cpp \
   common-src/helpers.cpp \
+  common-src/version_info.cpp \
+  common-src/win32_console.cpp \
   common-src/jobs/job.cpp \
   common-src/jobs/job_variables.cpp \
   common-src/log/log_styles_model.cpp \
@@ -309,8 +275,8 @@ SOURCES +=  \
   common-src/settings/settings_manager_core.cpp \
   common-src/timeline_slider/timeline_slider.cpp \
   common-src/vapoursynth/vs_pack_rgb.cpp \
-  common-src/vapoursynth/vs_gray_frame_prop.cpp \
   common-src/vapoursynth/vapoursynth_script_processor.cpp \
+  common-src/vapoursynth/vs_set_matrix.cpp \
   common-src/vapoursynth/vs_script_library.cpp \
   common-src/vapoursynth/vs_script_processor_structures.cpp \
   frame_consumers/benchmark_dialog.cpp \
@@ -323,6 +289,7 @@ SOURCES +=  \
   preview/preview_advanced_settings_dialog.cpp \
   preview/preview_area.cpp \
   preview/preview_dialog.cpp \
+  preview/zoom_ratio_spinbox.cpp \
   preview/scroll_navigator.cpp \
   script_editor/number_matcher.cpp \
   script_editor/script_completer.cpp \
@@ -339,10 +306,10 @@ SOURCES +=  \
   settings/theme_elements_model.cpp \
   vapoursynth/vapoursynth_plugins_manager.cpp \
   vapoursynth/vs_plugin_data.cpp \
-  vapoursynth/vs_script_processor_dialog.cpp \
-  common-src/vapoursynth/vs_gray_frame_prop.h
+  vapoursynth/vs_script_processor_dialog.cpp
 
-# libp2p
+
+
 # libp2p
 SOURCES_P2P += common-src/libp2p/p2p_api.cpp
 SOURCES_P2P += common-src/libp2p/v210.cpp

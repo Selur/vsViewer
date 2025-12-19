@@ -3,7 +3,7 @@
 
 #include "vs_plugin_data.h"
 
-#include <VapourSynth.h>
+#include <VapourSynth4.h>
 
 #include <QObject>
 #include <QStringList>
@@ -12,56 +12,43 @@ class SettingsManager;
 
 class VapourSynthPluginsManager : public QObject
 {
-	Q_OBJECT
+    Q_OBJECT
 
-public:
+  public:
+    VapourSynthPluginsManager(SettingsManager* a_pSettingsManager, const VSAPI* a_cpVSAPI, QObject* a_pParent = nullptr);
 
-	VapourSynthPluginsManager(SettingsManager * a_pSettingsManager,
-		QObject * a_pParent = nullptr);
+    virtual ~VapourSynthPluginsManager();
 
-	virtual ~VapourSynthPluginsManager();
+    void getCorePlugins(const VSAPI* a_cpVSAPI = nullptr);
 
-	void getCorePlugins();
+    QStringList functions() const;
 
-	void pollPaths(const QStringList & a_pluginsPaths);
+    VSPluginsList pluginsList() const;
 
-	QStringList functions() const;
+    static VSData::Function parseFunctionSignature(const QString& a_name, const QString& a_arguments);
 
-	VSPluginsList pluginsList() const;
+  public slots:
 
-	static VSData::Function parseFunctionSignature(const QString & a_name,
-		const QString & a_arguments);
+    void slotClear();
 
-	friend void VS_CC fakeConfigPlugin(const char * a_identifier,
-		const char * a_defaultNamespace, const char * a_name,
-		int a_apiVersion, int a_readonly, VSPlugin * a_pPlugin);
+    void slotSort();
 
-	friend void VS_CC fakeRegisterFunction(const char * a_name,
-		const char * a_args, VSPublicFunction a_argsFunc,
-		void * a_pFunctionData, VSPlugin * a_pPlugin);
+    void slotRefill(const VSAPI* a_cpVSAPI);
 
-public slots:
+  signals:
 
-	void slotClear();
+    void signalWriteLogMessage(int a_messageType, const QString& a_message);
 
-	void slotSort();
+  private:
+    VSPluginsList m_pluginsList;
 
-	void slotRefill();
+    QString m_currentPluginPath;
 
-signals:
+    bool m_pluginAlreadyLoaded;
 
-	void signalWriteLogMessage(int a_messageType,
-		const QString & a_message);
+    SettingsManager* m_pSettingsManager;
 
-private:
-
-	VSPluginsList m_pluginsList;
-
-	QString m_currentPluginPath;
-
-	bool m_pluginAlreadyLoaded;
-
-	SettingsManager * m_pSettingsManager;
+    VSPLUGINAPI m_VSPAPI;
 };
 
-#endif // VAPOURSYNTHPLUGINSMANAGER_H
+#endif  // VAPOURSYNTHPLUGINSMANAGER_H

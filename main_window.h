@@ -23,8 +23,7 @@ class MainWindow : public QMainWindow
   Q_OBJECT
 
 public:
-
-  MainWindow();
+  MainWindow(SettingsManager* settings);
 
   virtual ~MainWindow();
   void show();
@@ -37,6 +36,10 @@ public slots:
 
   void slotInsertTextIntoScriptAtNewLine(const QString & a_text);
   void slotInsertTextIntoScriptAtCursor(const QString & a_text);
+
+signals:
+
+  void signalToggleAttachedConsole();
 
 protected:
 
@@ -77,6 +80,8 @@ private slots:
   void slotScriptFileDropped(const QString & a_filePath, bool * a_pHandled);
 
   void slotSaveGeometry();
+
+  void slotReloadTextFromDisk();
 
   void ipcCallMethod(const QString& typ, const QString& value, const QString &optionString);
 
@@ -150,6 +155,8 @@ private:
 
   QTimer * m_pGeometrySaveTimer;
   QByteArray m_windowGeometry;
+
+  QTimer* m_pReloadTextTimer;
 
   LocalSocketIpcClient* m_ipcClient;
   LocalSocketIpcServer* m_ipcServer;

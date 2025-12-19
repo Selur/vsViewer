@@ -728,15 +728,14 @@ void ScriptEditor::dragEnterEvent(QDragEnterEvent * a_pEvent)
 // END OF void ScriptEditor::dragEnterEvent(QDragEnterEvent * a_pEvent)
 //==============================================================================
 
-void ScriptEditor::dragMoveEvent(QDragMoveEvent * a_pEvent)
+void ScriptEditor::dragMoveEvent(QDragMoveEvent *a_pEvent)
 {
-  if(!a_pEvent->mimeData()->hasUrls())
-  {
+  if (!a_pEvent->mimeData()->hasUrls()) {
     QPlainTextEdit::dragMoveEvent(a_pEvent);
     return;
   }
 
-  QTextCursor cursor = cursorForPosition(a_pEvent->pos());
+  QTextCursor cursor = cursorForPosition(a_pEvent->position().toPoint());
   setTextCursor(cursor);
   a_pEvent->acceptProposedAction();
 }

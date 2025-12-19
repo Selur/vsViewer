@@ -65,6 +65,16 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="reloadFromDiskCheckBox">
+         <property name="text">
+          <string>Periodically reload script text from disk (to sync with external changes)</string>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QCheckBox" name="promptToSaveChangesCheckBox">
          <property name="text">
           <string>Prompt to save changes when closing script file</string>
@@ -245,13 +255,6 @@
         </widget>
        </item>
        <item>
-        <widget class="QCheckBox" name="reloadBeforeExecutionCheckBox">
-         <property name="text">
-          <string>Reload script from disk before execution</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
           <widget class="QLabel" name="snapshotCompressionLevelLabel">
@@ -289,6 +292,20 @@
         </layout>
        </item>
        <item>
+        <widget class="QCheckBox" name="debugMsgCheckBox">
+         <property name="text">
+          <string>Show debug messages</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="darkModeCheckBox">
+         <property name="text">
+          <string>Dark theme (overriding OS theme; relaunching required)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QFrame" name="delimiter">
          <property name="frameShape">
           <enum>QFrame::HLine</enum>
@@ -323,7 +340,7 @@
          <property name="sizeHint" stdset="0">
           <size>
            <width>20</width>
-           <height>171</height>
+           <height>31</height>
           </size>
          </property>
         </spacer>
@@ -353,7 +370,7 @@
        <item>
         <widget class="QGroupBox" name="vsLibraryPathsGroupBox">
          <property name="title">
-          <string>VapourSynth library search paths</string>
+          <string>VapourSynth library (VSScript) search paths</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
           <property name="leftMargin">
@@ -434,169 +451,10 @@
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="vsPluginsPathsGroupBox">
-         <property name="title">
-          <string>VapourSynth plugins paths</string>
+        <widget class="QCheckBox" name="preferLibraryFromListCheckBox">
+         <property name="text">
+          <string>Libraries from this list are loaded prior to Windows registry or system PATH</string>
          </property>
-         <layout class="QGridLayout" name="gridLayout">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-          <property name="spacing">
-           <number>2</number>
-          </property>
-          <item row="0" column="0" rowspan="3">
-           <widget class="QListWidget" name="vsPluginsPathsListWidget">
-            <property name="horizontalScrollBarPolicy">
-             <enum>Qt::ScrollBarAlwaysOff</enum>
-            </property>
-            <property name="alternatingRowColors">
-             <bool>true</bool>
-            </property>
-            <property name="textElideMode">
-             <enum>Qt::ElideNone</enum>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QToolButton" name="removeVSPluginsPathButton">
-            <property name="toolTip">
-             <string>Remove VapourSynth plugins path</string>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <spacer name="verticalSpacer_2">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>124</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item row="2" column="1">
-           <widget class="QToolButton" name="addVSPluginsPathButton">
-            <property name="toolTip">
-             <string>Add VapourSynth plugins path</string>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QLineEdit" name="vsPluginsPathEdit"/>
-          </item>
-          <item row="3" column="1">
-           <widget class="QToolButton" name="selectVSPluginsPathButton">
-            <property name="toolTip">
-             <string>Select path</string>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="vsDocumentationPathsGroupBox">
-         <property name="title">
-          <string>Documentation paths</string>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_3">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
-          <property name="spacing">
-           <number>2</number>
-          </property>
-          <item row="0" column="0" rowspan="3">
-           <widget class="QListWidget" name="vsDocumentationPathsListWidget">
-            <property name="horizontalScrollBarPolicy">
-             <enum>Qt::ScrollBarAlwaysOff</enum>
-            </property>
-            <property name="alternatingRowColors">
-             <bool>true</bool>
-            </property>
-            <property name="textElideMode">
-             <enum>Qt::ElideNone</enum>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QToolButton" name="removeVSDocumentationPathButton">
-            <property name="toolTip">
-             <string>Remove VapourSynth documentation path</string>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <spacer name="verticalSpacer_4">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>124</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item row="2" column="1">
-           <widget class="QToolButton" name="addVSDocumentationPathButton">
-            <property name="toolTip">
-             <string>Add VapourSynth documentation path</string>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QLineEdit" name="vsDocumentationPathEdit"/>
-          </item>
-          <item row="3" column="1">
-           <widget class="QToolButton" name="selectVSDocumentationPathButton">
-            <property name="toolTip">
-             <string>Select path</string>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-         </layout>
         </widget>
        </item>
       </layout>
