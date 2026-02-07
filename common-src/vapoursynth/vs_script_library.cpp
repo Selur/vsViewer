@@ -334,14 +334,14 @@ bool VSScriptLibrary::initLibrary()
   if(m_pSettingsManager->getPreferVSLibrariesFromList())
   {
     if(!loaded) load_from_list();
+    if (!loaded) load_from_path();
     if(!loaded) load_from_registry();
-    if(!loaded) load_from_path();
   }
   else
   {
+    if (!loaded) load_from_path();
+    if (!loaded) load_from_list();
     if(!loaded) load_from_registry();
-    if(!loaded) load_from_path();
-    if(!loaded) load_from_list();
   }
 
   if(!loaded)
