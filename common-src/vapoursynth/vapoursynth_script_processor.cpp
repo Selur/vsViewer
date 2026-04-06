@@ -1013,16 +1013,11 @@ QString VapourSynthScriptProcessor::framePropsString(
      {1, "from top field"},
      };
 
-  static std::map<QString, std::map<int64_t, QString>> reservedPropToMap =
-    {
-     {"_ChromaLocation", _ChromaLocationToString},
-     {"_ColorRange", _ColorRangeToString},
-     {"_Primaries", _PrimariesToString},
-     {"_Matrix", _MatrixToString},
-     {"_Transfer", _TransferToString},
-     {"_FieldBased", _FieldBasedToString},
-     {"_Field", _FieldToString},
-     };
+  static std::map<QString, std::map<int64_t, QString>> reservedPropToMap = {
+    {"_ChromaLocation", _ChromaLocationToString}, {"_Range", _ColorRangeToString}, {"_ColorRange", _ColorRangeToString},
+    {"_Primaries", _PrimariesToString},           {"_Matrix", _MatrixToString},    {"_Transfer", _TransferToString},
+    {"_FieldBased", _FieldBasedToString},         {"_Field", _FieldToString},
+  };
 
   const VSMap * cpProps = m_cpVSAPI->getFramePropertiesRO(a_cpFrame);
 
