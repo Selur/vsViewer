@@ -135,7 +135,8 @@ win32 {
 
     #INCLUDEPATH += 'F:/workspace/VapourSynth/include'
     #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
-    INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/vapoursynth'
+    #INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/vapoursynth'
+    INCLUDEPATH += 'F:/Hybrid/64bit/Vapoursynth/Lib/site-packages/vapoursynth/include'
 
 
     contains(ARCHITECTURE_64_BIT, true) {

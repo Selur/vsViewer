@@ -4,8 +4,8 @@
 #include "../version_info.h"
 #include <VSScript4.h>
 
-#include <QObject>
 #include <QLibrary>
+#include <QObject>
 #include <map>
 #include <vector>
 
@@ -13,7 +13,8 @@ class SettingsManagerCore;
 
 //==============================================================================
 
-typedef const VSSCRIPTAPI * (VS_CC * FNP_getVSSAPI)(int);
+typedef const VSSCRIPTAPI *(VS_CC *FNP_getVSSAPI)(int);
+typedef const char *(VS_CC *FNP_getVSSAPILastError)();
 
 //==============================================================================
 
@@ -22,9 +23,7 @@ class VSScriptLibrary : public QObject
     Q_OBJECT
 
   public:
-
-    VSScriptLibrary(SettingsManagerCore * a_pSettingsManager,
-                    QObject * a_pParent = nullptr);
+    VSScriptLibrary(SettingsManagerCore *a_pSettingsManager, QObject *a_pParent = nullptr);
 
     virtual ~VSScriptLibrary();
 
@@ -34,55 +33,53 @@ class VSScriptLibrary : public QObject
 
     bool isInitialized() const;
 
-    const VSAPI * getVSAPI();
+    const VSAPI *getVSAPI();
 
-    VSScript * createScript(VSCore * a_pCore = nullptr);
+    VSScript *createScript(VSCore *a_pCore = nullptr);
 
-    int evaluateScript(VSScript * a_pScript, const char * a_scriptText,
-                       const char * a_scriptFilename);
+    int evaluateScript(VSScript *a_pScript, const char *a_scriptText, const char *a_scriptFilename);
 
-    const char * getError(VSScript * a_pScript);
+    const char *getError(VSScript *a_pScript);
 
-    VSCore * createCore(int a_flag = 0);
+    VSCore *createCore(int a_flag = 0);
 
-            // Returns empty vector if not supported by API
-    std::vector<int> getOutputIndices(VSScript * a_pScript) const;
+    // Returns empty vector if not supported by API
+    std::vector<int> getOutputIndices(VSScript *a_pScript) const;
 
-    VSNode * getOutput(VSScript * a_pScript, int a_index);
+    VSNode *getOutput(VSScript *a_pScript, int a_index);
 
-    bool freeScript(VSScript * a_pScript);
+    bool freeScript(VSScript *a_pScript);
 
-    bool clearCoreCaches(VSCore * a_pCore);
+    bool clearCoreCaches(VSCore *a_pCore);
 
     QString VSAPIInfo();
     QString VSSAPIInfo();
 
   signals:
 
-    void signalWriteLogMessage(int a_messageType, const QString & a_message);
+    void signalWriteLogMessage(int a_messageType, const QString &a_message);
 
   private:
-
-    bool initLibrary();
+    bool initLibrary2();  // For VSScript API  4.3 and later
 
     void freeLibrary();
 
-    void handleVSMessage(int a_messageType, const QString & a_message);
+    void handleVSMessage(int a_messageType, const QString &a_message);
 
-    friend void VS_CC vsMessageHandler(int a_msgType,
-                                       const char * a_message, void * a_pUserData);
+    friend void VS_CC vsMessageHandler(int a_msgType, const char *a_message, void *a_pUserData);
 
-    SettingsManagerCore * m_pSettingsManager;
+    SettingsManagerCore *m_pSettingsManager;
 
     QLibrary m_vsScriptLibrary;
 
     FNP_getVSSAPI vssGetAPI;
+    FNP_getVSSAPILastError vssGetAPILastError;
 
     bool m_initialized;
 
-    const VSSCRIPTAPI * m_cpVSSAPI;
+    const VSSCRIPTAPI *m_cpVSSAPI;
 
-    const VSAPI * m_cpVSAPI;
+    const VSAPI *m_cpVSAPI;
 
     std::map<VSCore *, VSLogHandle *> m_VSCoreLogHandles;
 
@@ -90,8 +87,12 @@ class VSScriptLibrary : public QObject
     int m_VSAPIMinor;
     int m_VSSAPIMajor;
     int m_VSSAPIMinor;
+
+    int vsVersionCompare(int a_major, int a_minor) const { return version_compare(m_VSAPIMajor, m_VSAPIMinor, a_major, a_minor); }
+
+    int vssVersionCompare(int a_major, int a_minor) const { return version_compare(m_VSSAPIMajor, m_VSSAPIMinor, a_major, a_minor); }
 };
 
 //==============================================================================
 
-#endif // VS_SCRIPT_LIBRARY_H_INCLUDED
+#endif  // VS_SCRIPT_LIBRARY_H_INCLUDED
