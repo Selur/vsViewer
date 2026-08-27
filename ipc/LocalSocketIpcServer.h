@@ -13,6 +13,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 
+/// Inbound command channel from Hybrid. May log through MainWindow - its messages end in the client queue.
 class LocalSocketIpcServer : public QObject
 {
   Q_OBJECT
@@ -20,11 +21,14 @@ class LocalSocketIpcServer : public QObject
     explicit LocalSocketIpcServer(const QString &servername, QObject *parent);
     ~LocalSocketIpcServer();
 
+    /// False if listen() failed; the caller reports it, nothing is connected to us yet
+    bool isListening() const;
+    QString errorString() const;
+
   private:
     QLocalServer* m_server;
     QString m_serverName;
     QLocalSocket* m_clientConnection;
-    void currentState(QLocalSocket::LocalSocketState state);
 
   public slots:
     void socket_new_connection();

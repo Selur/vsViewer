@@ -2494,6 +2494,11 @@ void PreviewDialog::setPreviewPixmap()
   m_devicePixelRatio = window()->devicePixelRatioF();
   if (!m_framePixmap.isNull()) m_framePixmap.setDevicePixelRatio(m_devicePixelRatio);
   if (m_ui.cropPanel->isVisible()) {
+    // nothing to crop yet; scaling a null pixmap would make Qt warn, and that warning reaches Hybrid
+    if (m_framePixmap.isNull()) {
+      m_ui.previewArea->setPixmap(QPixmap());
+      return;
+    }
     int cropLeft = m_ui.cropLeftSpinBox->value();
     int cropTop = m_ui.cropTopSpinBox->value();
     int cropWidth = m_ui.cropWidthSpinBox->value();
@@ -2566,12 +2571,14 @@ void PreviewDialog::recalculateCropMods()
 void PreviewDialog::resetCropSpinBoxes()
 {
   BEGIN_CROP_VALUES_CHANGE
+  resetCropSpinBoxesUnguarded();
+  END_CROP_VALUES_CHANGE
+}
 
+void PreviewDialog::resetCropSpinBoxesUnguarded()
+{
   const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
-  if (!vi) {
-    END_CROP_VALUES_CHANGE
-    return;
-  }
+  if (!vi) return;
 
   m_ui.cropLeftSpinBox->setMaximum(vi->width - 1);
   m_ui.cropLeftSpinBox->setValue(0);
@@ -2589,8 +2596,6 @@ void PreviewDialog::resetCropSpinBoxes()
   m_ui.cropBottomSpinBox->setValue(0);
 
   recalculateCropMods();
-
-  END_CROP_VALUES_CHANGE
 }
 
 // END OF void PreviewDialog::resetCropSpinBoxes()
@@ -2945,16 +2950,30 @@ void FramePropsPanel::setHideAction(SettingsManager *a_pSettingsManager)
   addAction(m_pActionHide);
 }
 
-void PreviewDialog::ipcAdjustCrop(const QString &cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom)
+// False when cropping on has no video output to size against - before a preview, or for audio. Off always works.
+bool PreviewDialog::ipcAdjustCrop(const QString &cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom)
 {
-  BEGIN_CROP_VALUES_CHANGE
-  bool crop = cropping == "on";
+  const bool crop = (cropping == "on");
+
+  const VSVideoInfo *vi = nullptr;
+  if (crop) {
+    const auto it = m_nodeInfo.find(m_outputIndex);
+    if (it != m_nodeInfo.end()) vi = it->second.getAsVideo();
+    if (vi == nullptr) return false;
+  }
+
+  // BEGIN_CROP_VALUES_CHANGE cannot be used here: it expands to a bare "return;"
+  if (m_changingCropValues) return false;
+  m_changingCropValues = true;
+
   m_ui.cropCheckButton->setChecked(crop);
   this->slotToggleCropPanelVisible(crop);
   m_ui.cropCheckButton->setEnabled(!crop);
-  if (!crop) { this->resetCropSpinBoxes(); }
+  if (!crop) {
+    // not resetCropSpinBoxes(): we hold the guard, so its own BEGIN_CROP_VALUES_CHANGE would do nothing
+    this->resetCropSpinBoxesUnguarded();
+  }
   else {
-    const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
     int width = vi->width;
     int height = vi->height;
     m_ui.cropLeftSpinBox->setMaximum(width - 1);
@@ -2973,7 +2992,8 @@ void PreviewDialog::ipcAdjustCrop(const QString &cropping, const int cropLeft, c
   }
   this->recalculateCropMods();
   this->setPreviewPixmap();
-  END_CROP_VALUES_CHANGE
+  m_changingCropValues = false;
+  return true;
 }
 
 int PreviewDialog::getScrollX() const { return m_ui.previewArea->horizontalScrollBar()->value(); }

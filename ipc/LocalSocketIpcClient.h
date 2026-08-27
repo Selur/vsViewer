@@ -10,8 +10,10 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QLocalSocket>
 
+/// Outbound status channel to Hybrid. No log signal on purpose - it recursed to a stack overflow (docs/issues.md #1).
 class LocalSocketIpcClient : public QObject
 {
   Q_OBJECT
@@ -21,21 +23,21 @@ class LocalSocketIpcClient : public QObject
 
   private:
     QLocalSocket* m_socket;
-    quint16 m_blockSize;
-    QString m_message;
+    QStringList m_pending; // queued while the connection is still being established
     QString m_serverName;
+    qint64 m_lastConnectAttemptMs; // -1 = never tried; used to back off failed connects
+
+    void flushPending();
+    void tryConnect();
 
   public slots:
-    void send_MessageToServer(const QString &message);
+    void send_MessageToServer(QString message);
 
     void socket_connected();
     void socket_disconnected();
 
     void socket_readReady();
     void socket_error(QLocalSocket::LocalSocketError);
-
-  signals:
-    void signalWriteLogMessage(int a_messageType, const QString & a_message);
 };
 
 #endif /* LOCALSOCKETIPCCLIENT_H_ */

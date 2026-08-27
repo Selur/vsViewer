@@ -39,6 +39,13 @@
 #include <QUrl>
 #include <QDateTime>
 #include <QTimer>
+#include <QThread>
+
+//==============================================================================
+
+// Crop specs travel both on the command line (--crop) and inside IPC messages.
+static const int CROP_SPEC_FIELDS = 5;
+static const char CROP_SPEC_FORM[] = "<on|off>#<left>#<right>#<top>#<bottom>";
 
 //==============================================================================
 
@@ -50,7 +57,7 @@ MainWindow::MainWindow(SettingsManager *settings)
     m_pActionExit(nullptr), m_pActionAbout(nullptr), m_settableActionsList(), m_pMenuRecentScripts(nullptr), m_pPreviewDialog(nullptr),
     m_pSettingsDialog(nullptr), m_pBenchmarkDialog(nullptr), m_pEncodeDialog(nullptr), m_pTemplatesDialog(nullptr), m_scriptFilePath(),
     m_lastSavedText(), m_pJobServerWatcherSocket(nullptr), m_pGeometrySaveTimer(nullptr), m_pReloadTextTimer(nullptr), m_ipcClient(nullptr),
-    m_ipcServer(nullptr), m_hideMainWindow(false)
+    m_ipcClientThread(nullptr), m_ipcServer(nullptr), m_hideMainWindow(false)
 {
   loadFonts();
 
@@ -59,13 +66,11 @@ MainWindow::MainWindow(SettingsManager *settings)
   setWindowIcon(QIcon(":vsviewer.ico"));
 
   if (m_pSettingsManager->inDarkMode()) {
-    // Load qDarkStyle colors
+    // qDarkStyle is not bundled, so this normally fails - append, never replace, and do not nag
     QFile styleSheetDark(":/dark/style.qss");
-    if (!styleSheetDark.open(QFile::ReadOnly | QFile::Text)) {
-      QMessageBox::critical(this, QString::fromUtf8("File open error"),
-                            QString::fromUtf8("Failed to open stylesheet file ") + styleSheetDark.errorString());
+    if (styleSheetDark.open(QFile::ReadOnly | QFile::Text)) {
+      qApp->setStyleSheet(qApp->styleSheet() + QString::fromUtf8(styleSheetDark.readAll()));
     }
-    qApp->setStyleSheet(styleSheetDark.readAll());
     // With the current impl of the timeline slider
     // we have to relaunch anyway
     QPalette newPal(qApp->palette());
@@ -171,6 +176,17 @@ MainWindow::~MainWindow()
   }
 
   qInstallMessageHandler(0);
+
+  // stop the client thread first: it deletes the client, so m_ipcClient dangles after this
+  if (m_ipcClientThread != nullptr) {
+    m_ipcClientThread->quit();
+    if (!m_ipcClientThread->wait(5000)) {
+      m_ipcClientThread->terminate();
+      m_ipcClientThread->wait(1000);
+    }
+    m_ipcClient = nullptr;
+  }
+
   destroyOrphanQObjects();
 }
 
@@ -193,7 +209,7 @@ void MainWindow::slotWriteLogMessage(const QString & a_message,
 {
   m_ui.logView->addEntry(a_message, a_style);
 
-  if (m_ipcClient != nullptr) m_ipcClient->send_MessageToServer(a_message);
+  this->ipcSend(a_message);
 
   QString fatalTypes[] = {LOG_STYLE_VS_FATAL, LOG_STYLE_QT_FATAL};
   if(!vsedit::contains(fatalTypes, a_style))
@@ -210,7 +226,7 @@ void MainWindow::slotWriteLogMessage(const QString & a_message,
     QStandardPaths::writableLocation(QStandardPaths::TempLocation);
   if(tempPath.isEmpty())
   {
-    if (m_ipcClient != nullptr) m_ipcClient->send_MessageToServer(fullMessage);
+    this->ipcSend(fullMessage);
 
     QMessageBox::critical(nullptr, caption, fullMessage);
     return;
@@ -223,7 +239,7 @@ void MainWindow::slotWriteLogMessage(const QString & a_message,
   bool saved = m_ui.logView->saveHtml(filePath);
   if(!saved)
   {
-    if (m_ipcClient != nullptr) m_ipcClient->send_MessageToServer(fullMessage);
+    this->ipcSend(fullMessage);
 
     QMessageBox::critical(nullptr, caption, fullMessage);
     return;
@@ -771,7 +787,7 @@ bool MainWindow::saveScriptToFile(const QString& a_filePath)
 // END OF bool MainWindow::saveScriptToFile(const QString& a_filePath)
 //==============================================================================
 
-bool MainWindow::loadScriptFromFile(const QString& a_filePath)
+bool MainWindow::loadScriptFromFile(const QString& a_filePath, bool a_mayShowDialog)
 {
   if(a_filePath.isEmpty())
     return false;
@@ -780,9 +796,12 @@ bool MainWindow::loadScriptFromFile(const QString& a_filePath)
   bool loadSuccess = scriptFile.open(QIODevice::ReadOnly | QIODevice::Text);
   if(!loadSuccess)
   {
-    QMessageBox::critical(this,
-      QString::fromUtf8("File open error"),
-      QString::fromUtf8("Failed to open the file %1.").arg(a_filePath));
+    const QString message = tr("Failed to open the file %1.").arg(a_filePath);
+    // a modal from the constructor is fatal, and one behind a hidden window blocks IPC (docs/issues.md #10)
+    if(a_mayShowDialog)
+      QMessageBox::critical(this, tr("File open error"), message);
+    else
+      slotWriteLogMessage(mtCritical, message);
     return false;
   }
 
@@ -878,62 +897,100 @@ void MainWindow::ipcMessageReceived(const QString& message)
 bool MainWindow::hybridCustom(const QStringList& arguments)
 {
   QString option, input, previewOnly, ipcID, remoteName;
-  QStringList cropSettings;
+  QStringList cropSettings, unknownOptions;
   int argc = arguments.count();
   bool usingHybrid = false;
+  // every option takes one value, so it may not be the last argument (docs/issues.md #3)
   for (int i = 1; i < argc; ++i) {
     option = arguments.at(i);
-    if (option == "--preview-only" && i + 1 <= argc) {
+    const bool hasValue = (i + 1 < argc);
+    if (option == "--preview-only" && hasValue) {
       previewOnly = arguments.at(++i);
       usingHybrid = true;
-      continue;
     }
-    if (option == "--input" && i + 1 <= argc) {
+    else if (option == "--input" && hasValue) {
       input = arguments.at(++i);
       usingHybrid = true;
-      continue;
     }
-    if (m_ipcServer == nullptr && ipcID.isEmpty()) {
-      if (option == "--listen" && i + 1 <= argc) {
-        ipcID = arguments.at(++i);
-        m_ipcServer = new LocalSocketIpcServer(ipcID + "VSE", this);
-        connect(m_ipcServer, SIGNAL(messageReceived(QString)), this,
-            SLOT(ipcMessageReceived(QString)));
-        connect(m_ipcServer, SIGNAL(signalWriteLogMessage(int, const QString &)), this,
-            SLOT(slotWriteLogMessage(int, const QString &)));
-        usingHybrid = true;
-      }
-      continue;
+    else if (option == "--listen" && hasValue) {
+      const QString value = arguments.at(++i);
+      if (ipcID.isEmpty()) ipcID = value; // first one wins, as before
+      usingHybrid = true;
     }
-    if (option == "--listen-to" && i + 1 <= argc) {
-      if (m_ipcClient == nullptr && remoteName.isEmpty()) {
-        remoteName = arguments.at(++i);
-        m_ipcClient = new LocalSocketIpcClient(ipcID + remoteName, this);
-        connect(m_ipcClient, SIGNAL(signalWriteLogMessage(int, const QString &)), this, SLOT(slotWriteLogMessage(int, const QString &)));
-
-
-        usingHybrid = true;
-      }
-      continue;
+    else if (option == "--listen-to" && hasValue) {
+      const QString value = arguments.at(++i);
+      if (remoteName.isEmpty()) remoteName = value; // first one wins, as before
+      usingHybrid = true;
     }
-    if (option == "--crop" && i + 1 <= argc) {
+    else if (option == "--crop" && hasValue) {
       cropSettings = arguments.at(++i).split("#");
       usingHybrid = true;
     }
+    else if (option.startsWith("--")) {
+      // reported after the loop, so the warning also reaches the parent over IPC
+      unknownOptions.append(option);
+    }
   }
+
+  // built after the whole command line is read, so --listen/--listen-to work in either order (docs/issues.md #2)
+  if (!ipcID.isEmpty() && m_ipcServer == nullptr) {
+    m_ipcServer = new LocalSocketIpcServer(ipcID + "VSE", this);
+    connect(m_ipcServer, SIGNAL(messageReceived(QString)), this,
+        SLOT(ipcMessageReceived(QString)));
+    connect(m_ipcServer, SIGNAL(signalWriteLogMessage(int, const QString &)), this,
+        SLOT(slotWriteLogMessage(int, const QString &)));
+  }
+  if (!remoteName.isEmpty()) {
+    if (ipcID.isEmpty()) {
+      // the outbound name is id + remote name; without an id it would be a bare global name
+      slotWriteLogMessage(mtWarning, tr("--listen-to needs --listen; ignoring --listen-to."));
+    }
+    else if (m_ipcClient == nullptr) {
+      // own thread: connect blocks for seconds on a busy pipe (#5). No parent - moveToThread refuses one. No log connect (#1)
+      m_ipcClientThread = new QThread(this);
+      m_ipcClientThread->setObjectName("ipc-client");
+      m_ipcClient = new LocalSocketIpcClient(ipcID + remoteName);
+      m_ipcClient->moveToThread(m_ipcClientThread);
+      // destroy the client on its own thread, where its socket lives
+      connect(m_ipcClientThread, &QThread::finished, m_ipcClient, &QObject::deleteLater);
+      m_ipcClientThread->start();
+    }
+  }
+
+  for (const QString& unknown : unknownOptions) {
+    slotWriteLogMessage(mtWarning, tr("Ignoring command line option \"%1\": "
+                                      "unknown, or missing its value.").arg(unknown));
+  }
+
+  if (m_ipcServer != nullptr && !m_ipcServer->isListening()) {
+    slotWriteLogMessage(mtCritical, tr("Could not listen on \"%1VSE\" (%2). "
+                                       "Commands from the parent application will not arrive.")
+                                      .arg(ipcID, m_ipcServer->errorString()));
+  }
+
   if (usingHybrid) {
+    // silently: a modal from the constructor is fatal (docs/issues.md #10)
     if (!input.isEmpty()) {
-      loadScriptFromFile(input);
+      loadScriptFromFile(input, false);
     } else if (previewOnly.endsWith(".vpy", Qt::CaseInsensitive)) {
-      loadScriptFromFile(previewOnly);
-      m_pPreviewDialog->ipcAdjustCrop(QString("off"), 0, 0, 0, 0);
-    } else if (cropSettings.count() == 5) {
-      m_pPreviewDialog->ipcAdjustCrop(cropSettings.at(0), cropSettings.at(1).toInt(), cropSettings.at(2).toInt(), cropSettings.at(3).toInt(), cropSettings.at(4).toInt());
+      loadScriptFromFile(previewOnly, false);
+      // --preview-only starts with cropping off unless an explicit --crop says otherwise
+      if (cropSettings.isEmpty()) cropSettings = QString("off#0#0#0#0").split("#");
     }
     if(!checkHybridScript()) {
       return true;
     }
     slotPreview();
+
+    // after slotPreview(), so an "on" crop has a video output to size itself against
+    if (cropSettings.count() == CROP_SPEC_FIELDS) {
+      if (!applyIpcCrop(cropSettings)) {
+        slotWriteLogMessage(mtWarning, tr("Ignoring --crop: no video output to apply it to."));
+      }
+    } else if (!cropSettings.isEmpty()) {
+      slotWriteLogMessage(mtWarning, tr("Ignoring --crop: expected %1.").arg(CROP_SPEC_FORM));
+    }
+
     m_hideMainWindow = true;
   }
 
@@ -957,17 +1014,18 @@ void MainWindow::loadStartUpScript()
 {
   slotNewScript();
 
+  // runs from the constructor, so nothing here may raise a modal (docs/issues.md #10)
   QStringList argumentsList = QCoreApplication::arguments();
   if(argumentsList.size() > 1)
   {
     if (!hybridCustom(argumentsList)) {
-      loadScriptFromFile(argumentsList.at(1));
+      loadScriptFromFile(argumentsList.at(1), false);
     }
   } else if(m_pSettingsManager->getAutoLoadLastScript())
   {
     QString lastUsedPath = m_pSettingsManager->getLastUsedPath();
     if(!lastUsedPath.isEmpty())
-      loadScriptFromFile(lastUsedPath);
+      loadScriptFromFile(lastUsedPath, false);
   }
 }
 
@@ -994,26 +1052,48 @@ bool MainWindow::checkHybridScript()
   return correct;
 }
 
-void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const QString &optionString)
+// no-op without an outbound channel: the two IPC directions are independent endpoints
+void MainWindow::ipcSend(const QString& message)
 {
   if (m_ipcClient == nullptr) {
     return;
   }
+  // queued, never direct: the client is on another thread and may be blocked in connect
+  QMetaObject::invokeMethod(m_ipcClient, "send_MessageToServer", Qt::QueuedConnection,
+                            Q_ARG(QString, message));
+}
 
-  m_ipcClient->send_MessageToServer(QString("%1 => %2").arg(typ).arg(value));
+// "<on|off>#<left>#<right>#<top>#<bottom>"; callers check the field count first
+bool MainWindow::applyIpcCrop(const QStringList& fields)
+{
+  Q_ASSERT(fields.count() == CROP_SPEC_FIELDS);
+  return m_pPreviewDialog->ipcAdjustCrop(fields.at(0), fields.at(1).toInt(), fields.at(2).toInt(),
+                                         fields.at(3).toInt(), fields.at(4).toInt());
+}
+
+void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const QString &optionString)
+{
+  // dispatched with or without an outbound client - it used to refuse (docs/issues.md #2)
+  this->ipcSend(QString("%1 => %2").arg(typ).arg(value));
   if (typ == "changeTo") {
     int x = m_pPreviewDialog->getScrollX();
     int y = m_pPreviewDialog->getScrollY();
-    if (!QFile::exists(value)) {
-      m_ipcClient->send_MessageToServer(value + " doesn't exist!");
+    // the socket is unauthenticated, so do not open an arbitrary path
+    if (!value.endsWith(".vpy", Qt::CaseInsensitive)) {
+      this->ipcSend(value + " is not a .vpy script!");
       return;
     }
-    if(!loadScriptFromFile(value)) {
-      m_ipcClient->send_MessageToServer(value + " couldn't be loaded(1)!");
+    if (!QFile::exists(value)) {
+      this->ipcSend(value + " doesn't exist!");
+      return;
+    }
+    // silently: in Hybrid mode a modal behind the hidden window would block every further command
+    if(!loadScriptFromFile(value, false)) {
+      this->ipcSend(value + " couldn't be loaded(1)!");
       return;
     }
     if(!checkHybridScript()) {
-      m_ipcClient->send_MessageToServer(value + " couldn't be loaded(2)!");
+      this->ipcSend(value + " couldn't be loaded(2)!");
       if (m_hideMainWindow) {
         m_hideMainWindow = false;
         this->show();
@@ -1022,8 +1102,14 @@ void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const Q
     }
     slotPreview();
     if (!optionString.isEmpty() && x == 0 && y == 0) {
-      QStringList options = optionString.split("#");
-      m_pPreviewDialog->ipcAdjustCrop(options.at(0), options.at(1).toInt(), options.at(2).toInt(), options.at(3).toInt(), options.at(4).toInt());
+      // the script is loaded by now, so a bad crop is reported but does not fail the changeTo
+      const QStringList options = optionString.split("#");
+      if (options.count() != CROP_SPEC_FIELDS) {
+        this->ipcSend(QString("ignoring crop option \"%1\": expected %2").arg(optionString, CROP_SPEC_FORM));
+      }
+      else if (!applyIpcCrop(options)) {
+        this->ipcSend("ignoring crop option: no video output to apply it to!");
+      }
     }
     if (!m_hideMainWindow) {
       m_hideMainWindow = true;
@@ -1032,8 +1118,15 @@ void MainWindow::ipcCallMethod(const QString& typ, const QString& value, const Q
     return;
   }
   if (typ == "crop") {
-    QStringList options = value.split("#");
-    m_pPreviewDialog->ipcAdjustCrop(options.at(0), options.at(1).toInt(), options.at(2).toInt(), options.at(3).toInt(), options.at(4).toInt());
+    const QStringList options = value.split("#");
+    if (options.count() != CROP_SPEC_FIELDS) {
+      // at(1)..at(4) on a shorter list used to run straight off the end
+      this->ipcSend(QString("crop expects %1, got \"%2\"!").arg(CROP_SPEC_FORM, value));
+      return;
+    }
+    if (!applyIpcCrop(options)) {
+      this->ipcSend("crop needs a video output to apply to!");
+    }
     return;
   }
 }

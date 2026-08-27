@@ -15,6 +15,7 @@ class EncodeDialog;
 class TemplatesDialog;
 class JobServerWatcherSocket;
 class QTimer;
+class QThread;
 class LocalSocketIpcClient;
 class LocalSocketIpcServer;
 
@@ -95,7 +96,8 @@ private:
 
   bool saveScriptToFile(const QString& a_filePath);
 
-  bool loadScriptFromFile(const QString& a_filePath);
+  /// a_mayShowDialog must be false from the constructor or while the window is hidden (docs/issues.md #10)
+  bool loadScriptFromFile(const QString& a_filePath, bool a_mayShowDialog = true);
 
   bool safeToCloseFile();
 
@@ -112,6 +114,10 @@ private:
   void reloadTexts();
 
   bool hybridCustom(const QStringList& arguments);
+
+  void ipcSend(const QString& message);
+
+  bool applyIpcCrop(const QStringList& fields);
 
   bool checkHybridScript();
 
@@ -158,7 +164,9 @@ private:
 
   QTimer* m_pReloadTextTimer;
 
+  /// on m_ipcClientThread - reach it only through ipcSend()
   LocalSocketIpcClient* m_ipcClient;
+  QThread* m_ipcClientThread;
   LocalSocketIpcServer* m_ipcServer;
   bool m_hideMainWindow;
 };

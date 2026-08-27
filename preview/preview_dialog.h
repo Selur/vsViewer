@@ -62,7 +62,8 @@ class PreviewDialog : public VSScriptProcessorDialog
 
     bool busy() const { return VSScriptProcessorDialog::busy(m_outputIndex); }
 
-    void ipcAdjustCrop(const QString& cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom);
+    /// Returns false when there is nothing to crop - see the implementation.
+    bool ipcAdjustCrop(const QString& cropping, const int cropLeft, const int cropRight, const int cropTop, const int cropBottom);
     int getScrollX() const;
     int getScrollY() const;
 
@@ -233,6 +234,9 @@ class PreviewDialog : public VSScriptProcessorDialog
     void recalculateCropMods();
 
     void resetCropSpinBoxes();
+
+    /// Body of resetCropSpinBoxes() for callers already holding the m_changingCropValues guard
+    void resetCropSpinBoxesUnguarded();
 
     qlonglong frameToTimestamp(int a_frame);
     int timestampToFrame(qlonglong a_timestamp);
