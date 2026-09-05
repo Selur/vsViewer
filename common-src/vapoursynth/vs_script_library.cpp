@@ -331,7 +331,13 @@ bool VSScriptLibrary::initLibrary2()
       "print(vapoursynth.get_vsscript())\"");
     if (vssProc.waitForFinished(3000)) {
       QString ret = QString::fromLocal8Bit(vssProc.readAllStandardOutput()).trimmed();
-      if (ret.count('\n') == 0 && ret.endsWith(libraryName2, libraryName2CS ? Qt::CaseSensitive : Qt::CaseInsensitive)) {
+      // pip's vapoursynth wheel on Linux reports get_vsscript() as unversioned libvsscript.so, not
+      // libvsscript.so.4 - accept that too there, Windows/macOS keep their existing exact match.
+      if (ret.count('\n') == 0 && (ret.endsWith(libraryName2, libraryName2CS ? Qt::CaseSensitive : Qt::CaseInsensitive)
+#ifdef Q_OS_LINUX
+                                    || ret.endsWith(QStringLiteral("libvsscript.so"))
+#endif
+                                    )) {
 #ifdef Q_OS_WIN
         ret.chop(libraryName2Chop);
 #endif
