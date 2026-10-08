@@ -33,10 +33,13 @@ LocalSocketIpcClient::LocalSocketIpcClient(const QString& remoteServername, QObj
 
 LocalSocketIpcClient::~LocalSocketIpcClient()
 {
-  // bounded last flush: queued messages would otherwise be dropped by abort()
+  // best-effort last flush: queued messages would otherwise be dropped by abort()
   if (m_socket->state() == QLocalSocket::ConnectedState) {
     this->flushPending();
-    m_socket->waitForBytesWritten(1000);
+    // Destroying the socket cancels a pending overlapped write, so the last messages need
+    // this - but only when something really is outstanding: with the event loop already
+    // stopped waitForBytesWritten() cannot complete and burns its whole timeout, so keep it short.
+    if (m_socket->bytesToWrite() > 0) m_socket->waitForBytesWritten(1000);
   }
   m_socket->abort();
   delete m_socket;
