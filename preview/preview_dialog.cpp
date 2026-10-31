@@ -5,6 +5,7 @@
 #include "common-src/settings/settings_manager.h"
 #include "common-src/timeline_slider/timeline_slider.h"
 #include "common-src/vapoursynth/vapoursynth_script_processor.h"
+#include "display_capabilities.h"
 #include "preview_advanced_settings_dialog.h"
 #include "preview_dialog.h"
 #include "scroll_navigator.h"
@@ -35,8 +36,10 @@
 #include <QPoint>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QShowEvent>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QWindow>
 #include <algorithm>
 #include <cmath>
 
@@ -167,6 +170,9 @@ PreviewDialog::PreviewDialog(SettingsManager *a_pSettingsManager, VSScriptLibrar
   connect(m_ui.previewArea, SIGNAL(signalMouseMiddleButtonReleased()), this, SLOT(slotPreviewAreaMouseMiddleButtonReleased()));
   connect(m_ui.previewArea, SIGNAL(signalMouseRightButtonReleased()), this, SLOT(slotPreviewAreaMouseRightButtonReleased()));
   connect(m_ui.previewArea, SIGNAL(signalMouseOverPoint(double, double)), this, SLOT(slotPreviewAreaMouseOverPoint(double, double)));
+  connect(m_ui.previewArea, &PreviewArea::signalHighBitDepthStatus, this,
+          [this](bool a_isError, const QString &a_message) { emit signalWriteLogMessage(a_isError ? mtWarning : mtInformation, a_message); });
+  updateHighBitDepthOutput();
   connect(m_pPlayTimer, SIGNAL(timeout()), this, SLOT(slotProcessPlayQueue()));
   connect(this, SIGNAL(signalProcessorIdle(bool)), this, SLOT(slotEnableSwitchOutputIndex(bool)));
 
@@ -368,6 +374,7 @@ void PreviewDialog::stopAndCleanUp()
   }
   m_frameShown = -1;
   m_framePixmap = QPixmap();
+  m_frameImage10Bit = QImage();
   // Replace shown image with a blank one of the same dimension:
   // -helps to keep the scrolling position when refreshing the script;
   // -leaves the image blank on sudden error;
@@ -426,9 +433,51 @@ void PreviewDialog::changeEvent(QEvent *a_pEvent)
     else
       m_pSettingsManager->setPreviewDialogMaximized(false);
   }
+  // coming back from the Windows display settings is the moment HDR may have been switched
+  else if (a_pEvent->type() == QEvent::ActivationChange && isActiveWindow()) {
+    if (updateHighBitDepthOutput() && !m_playing) requestShowFrame(m_frameExpected);
+  }
 }
 
 // END OF void PreviewDialog::changeEvent(QEvent * a_pEvent)
+//==============================================================================
+
+void PreviewDialog::showEvent(QShowEvent *a_pEvent)
+{
+  QDialog::showEvent(a_pEvent);
+  if (!m_screenChangeConnected && windowHandle()) {
+    connect(windowHandle(), &QWindow::screenChanged, this, [this]() {
+      if (updateHighBitDepthOutput() && !m_playing) requestShowFrame(m_frameExpected);
+    });
+    m_screenChangeConnected = true;
+  }
+  if (updateHighBitDepthOutput() && !m_playing) requestShowFrame(m_frameExpected);
+}
+
+// END OF void PreviewDialog::showEvent(QShowEvent * a_pEvent)
+//==============================================================================
+
+bool PreviewDialog::updateHighBitDepthOutput()
+{
+  HighBitDepthOutputMode mode = m_pSettingsManager->getHighBitDepthOutputMode();
+  bool enabled = (mode == HighBitDepthOutputMode::ON);
+  QString reason;
+  if (mode == HighBitDepthOutputMode::AUTO) {
+    DisplayCapabilities display = displayCapabilities(windowHandle());
+    enabled = display.known && display.hdrActive && (display.bitsPerColor >= 10);
+    reason = display.known ? tr(" (auto: HDR %1, %2 bit per color)").arg(display.hdrActive ? tr("on") : tr("off")).arg(display.bitsPerColor)
+                           : tr(" (auto: display not detected)");
+  }
+  if (enabled == m_highBitDepthOutputActive) return false;
+
+  m_highBitDepthOutputActive = enabled;
+  m_ui.previewArea->setHighBitDepthOutput(enabled);
+  m_pVapourSynthScriptProcessor->setHighBitDepthOutput(enabled);
+  emit signalWriteLogMessage(mtInformation, tr("10 bit preview output %1%2.").arg(enabled ? tr("on") : tr("off"), reason));
+  return true;
+}
+
+// END OF bool PreviewDialog::updateHighBitDepthOutput()
 //==============================================================================
 
 void PreviewDialog::closeEvent(QCloseEvent *a_pEvent)
@@ -1382,6 +1431,7 @@ void PreviewDialog::slotFrameToClipboard()
 void PreviewDialog::slotAdvancedSettingsChanged()
 {
   m_pVapourSynthScriptProcessor->slotResetSettings();
+  updateHighBitDepthOutput();
   if (!m_playing) requestShowFrame(m_frameExpected);
 }
 
@@ -2504,22 +2554,23 @@ void PreviewDialog::setPreviewPixmap()
     int cropWidth = m_ui.cropWidthSpinBox->value();
     int cropHeight = m_ui.cropHeightSpinBox->value();
     QPixmap croppedPixmap = m_framePixmap.copy(cropLeft, cropTop, cropWidth, cropHeight);
+    QRect cropRect(cropLeft, cropTop, cropWidth, cropHeight);
     int ratio = m_ui.cropZoomRatioSpinBox->value();
 
     if (abs(ratio * m_devicePixelRatio - 1) < 1e-7) {
-      m_ui.previewArea->setPixmap(croppedPixmap);
+      m_ui.previewArea->setPixmap(croppedPixmap, false, highBitDepthImage(cropRect, QSize(), Qt::FastTransformation));
       return;
     }
 
     QPixmap zoomedPixmap
       = croppedPixmap.scaled(croppedPixmap.width() * ratio, croppedPixmap.height() * ratio, Qt::KeepAspectRatio, Qt::FastTransformation);
-    m_ui.previewArea->setPixmap(zoomedPixmap);
+    m_ui.previewArea->setPixmap(zoomedPixmap, false, highBitDepthImage(cropRect, zoomedPixmap.size(), Qt::FastTransformation));
     return;
   }
 
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
   if (zoomMode == ZoomMode::NoZoom) {
-    m_ui.previewArea->setPixmap(m_framePixmap, true);
+    m_ui.previewArea->setPixmap(m_framePixmap, true, highBitDepthImage(QRect(), QSize(), Qt::FastTransformation));
     return;
   }
 
@@ -2543,10 +2594,23 @@ void PreviewDialog::setPreviewPixmap()
 
   previewPixmap = m_framePixmap.scaled(frameWidth, frameHeight, Qt::KeepAspectRatio, scaleMode);
 
-  m_ui.previewArea->setPixmap(previewPixmap, true);
+  m_ui.previewArea->setPixmap(previewPixmap, true, highBitDepthImage(QRect(), previewPixmap.size(), scaleMode));
 }
 
 // END OF bool void PreviewDialog::setPreviewPixmap()
+//==============================================================================
+
+QImage PreviewDialog::highBitDepthImage(const QRect &a_crop, const QSize &a_size, Qt::TransformationMode a_mode) const
+{
+  if (m_frameImage10Bit.isNull() || !m_ui.previewArea->highBitDepthOutput()) return QImage();
+  QImage image = a_crop.isNull() ? m_frameImage10Bit : m_frameImage10Bit.copy(a_crop);
+  if (a_size.isEmpty() || a_size == image.size()) return image;
+  // scaled as 16 bit per channel so the result keeps all 10 bit
+  return image.convertToFormat(QImage::Format_RGBX64).scaled(a_size, Qt::IgnoreAspectRatio, a_mode).convertToFormat(QImage::Format_RGB30);
+}
+
+// END OF QImage PreviewDialog::highBitDepthImage(const QRect & a_crop,
+//		const QSize & a_size, Qt::TransformationMode a_mode) const
 //==============================================================================
 
 void PreviewDialog::recalculateCropMods()
@@ -2641,7 +2705,9 @@ void PreviewDialog::setCurrentFrame(const VSFrame *a_cpOutputFrame, const VSFram
     m_cpVSAPI->freeFrame(m_cpPreviewFrame);
     m_cpPreviewFrame = nullptr;
   }
-  m_framePixmap = pixmapFromRGB(a_cpPreviewFrame);
+  QImage frameImage = imageFromRGB(a_cpPreviewFrame);
+  m_frameImage10Bit = (frameImage.format() == QImage::Format_RGB30) ? frameImage : QImage();
+  m_framePixmap = frameImage.isNull() ? QPixmap() : QPixmap::fromImage(frameImage, Qt::NoFormatConversion);
   m_cpPreviewFrame = a_cpPreviewFrame;
   setPreviewPixmap();
   QPointF pixelPos = m_ui.previewArea->pixelPosition();
@@ -2766,9 +2832,9 @@ void PreviewDialog::previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[])
 //		int a_ret[])
 //==============================================================================
 
-QPixmap PreviewDialog::pixmapFromRGB(const VSFrame *a_cpFrame)
+QImage PreviewDialog::imageFromRGB(const VSFrame *a_cpFrame)
 {
-  if ((!m_cpVSAPI) || (!a_cpFrame)) return QPixmap();
+  if ((!m_cpVSAPI) || (!a_cpFrame)) return QImage();
 
   const VSVideoFormat *cpFormat = m_cpVSAPI->getVideoFrameFormat(a_cpFrame);
   Q_ASSERT(cpFormat);
@@ -2779,7 +2845,7 @@ QPixmap PreviewDialog::pixmapFromRGB(const VSFrame *a_cpFrame)
       "Error forming pixmap from frame. "
       "Expected format Gray8 with width divisible by 4. ");
     emit signalWriteLogMessage(mtCritical, errorString);
-    return QPixmap();
+    return QImage();
   }
 
   const VSMap *props = m_cpVSAPI->getFramePropertiesRO(a_cpFrame);
@@ -2794,7 +2860,7 @@ QPixmap PreviewDialog::pixmapFromRGB(const VSFrame *a_cpFrame)
       "Error forming pixmap from frame. "
       "Expected frame being packed from RGB24 or RGB30.");
     emit signalWriteLogMessage(mtCritical, errorString);
-    return QPixmap();
+    return QImage();
   }
 
   int width = wwidth / 4;
@@ -2804,11 +2870,11 @@ QPixmap PreviewDialog::pixmapFromRGB(const VSFrame *a_cpFrame)
   const uint8_t *pData = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
   QImage frameImage(reinterpret_cast<const uchar *>(pData), width, height, stride,
                     is_10_bits ? QImage::Format_RGB30 : QImage::Format_ARGB32);
-  QPixmap framePixmap = QPixmap::fromImage(frameImage, Qt::NoFormatConversion);
-  return framePixmap;
+  // deep copy: the frame memory goes back to VapourSynth when the next frame arrives
+  return frameImage.copy();
 }
 
-// END OF QPixmap PreviewDialog::pixmapFromRGB(
+// END OF QImage PreviewDialog::imageFromRGB(
 //		const VSFrame * a_cpFrame)
 //==============================================================================
 

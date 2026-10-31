@@ -309,6 +309,15 @@ SOURCES +=  \
   vapoursynth/vs_plugin_data.cpp \
   vapoursynth/vs_script_processor_dialog.cpp
 
+# 10 bit preview output through a Direct3D 11 scRGB swapchain
+HEADERS += preview/display_capabilities.h
+SOURCES += preview/display_capabilities.cpp
+win32 {
+  QT += gui-private
+  LIBS += -ldxgi
+  HEADERS += preview/high_bit_depth_frame_window.h
+  SOURCES += preview/high_bit_depth_frame_window.cpp
+}
 
 
 # libp2p

@@ -21,6 +21,7 @@
 class QEvent;
 class QMoveEvent;
 class QResizeEvent;
+class QShowEvent;
 class QKeyEvent;
 class QMenu;
 class QActionGroup;
@@ -215,6 +216,11 @@ class PreviewDialog : public VSScriptProcessorDialog
 
     void changeEvent(QEvent* a_pEvent) override;
 
+    void showEvent(QShowEvent* a_pEvent) override;
+
+    // applies the 10 bit setting (Auto checks the monitor); true when the output changed
+    bool updateHighBitDepthOutput();
+
     void closeEvent(QCloseEvent* a_pEvent) override;
 
     void keyPressEvent(QKeyEvent* a_pEvent) override;
@@ -251,7 +257,9 @@ class PreviewDialog : public VSScriptProcessorDialog
 
     void previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[]);
 
-    QPixmap pixmapFromRGB(const VSFrame* a_cpFrame);
+    QImage imageFromRGB(const VSFrame* a_cpFrame);
+
+    QImage highBitDepthImage(const QRect& a_crop, const QSize& a_size, Qt::TransformationMode a_mode) const;
 
     void setTitle();
 
@@ -288,6 +296,9 @@ class PreviewDialog : public VSScriptProcessorDialog
     const VSFrame* m_cpFrame;
     const VSFrame* m_cpPreviewFrame;
     QPixmap m_framePixmap;
+    QImage m_frameImage10Bit;
+    bool m_highBitDepthOutputActive = false;
+    bool m_screenChangeConnected = false;
 
     bool m_changingCropValues;
 

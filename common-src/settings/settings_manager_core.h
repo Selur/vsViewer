@@ -59,6 +59,10 @@ class SettingsManagerCore : public QObject
 
     bool setDitherType(DitherType a_dither);
 
+    HighBitDepthOutputMode getHighBitDepthOutputMode() const;
+
+    bool setHighBitDepthOutputMode(HighBitDepthOutputMode a_mode);
+
     std::vector<EncodingPreset> getAllEncodingPresets() const;
 
     EncodingPreset getEncodingPreset(const QString & a_name) const;

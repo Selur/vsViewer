@@ -426,6 +426,24 @@ void VapourSynthScriptProcessor::slotResetSettings()
 // END OF void VapourSynthScriptProcessor::slotResetSettings()
 //==============================================================================
 
+void VapourSynthScriptProcessor::setHighBitDepthOutput(bool a_enabled)
+{
+  if(m_highBitDepthOutput == a_enabled)
+    return;
+  m_highBitDepthOutput = a_enabled;
+
+  for(std::pair<const int, NodePair> & mapItem : m_nodePairForOutputIndex)
+  {
+    NodePair & nodePair = mapItem.second;
+    if(nodePair.pPreviewNode)
+      recreatePreviewNode(nodePair);
+  }
+}
+
+// END OF void VapourSynthScriptProcessor::setHighBitDepthOutput(
+//		bool a_enabled)
+//==============================================================================
+
 void VapourSynthScriptProcessor::receiveFrame(
   const VSFrame * a_cpFrame, int a_frameNumber,
   VSNode * a_pNode, const QString & a_errorMessage)
@@ -624,7 +642,8 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
     return false;
   const VSVideoFormat * cpFormat = &cpVideoInfo->format;
 
-  bool to_10_bit = (QColormap::instance().depth() == 30);
+  bool to_10_bit = m_highBitDepthOutput ||
+    (QColormap::instance().depth() == 30);
 
   VSMap * pResultMap = nullptr;
 

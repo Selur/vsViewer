@@ -7,6 +7,7 @@
 
 class QLabel;
 class ScrollNavigator;
+class HighBitDepthFrameWindow;
 class QKeyEvent;
 class QWheelEvent;
 class QMouseEvent;
@@ -27,7 +28,10 @@ class PreviewArea : public QScrollArea
 
     int pixmapHeight() const { return m_pixmapHeight; }
 
-    void setPixmap(const QPixmap& a_pixmap, bool a_isVideoFrame = false);
+    // a_highBitDepthImage: the same picture as RGB30 for the 10 bit view; empty falls back to the pixmap
+    void setPixmap(const QPixmap& a_pixmap, bool a_isVideoFrame = false, const QImage& a_highBitDepthImage = QImage());
+
+    bool highBitDepthOutput() const { return m_pHighBitDepthWindow != nullptr; }
 
     void checkMouseOverPreview(const QPointF& a_pixelPos);
 
@@ -36,6 +40,8 @@ class PreviewArea : public QScrollArea
     QPoint getScrollBarPositions() const;
 
     void getScrollBarPositionsFromPreviewer(const QPoint& pos);
+
+    void setHighBitDepthOutput(bool a_enabled);
 
   public slots:
 
@@ -61,9 +67,14 @@ class PreviewArea : public QScrollArea
     void signalMouseMiddleButtonReleased();
     void signalMouseRightButtonReleased();
     void signalMouseOverPoint(double a_normX, double a_normY);
+    void signalHighBitDepthStatus(bool a_isError, const QString& a_message);
+
+  protected:
+    bool eventFilter(QObject* a_pObject, QEvent* a_pEvent) override;
 
   private:
     void drawScrollNavigator();
+    void updateHighBitDepthView();
 
     QLabel* m_pPreviewLabel;
 
@@ -79,6 +90,9 @@ class PreviewArea : public QScrollArea
 
     bool m_newToPreviewer;
     QPoint m_lastScrollBarPos;
+
+    HighBitDepthFrameWindow* m_pHighBitDepthWindow = nullptr;
+    QWidget* m_pHighBitDepthContainer = nullptr;
 };
 
 #endif  // PREVIEWAREA_H

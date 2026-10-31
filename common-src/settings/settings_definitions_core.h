@@ -43,6 +43,13 @@ enum class DitherType: int
   ERROR_DIFFUSION,
 };
 
+enum class HighBitDepthOutputMode : int
+{
+  AUTO,
+  ON,
+  OFF,
+};
+
 enum class EncodingType
 {
   CLI,
@@ -161,6 +168,7 @@ extern const double DEFAULT_BICUBIC_FILTER_PARAMETER_B;
 extern const double DEFAULT_BICUBIC_FILTER_PARAMETER_C;
 extern const int DEFAULT_LANCZOS_FILTER_TAPS;
 extern const DitherType DEFAULT_DITHER_TYPE;
+extern const HighBitDepthOutputMode DEFAULT_HIGH_BIT_DEPTH_OUTPUT_MODE;
 extern const EncodingType DEFAULT_ENCODING_TYPE;
 extern const EncodingHeaderType DEFAULT_ENCODING_HEADER_TYPE;
 extern const JobType DEFAULT_JOB_TYPE;

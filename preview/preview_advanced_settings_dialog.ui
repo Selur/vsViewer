@@ -135,7 +135,21 @@
    <item row="10" column="1">
     <widget class="QComboBox" name="syncOutputComboBox"/>
    </item>
-   <item row="11" column="0" colspan="2">
+   <item row="11" column="0">
+    <widget class="QLabel" name="label_highBitDepth">
+     <property name="text">
+      <string>10 bit preview output:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="11" column="1">
+    <widget class="QComboBox" name="highBitDepthOutputComboBox">
+     <property name="toolTip">
+      <string>Convert the preview to 10 bit RGB and show it through a 16 bit float (scRGB) Direct3D swapchain. Auto: only on a monitor with Windows HDR on and at least 10 bit per color.</string>
+     </property>
+    </widget>
+   </item>
+   <item row="12" column="0" colspan="2">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QPushButton" name="okButton">

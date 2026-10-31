@@ -55,6 +55,9 @@ class VapourSynthScriptProcessor : public QObject
 
     bool clearCoreCaches();
 
+    // preview nodes pack RGB30 instead of RGB24; the preview decides, the processor only converts
+    void setHighBitDepthOutput(bool a_enabled);
+
   public slots:
 
     void slotResetSettings();
@@ -128,6 +131,7 @@ class VapourSynthScriptProcessor : public QObject
     double m_resamplingFilterParameterB;
     YuvMatrixCoefficients m_yuvMatrix;
     DitherType m_ditherType;
+    bool m_highBitDepthOutput = false;
 
     bool m_finalizing;
 };

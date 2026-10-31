@@ -57,6 +57,10 @@ PreviewAdvancedSettingsDialog::PreviewAdvancedSettingsDialog(
   m_ui.ditherTypeComboBox->addItem("Ordered", (int)DitherType::ORDERED);
   m_ui.ditherTypeComboBox->addItem("Random", (int)DitherType::RANDOM);
 
+  m_ui.highBitDepthOutputComboBox->addItem(tr("Auto"), (int)HighBitDepthOutputMode::AUTO);
+  m_ui.highBitDepthOutputComboBox->addItem(tr("On"), (int)HighBitDepthOutputMode::ON);
+  m_ui.highBitDepthOutputComboBox->addItem(tr("Off"), (int)HighBitDepthOutputMode::OFF);
+
   m_ui.syncOutputComboBox->addItem("Frame", (int)SyncOutputNodesMode::Frame);
   m_ui.syncOutputComboBox->addItem("Timestamp",
                                    (int)SyncOutputNodesMode::Time);
@@ -127,6 +131,11 @@ void PreviewAdvancedSettingsDialog::slotCall()
   if(comboIndex != -1)
     m_ui.syncOutputComboBox->setCurrentIndex(comboIndex);
 
+  comboIndex = m_ui.highBitDepthOutputComboBox->findData(
+    (int)m_pSettingsManager->getHighBitDepthOutputMode());
+  if(comboIndex != -1)
+    m_ui.highBitDepthOutputComboBox->setCurrentIndex(comboIndex);
+
   show();
 }
 
@@ -164,6 +173,8 @@ void PreviewAdvancedSettingsDialog::slotApply()
     m_ui.saveSnapshotTemplateLineEdit->text());
   m_pSettingsManager->setSyncOutputMode((SyncOutputNodesMode)
                                         m_ui.syncOutputComboBox->currentData().toInt());
+  m_pSettingsManager->setHighBitDepthOutputMode((HighBitDepthOutputMode)
+                                                m_ui.highBitDepthOutputComboBox->currentData().toInt());
 
   emit signalSettingsChanged();
 }
@@ -208,6 +219,11 @@ void PreviewAdvancedSettingsDialog::slotResetToDefault()
   m_ui.silentSnapshotCheckBox->setChecked(DEFAULT_SILENT_SNAPSHOT);
   m_ui.saveSnapshotTemplateLineEdit->setText(DEFAULT_SNAPSHOT_TEMPLATE);
   m_ui.saveSnapshotTemplateLineEdit->setEnabled(false);
+
+  comboIndex = m_ui.highBitDepthOutputComboBox->findData(
+    (int)DEFAULT_HIGH_BIT_DEPTH_OUTPUT_MODE);
+  if(comboIndex != -1)
+    m_ui.highBitDepthOutputComboBox->setCurrentIndex(comboIndex);
 }
 
 // END OF void PreviewAdvancedSettingsDialog::slotResetToDefault()

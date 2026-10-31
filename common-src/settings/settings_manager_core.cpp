@@ -23,6 +23,7 @@ const char BICUBIC_FILTER_PARAMETER_B_KEY[] = "bicubic_filter_parameter_b";
 const char BICUBIC_FILTER_PARAMETER_C_KEY[] = "bicubic_filter_parameter_c";
 const char LANCZOS_FILTER_TAPS_KEY[] = "lanczos_filter_taps";
 const char DITHER_TYPE_KEY[] = "dither_type";
+const char HIGH_BIT_DEPTH_OUTPUT_MODE_KEY[] = "high_bit_depth_output_mode";
 const char RECENT_JOB_SERVERS_KEY[] = "recent_job_servers";
 const char TRUSTED_CLIENTS_ADDRESSES_KEY[] = "trusted_clients_addresses";
 
@@ -315,6 +316,17 @@ DitherType SettingsManagerCore::getDitherType() const
 bool SettingsManagerCore::setDitherType(DitherType a_dither)
 {
   return setValue(DITHER_TYPE_KEY, (int)a_dither);
+}
+
+HighBitDepthOutputMode SettingsManagerCore::getHighBitDepthOutputMode() const
+{
+  return (HighBitDepthOutputMode)value(HIGH_BIT_DEPTH_OUTPUT_MODE_KEY,
+                                       (int)DEFAULT_HIGH_BIT_DEPTH_OUTPUT_MODE).toInt();
+}
+
+bool SettingsManagerCore::setHighBitDepthOutputMode(HighBitDepthOutputMode a_mode)
+{
+  return setValue(HIGH_BIT_DEPTH_OUTPUT_MODE_KEY, (int)a_mode);
 }
 
 //==============================================================================

@@ -1,6 +1,9 @@
 #include "preview_area.h"
 
 #include "scroll_navigator.h"
+#ifdef Q_OS_WIN
+#include "high_bit_depth_frame_window.h"
+#endif
 
 #include <QCoreApplication>
 #include <QEnterEvent>
@@ -32,6 +35,9 @@ PreviewArea::PreviewArea(QWidget *a_pParent)
   setAttribute(Qt::WA_Hover, true);
   setMouseTracking(true);
   m_pPreviewLabel->setMouseTracking(true);
+
+  m_pPreviewLabel->installEventFilter(this);
+  viewport()->installEventFilter(this);
 }
 
 // END OF PreviewArea::PreviewArea(QWidget * a_pParent)
@@ -42,11 +48,17 @@ PreviewArea::~PreviewArea() {}
 // END OF PreviewArea::~PreviewArea()
 //==============================================================================
 
-void PreviewArea::setPixmap(const QPixmap &a_pixmap, bool a_isVideoFrame)
+void PreviewArea::setPixmap(const QPixmap &a_pixmap, bool a_isVideoFrame, const QImage &a_highBitDepthImage)
 {
   m_pPreviewLabel->setPixmap(a_pixmap);
   m_pixmapWidth = a_pixmap.width();
   m_pixmapHeight = a_pixmap.height();
+#ifdef Q_OS_WIN
+  if (m_pHighBitDepthWindow) {
+    m_pHighBitDepthWindow->setFrame(a_highBitDepthImage.isNull() ? a_pixmap.toImage() : a_highBitDepthImage);
+    updateHighBitDepthView();
+  }
+#endif
   if (a_isVideoFrame && m_newToPreviewer) {
     m_newToPreviewer = false;
     QCoreApplication::processEvents();
@@ -255,4 +267,52 @@ void PreviewArea::getScrollBarPositionsFromPreviewer(const QPoint &pos)
 {
   m_newToPreviewer = true;
   m_lastScrollBarPos = pos;
+}
+
+void PreviewArea::setHighBitDepthOutput(bool a_enabled)
+{
+#ifdef Q_OS_WIN
+  if (a_enabled == (m_pHighBitDepthWindow != nullptr)) return;
+
+  if (!a_enabled) {
+    delete m_pHighBitDepthContainer;
+    m_pHighBitDepthContainer = nullptr;
+    m_pHighBitDepthWindow = nullptr;
+    return;
+  }
+
+  m_pHighBitDepthWindow = new HighBitDepthFrameWindow();
+  connect(m_pHighBitDepthWindow, &HighBitDepthFrameWindow::signalStatus, this, &PreviewArea::signalHighBitDepthStatus);
+  // the container takes ownership of the window; mouse input falls through to the viewport
+  m_pHighBitDepthContainer = QWidget::createWindowContainer(m_pHighBitDepthWindow, viewport());
+  m_pHighBitDepthContainer->setAttribute(Qt::WA_TransparentForMouseEvents);
+  m_pHighBitDepthContainer->setFocusPolicy(Qt::NoFocus);
+  m_pHighBitDepthContainer->show();
+  m_pScrollNavigator->setAttribute(Qt::WA_NativeWindow);
+  m_pScrollNavigator->raise();
+
+  QPixmap currentPixmap = m_pPreviewLabel->pixmap();
+  if (!currentPixmap.isNull()) m_pHighBitDepthWindow->setFrame(currentPixmap.toImage());
+  updateHighBitDepthView();
+#else
+  Q_UNUSED(a_enabled);
+#endif
+}
+
+bool PreviewArea::eventFilter(QObject *a_pObject, QEvent *a_pEvent)
+{
+  if ((a_pObject == m_pPreviewLabel || a_pObject == viewport()) && (a_pEvent->type() == QEvent::Move || a_pEvent->type() == QEvent::Resize))
+    updateHighBitDepthView();
+  return QScrollArea::eventFilter(a_pObject, a_pEvent);
+}
+
+void PreviewArea::updateHighBitDepthView()
+{
+#ifdef Q_OS_WIN
+  if (!m_pHighBitDepthWindow) return;
+  m_pHighBitDepthContainer->setGeometry(viewport()->rect());
+  double ratio = devicePixelRatioF();
+  m_pHighBitDepthWindow->setFrameOffset(QPoint(qRound(m_pPreviewLabel->x() * ratio), qRound(m_pPreviewLabel->y() * ratio)));
+  m_pHighBitDepthWindow->setBackground(viewport()->palette().color(viewport()->backgroundRole()));
+#endif
 }
