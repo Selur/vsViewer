@@ -10,10 +10,8 @@
 #include <QIcon>
 #include <QPixmap>
 #include <QTextEdit>
-#ifdef Q_OS_WIN  // AUDIO
 #include <QAudioSink>
 #include <QIODevice>
-#endif
 #include <chrono>
 #include <map>
 #include <vector>
@@ -39,7 +37,6 @@ class PreviewDialog : public VSScriptProcessorDialog
 {
     Q_OBJECT
 
-#ifdef Q_OS_WIN  // AUDIO
     struct AudioFrame {
         int number;
         int outputIndex;
@@ -50,7 +47,6 @@ class PreviewDialog : public VSScriptProcessorDialog
         bool valid() const { return !!data.size(); }
         bool operator==(const AudioFrame& a_other) const;
     };
-#endif
 
   public:
     PreviewDialog(SettingsManager* a_pSettingsManager, VSScriptLibrary* a_pVSScriptLibrary, bool a_inPreviewer = false,
@@ -151,9 +147,9 @@ class PreviewDialog : public VSScriptProcessorDialog
     void slotPlay(bool a_play);
 
     void slotProcessPlayQueue();
-#ifdef Q_OS_WIN  // AUDIO
     void slotProcessAudioPlayQueue();
-#endif
+    void slotToggleAudioWithVideo(bool a_on);
+    void slotFeedAudioWithVideo();
 
     void slotLoadChapters();
     void slotClearBookmarks();
@@ -271,13 +267,18 @@ class PreviewDialog : public VSScriptProcessorDialog
     QPoint loadLastScrollBarPositions() const;
     void saveLastScrollBarPositions();
 
-#ifdef Q_OS_WIN  // AUDIO
     void setAudioOutput();
+    bool openAudioSink(const VSAudioInfo* a_pAudioInfo, int a_outputIndex);
     void stopAudioOutput();
     void playAudioFrame();
 
-    QByteArray readAudioFrame(const VSFrame* a_cpFrame);
-#endif
+    QByteArray readAudioFrame(const VSFrame* a_cpFrame, const VSAudioInfo* a_pAudioInfo) const;
+
+    void findAudioWithVideo();
+    bool startAudioWithVideo(int a_firstFrame);
+    void stopAudioWithVideo();
+    double audioWithVideoClock() const;
+    void dropStaleFramesForAudioWithVideo(int a_nextFrame, int a_numFrames);
 
     Ui::PreviewDialog m_ui;
 
@@ -392,14 +393,26 @@ class PreviewDialog : public VSScriptProcessorDialog
 
     QMetaObject::Connection m_outputIndexComboBoxConnection;
 
-#ifdef Q_OS_WIN  // AUDIO
     bool m_currentIsAudio;
     QAudioSink* m_pAudioSink = nullptr;
     QIODevice* m_pAudioIODevice = nullptr;
     std::map<int, AudioFrame> m_audioCache;
     QTimer* m_pAudioPlayTimer = nullptr;
     double m_audioVolume = 1.0;
-#endif
+
+    // the first audio output of the script, played along with a video output while the Audio button is on
+    int m_audioWithVideoIndex = -1;
+    VSAudioInfo m_audioWithVideoFormat = {};
+    bool m_audioWithVideo = true;
+    bool m_audioWithVideoActive = false;
+    std::map<int, QByteArray> m_audioWithVideoCache;
+    QByteArray m_audioWithVideoPending;  // the part of a frame the sink had no room for yet
+    int m_audioWithVideoNextRequest = 0;
+    int m_audioWithVideoNextWrite = 0;
+    int m_audioWithVideoInFlight = 0;
+    int m_audioWithVideoSkipBytes = 0;  // samples of the first audio frame before the first video frame
+    int m_audioWithVideoStartFrame = 0;  // the video frame the audio clock starts at
+    QTimer* m_pAudioWithVideoTimer = nullptr;
 };
 
 class FramePropsPanel : public QTextEdit

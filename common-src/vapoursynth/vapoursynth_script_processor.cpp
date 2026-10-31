@@ -138,20 +138,11 @@ bool VapourSynthScriptProcessor::initialize(const QString& a_script,
 
   m_nodeInfo = VSNodeInfo(pOutputNode, m_cpVSAPI);
 
-#ifdef Q_OS_WIN // AUDIO
   if(a_reason == ProcessReason::Encode && m_nodeInfo.isAudio())
-#else
-  if((a_reason == ProcessReason::Preview
-       || a_reason == ProcessReason::Encode) && m_nodeInfo.isAudio())
-#endif
   {
     m_cpVSAPI->freeNode(pOutputNode);
     m_error = tr("Output node #%1 is audio. "
-#ifdef Q_OS_WIN // AUDIO
                 "Encoding audio are not supported.")
-#else
-                "Previewing and encoding audio are not supported.")
-#endif
                 .arg(a_outputIndex);
     emit signalWriteLogMessage(
       a_outputIndex == 0 ? mtCritical : mtWarning, m_error);
@@ -627,13 +618,7 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
   int outputMediaType = m_cpVSAPI->getNodeType(a_nodePair.pOutputNode);
   if(outputMediaType == mtAudio)
   {
-#ifdef Q_OS_WIN // AUDIO
     return recreateAudioPreviewNode(a_nodePair);
-#else
-    m_error = tr("Audio playback is supported on Windows only.");
-    emit signalWriteLogMessage(mtCritical, m_error);
-    return false;
-#endif
   }
 
   const VSVideoInfo * cpVideoInfo =

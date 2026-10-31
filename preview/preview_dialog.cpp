@@ -43,7 +43,6 @@
 #include <algorithm>
 #include <cmath>
 
-#ifdef Q_OS_WIN  // AUDIO
 #include <QMediaDevices>
 #include <random>
 
@@ -78,7 +77,6 @@ bool PreviewDialog::AudioFrame::operator==(const AudioFrame &a_other) const
 {
   return ((number == a_other.number) && (outputIndex == a_other.outputIndex));
 }
-#endif
 
 //==============================================================================
 
@@ -176,15 +174,20 @@ PreviewDialog::PreviewDialog(SettingsManager *a_pSettingsManager, VSScriptLibrar
   connect(m_pPlayTimer, SIGNAL(timeout()), this, SLOT(slotProcessPlayQueue()));
   connect(this, SIGNAL(signalProcessorIdle(bool)), this, SLOT(slotEnableSwitchOutputIndex(bool)));
 
-#ifdef Q_OS_WIN  // AUDIO
+#ifdef Q_OS_WIN
   qputenv("QT_MEDIA_BACKEND", QString("windows").toLocal8Bit());
+#endif
 
   m_pAudioPlayTimer = new QTimer(this);
   m_pAudioPlayTimer->setTimerType(Qt::PreciseTimer);
   m_pAudioPlayTimer->setSingleShot(true);
 
   connect(m_pAudioPlayTimer, &QTimer::timeout, this, &PreviewDialog::slotProcessAudioPlayQueue);
-#endif
+
+  m_pAudioWithVideoTimer = new QTimer(this);
+  m_pAudioWithVideoTimer->setTimerType(Qt::PreciseTimer);
+  m_pAudioWithVideoTimer->setInterval(10);
+  connect(m_pAudioWithVideoTimer, &QTimer::timeout, this, &PreviewDialog::slotFeedAudioWithVideo);
 
   slotSettingsChanged();
 
@@ -232,13 +235,23 @@ void PreviewDialog::previewScript(const QString &a_script, const QString &a_scri
   QString previousScriptName = scriptName();
   m_scriptTextChanged = false;
 
+  // a reload keeps the output the user picked; stopAndCleanUp() resets it to 0
+  const int outputIndex = m_outputIndex;
   if (!m_inPreviewer) stopAndCleanUp();
+  m_outputIndex = outputIndex;
 
   bool initialized = initialize(a_script, a_scriptName, ProcessReason::Preview);
+  // a reloaded script without the selected output falls back to output 0
+  if (!initialized && m_outputIndex != 0) {
+    m_outputIndex = 0;
+    initialized = initialize(a_script, a_scriptName, ProcessReason::Preview);
+  }
   if (!initialized) return;
 
   m_outputIndices = m_pVapourSynthScriptProcessor->getOutputIndices();
   if (m_outputIndices.size() > 0) {
+    // refilling the list would otherwise switch to its first entry through the previous script's connection
+    m_ui.outputIndexComboBox->disconnect(m_outputIndexComboBoxConnection);
     m_ui.outputIndexComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_ui.outputIndexComboBox->clear();
     for (auto i : m_outputIndices) m_ui.outputIndexComboBox->addItem(QString::number(i));
@@ -254,8 +267,17 @@ void PreviewDialog::previewScript(const QString &a_script, const QString &a_scri
   int lastFrameNumber;
 
   auto mt = m_nodeInfo[m_outputIndex].mediaType();
-#ifdef Q_OS_WIN  // AUDIO
   if (mt == mtVideo) {
+    // a reload that fell back from an audio output gives the picture controls back
+    if (m_currentIsAudio) {
+      stopAudioOutput();
+      m_ui.cropCheckButton->setEnabled(true);
+      m_pActionToggleCropPanel->setEnabled(true);
+      m_ui.saveSnapshotButton->setEnabled(true);
+      m_pActionSaveSnapshot->setEnabled(true);
+      m_ui.playFpsLimitSpinBox->setEnabled(true);
+      m_ui.playFpsLimitModeComboBox->setEnabled(true);
+    }
     m_currentIsAudio = false;
     const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
     if (!vi) return;
@@ -294,18 +316,6 @@ void PreviewDialog::previewScript(const QString &a_script, const QString &a_scri
 
     setAudioOutput();
   }
-#else
-  const VSVideoInfo *vi = m_nodeInfo[m_outputIndex].getAsVideo();
-  if (!vi) return;
-
-  lastFrameNumber = vi->numFrames - 1;
-  m_ui.frameNumberSpinBox->setMaximum(lastFrameNumber);
-  m_ui.frameNumberSlider->setFramesNumber(vi->numFrames, false);
-  auto fpsPair = m_nodeInfo[m_outputIndex].fpsPair();
-  m_fpsNum = fpsPair.first;
-  m_fpsDen = fpsPair.second;
-  m_ui.frameNumberSlider->setFPS(m_fpsDen == 0 ? 0.0 : (double)m_fpsNum / (double)m_fpsDen);
-#endif
 
   bool scriptChanged = ((previousScript != a_script) && (previousScriptName != a_scriptName));
 
@@ -353,6 +363,7 @@ void PreviewDialog::previewScript(const QString &a_script, const QString &a_scri
                                                 slotSwitchOutputIndex(idx);
                                               });
   }
+  findAudioWithVideo();
 
   setTitle();
 }
@@ -398,9 +409,7 @@ void PreviewDialog::stopAndCleanUp()
   }
 
   VSScriptProcessorDialog::stopAndCleanUp();
-#ifdef Q_OS_WIN  // AUDIO
   m_audioCache.clear();
-#endif
 }
 
 // END OF void PreviewDialog::stopAndCleanUp()
@@ -513,10 +522,6 @@ void PreviewDialog::keyPressEvent(QKeyEvent *a_pEvent)
     QDialog::keyPressEvent(a_pEvent);
     return;
   }
-#ifdef Q_OS_WIN  // AUDIO
-#else
-  if (!m_nodeInfo[m_outputIndex].isVideo()) return;
-#endif
 
   int key = a_pEvent->key();
 
@@ -553,24 +558,30 @@ void PreviewDialog::slotReceiveFrame(int a_frameNumber, int a_outputIndex, const
   if (!a_cpOutputFrame) return;
 
   Q_ASSERT(m_cpVSAPI);
+  // audio played along with the picture: copied out here, the ticket frees the frame after this slot
+  if (a_outputIndex != m_outputIndex) {
+    if (m_audioWithVideoActive && a_outputIndex == m_audioWithVideoIndex && a_frameNumber >= m_audioWithVideoNextWrite
+        && a_frameNumber < m_audioWithVideoNextRequest) {
+      if (m_audioWithVideoInFlight > 0) --m_audioWithVideoInFlight;
+      m_audioWithVideoCache[a_frameNumber] = readAudioFrame(a_cpOutputFrame, &m_audioWithVideoFormat);
+      slotFeedAudioWithVideo();
+    }
+    return;
+  }
   const VSFrame *cpOutputFrame = m_cpVSAPI->addFrameRef(a_cpOutputFrame);
   const VSFrame *cpPreviewFrame = m_cpVSAPI->addFrameRef(a_cpPreviewFrame);
 
   if (m_playing) {
     Frame newFrame(a_frameNumber, a_outputIndex, cpOutputFrame, cpPreviewFrame);
     m_framesCache[m_outputIndex].push_back(newFrame);
-#ifdef Q_OS_WIN  // AUDIO
     if (m_currentIsAudio && m_pAudioSink) {
-      QByteArray audioData = readAudioFrame(a_cpOutputFrame);
+      QByteArray audioData = readAudioFrame(a_cpOutputFrame, m_nodeInfo[m_outputIndex].getAsAudio());
       AudioFrame newAudioFrame(a_frameNumber, a_outputIndex, audioData);
       m_audioCache[a_frameNumber] = newAudioFrame;
       slotProcessAudioPlayQueue();
     }
     else
       slotProcessPlayQueue();
-#else
-    slotProcessPlayQueue();
-#endif
   }
   else {
     setCurrentFrame(cpOutputFrame, cpPreviewFrame);
@@ -586,9 +597,19 @@ void PreviewDialog::slotReceiveFrame(int a_frameNumber, int a_outputIndex, const
 
 void PreviewDialog::slotFrameRequestDiscarded(int a_frameNumber, int a_outputIndex, const QString &a_reason)
 {
-  (void)a_outputIndex;
   (void)a_reason;
 
+  // a lost frame of the audio played along with the picture becomes silence, so the audio clock keeps running
+  if (a_outputIndex != m_outputIndex) {
+    if (m_audioWithVideoActive && a_outputIndex == m_audioWithVideoIndex && a_frameNumber >= m_audioWithVideoNextWrite
+        && a_frameNumber < m_audioWithVideoNextRequest) {
+      if (m_audioWithVideoInFlight > 0) --m_audioWithVideoInFlight;
+      const int64_t samples = std::min<int64_t>(VS_AUDIO_FRAME_SAMPLES,
+                                                m_audioWithVideoFormat.numSamples - int64_t(a_frameNumber) * VS_AUDIO_FRAME_SAMPLES);
+      m_audioWithVideoCache[a_frameNumber] = QByteArray(int(std::max<int64_t>(samples, 0)) * m_audioWithVideoFormat.format.numChannels * 2, 0);
+    }
+    return;
+  }
   if (m_playing) { slotPlay(false); }
   else {
     if (a_frameNumber != m_frameExpected) return;
@@ -1265,7 +1286,6 @@ void PreviewDialog::slotPreviewAreaSizeChanged()
 
 void PreviewDialog::slotPreviewAreaCtrlWheel(QPoint a_angleDelta)
 {
-#ifdef Q_OS_WIN  // AUDIO
   if (m_currentIsAudio && m_pAudioSink) {
     int deltaY = a_angleDelta.y();
     m_audioVolume = m_pAudioSink->volume();
@@ -1279,7 +1299,6 @@ void PreviewDialog::slotPreviewAreaCtrlWheel(QPoint a_angleDelta)
     }
     return;
   }
-#endif
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
   int deltaY = a_angleDelta.y();
 
@@ -1452,11 +1471,7 @@ void PreviewDialog::slotSetPlayFPSLimit()
   double limit = m_ui.playFpsLimitSpinBox->value();
   if (limit < 1e-3) limit = 1e-3;
   m_nativePlaybackRate = false;
-#ifdef Q_OS_WIN  // AUDIO
   PlayFPSLimitMode mode = m_currentIsAudio ? PlayFPSLimitMode::FromVideo :
-#else
-  PlayFPSLimitMode mode =
-#endif
                                            (PlayFPSLimitMode)m_ui.playFpsLimitModeComboBox->currentData().toInt();
   if (mode == PlayFPSLimitMode::NoLimit)
     m_secondsBetweenFrames = 0.0;
@@ -1474,9 +1489,7 @@ void PreviewDialog::slotSetPlayFPSLimit()
   else
     Q_ASSERT(false);
 
-#ifdef Q_OS_WIN  // AUDIO
   if (m_currentIsAudio) return;
-#endif
   m_pSettingsManager->setPlayFPSLimitMode(mode);
   m_pSettingsManager->setPlayFPSLimit(limit);
 }
@@ -1495,20 +1508,18 @@ void PreviewDialog::slotPlay(bool a_play)
     m_ui.outputIndexComboBox->setEnabled(false);
     m_pActionPlay->setIcon(m_iconPause);
     m_lastFrameRequestedForPlay = m_frameShown;
-#ifdef Q_OS_WIN  // AUDIO
     if (m_currentIsAudio && m_pAudioSink)
       slotProcessAudioPlayQueue();
-    else
+    else {
+      const int numFrames = m_nodeInfo[m_outputIndex].numFrames();
+      if (!m_currentIsAudio && m_audioWithVideo && numFrames > 0) startAudioWithVideo((m_frameShown + 1) % numFrames);
       slotProcessPlayQueue();
-#else
-    slotProcessPlayQueue();
-#endif
+    }
   }
   else {
     clearFramesCache();
-#ifdef Q_OS_WIN  // AUDIO
     m_audioCache.clear();
-#endif
+    stopAudioWithVideo();
     m_pVapourSynthScriptProcessor->flushFrameTicketsQueue();
     m_ui.outputIndexComboBox->setEnabled(true);
     m_pActionPlay->setIcon(m_iconPlay);
@@ -1532,6 +1543,22 @@ void PreviewDialog::slotProcessPlayQueue()
   int nextFrame = (m_frameShown + 1) % vi->numFrames;
   Frame referenceFrame(nextFrame, m_outputIndex, nullptr);
 
+  if (m_audioWithVideoActive) {
+    // far behind the audio: carry on where the audio is instead of drifting further
+    const double clock = audioWithVideoClock();
+    const double behind = clock - double(nextFrame - m_audioWithVideoStartFrame) * m_fpsDen / m_fpsNum;
+    if (m_audioWithVideoActive && behind > 0.5) {
+      const int target = m_audioWithVideoStartFrame + int(clock * m_fpsNum / m_fpsDen) + int(m_maxThreads);
+      if (target > nextFrame && target < vi->numFrames) {
+        m_frameShown = target - 1;
+        if (m_lastFrameRequestedForPlay < m_frameShown) m_lastFrameRequestedForPlay = m_frameShown;
+        nextFrame = target;
+        referenceFrame.number = nextFrame;
+      }
+    }
+    dropStaleFramesForAudioWithVideo(nextFrame, vi->numFrames);
+  }
+
   while (!m_framesCache[m_outputIndex].empty()) {
     std::list<Frame>::const_iterator it
       = std::find(m_framesCache[m_outputIndex].begin(), m_framesCache[m_outputIndex].end(), referenceFrame);
@@ -1553,9 +1580,16 @@ void PreviewDialog::slotProcessPlayQueue()
       else
         m_secondsBetweenFrames = (double)durNum / (double)durDen;
     }
-    hr_time_point now = hr_clock::now();
-    double passed = duration_to_double(now - m_lastFrameShowTime);
-    double secondsToNextFrame = m_secondsBetweenFrames - passed;
+    double secondsToNextFrame;
+    // with audio along, the picture follows the audio clock
+    if (m_audioWithVideoActive)
+      secondsToNextFrame = double(nextFrame - m_audioWithVideoStartFrame) * m_fpsDen / m_fpsNum - audioWithVideoClock();
+    else
+    {
+      hr_time_point now = hr_clock::now();
+      double passed = duration_to_double(now - m_lastFrameShowTime);
+      secondsToNextFrame = m_secondsBetweenFrames - passed;
+    }
     if (secondsToNextFrame > 0) {
       int millisecondsToNextFrame = std::ceil(secondsToNextFrame * 1000);
       m_pPlayTimer->start(millisecondsToNextFrame);
@@ -1572,6 +1606,8 @@ void PreviewDialog::slotProcessPlayQueue()
     m_framesCache[m_outputIndex].erase(it);
     nextFrame = (m_frameShown + 1) % vi->numFrames;
     referenceFrame.number = nextFrame;
+    // the picture loops: the audio starts over with it, also after it ran out
+    if (nextFrame == 0 && m_audioWithVideo) startAudioWithVideo(0);
   }
 
   nextFrame = (m_lastFrameRequestedForPlay + 1) % vi->numFrames;
@@ -1590,7 +1626,6 @@ void PreviewDialog::slotProcessPlayQueue()
 // END OF void PreviewDialog::slotProcessPlayQueue()
 //==============================================================================
 
-#ifdef Q_OS_WIN  // AUDIO
 void PreviewDialog::slotProcessAudioPlayQueue()
 {
   if (!m_playing) return;
@@ -1656,7 +1691,6 @@ void PreviewDialog::slotProcessAudioPlayQueue()
 
   m_processingPlayQueue = false;
 }
-#endif
 
 void PreviewDialog::slotLoadChapters()
 {
@@ -1813,31 +1847,34 @@ void PreviewDialog::saveLastScrollBarPositions()
 // END OF void PreviewDialog::slotSaveGeometry()
 //==============================================================================
 
-#ifdef Q_OS_WIN  // AUDIO
 void PreviewDialog::setAudioOutput()
 {
-  const VSAudioInfo *pAI = m_nodeInfo[m_outputIndex].getAsAudio();
+  openAudioSink(m_nodeInfo[m_outputIndex].getAsAudio(), m_outputIndex);
+}
+
+bool PreviewDialog::openAudioSink(const VSAudioInfo *a_pAudioInfo, int a_outputIndex)
+{
+  stopAudioOutput();
+  if (!a_pAudioInfo) return false;
   QAudioFormat af;
-  int numChannels = pAI->format.numChannels;
-  int bytesPerSample = pAI->format.bytesPerSample;
+  int numChannels = a_pAudioInfo->format.numChannels;
   af.setChannelCount(numChannels);
-  af.setSampleRate(pAI->sampleRate);
+  af.setSampleRate(a_pAudioInfo->sampleRate);
 
   // Always convert to int16
-  bytesPerSample = 2;
+  int bytesPerSample = 2;
   af.setSampleFormat(QAudioFormat::Int16);
 
-  stopAudioOutput();
   QAudioDevice device = QMediaDevices::defaultAudioOutput();
   if (numChannels <= 2 && device.isFormatSupported(af)) {
     m_pAudioSink = new QAudioSink(device, af);
     m_pAudioSink->setVolume(m_audioVolume);
     m_pAudioSink->setBufferSize(numChannels * bytesPerSample * VS_AUDIO_FRAME_SAMPLES * 3);
     m_pAudioIODevice = m_pAudioSink->start();
+    return m_pAudioIODevice != nullptr;
   }
-  else {
-    qWarning() << QString("Audio format of node #%1 is not yet supported for playback.").arg(m_outputIndex).toStdString().c_str();
-  }
+  qWarning() << QString("Audio format of node #%1 is not yet supported for playback.").arg(a_outputIndex).toStdString().c_str();
+  return false;
 }
 
 void PreviewDialog::stopAudioOutput()
@@ -1854,80 +1891,175 @@ void PreviewDialog::stopAudioOutput()
 
 void PreviewDialog::playAudioFrame()
 {
-  QByteArray frameData = readAudioFrame(m_cpFrame);
+  QByteArray frameData = readAudioFrame(m_cpFrame, m_nodeInfo[m_outputIndex].getAsAudio());
   if (frameData.size() > 0 && m_pAudioSink) { m_pAudioIODevice->write(frameData); }
 }
 
-QByteArray PreviewDialog::readAudioFrame(const VSFrame *a_cpFrame)
+// interleaved 16 bit samples for the sink, in an array of its own: the frame is released after the caller returns
+QByteArray PreviewDialog::readAudioFrame(const VSFrame *a_cpFrame, const VSAudioInfo *a_pAudioInfo) const
 {
-  if (!a_cpFrame) return QByteArray();
+  if (!a_cpFrame || !a_pAudioInfo) return QByteArray();
   if (m_cpVSAPI->getFrameType(a_cpFrame) != mtAudio) return QByteArray();
-  if (!m_pAudioSink) return QByteArray();
 
-  int numChannels = m_nodeInfo[m_outputIndex].getAsAudio()->format.numChannels;
-  int bytesPerSample = m_nodeInfo[m_outputIndex].getAsAudio()->format.bytesPerSample;
-  auto sampleType = m_nodeInfo[m_outputIndex].getAsAudio()->format.sampleType;
-  if (numChannels == 1) {
-    if (bytesPerSample == 2)
-      return QByteArray::fromRawData(reinterpret_cast<const char *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0)),
-                                     bytesPerSample * VS_AUDIO_FRAME_SAMPLES);
-    else if (sampleType == stFloat) {
-      std::vector<int16_t> cache;
-      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
-      auto ptr0 = reinterpret_cast<const float *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
-      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
-      for (ptrdiff_t i = 0; i < stride; ++i) cache[i] = dither32Fto16(ptr0[i]);
-      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
-    }
-    else {
-      std::vector<uint16_t> cache;
-      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
-      auto ptr0 = reinterpret_cast<const uint32_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
-      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
-      for (ptrdiff_t i = 0; i < stride; ++i) cache[i] = dither32to16(ptr0[i]);
-      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+  const int numChannels = a_pAudioInfo->format.numChannels;
+  if (numChannels < 1 || numChannels > 2) return QByteArray();
+  const int bytesPerSample = a_pAudioInfo->format.bytesPerSample;
+  const int bitsPerSample = a_pAudioInfo->format.bitsPerSample;
+  const bool isFloat = a_pAudioInfo->format.sampleType == stFloat;
+  const int samples = m_cpVSAPI->getFrameLength(a_cpFrame);
+
+  QByteArray data(samples * numChannels * 2, Qt::Uninitialized);
+  int16_t *out = reinterpret_cast<int16_t *>(data.data());
+  for (int channel = 0; channel < numChannels; ++channel) {
+    const uint8_t *in = m_cpVSAPI->getReadPtr(a_cpFrame, channel);
+    for (int i = 0; i < samples; ++i) {
+      int16_t value;
+      if (isFloat)
+        value = dither32Fto16(reinterpret_cast<const float *>(in)[i]);
+      else if (bytesPerSample == 2)
+        value = reinterpret_cast<const int16_t *>(in)[i];
+      else if (bitsPerSample == 32)
+        value = int16_t(dither32to16(reinterpret_cast<const uint32_t *>(in)[i]));
+      else
+        value = int16_t(reinterpret_cast<const int32_t *>(in)[i] >> (bitsPerSample - 16));
+      out[i * numChannels + channel] = value;
     }
   }
-  else {
-    if (sampleType == stFloat) {
-      std::vector<int16_t> cache;
-      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
-      auto ptr0 = reinterpret_cast<const float *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
-      auto ptr1 = reinterpret_cast<const float *>(m_cpVSAPI->getReadPtr(a_cpFrame, 1));
-      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
-      for (ptrdiff_t i = 0; i < stride; ++i) {
-        cache[2 * i] = dither32Fto16(ptr0[i]);
-        cache[2 * i + 1] = dither32Fto16(ptr1[i]);
-      }
-      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+  return data;
+}
+
+void PreviewDialog::findAudioWithVideo()
+{
+  m_audioWithVideoIndex = -1;
+  if (!m_currentIsAudio) {
+    for (int index : m_outputIndices) {
+      if (index == m_outputIndex) continue;
+      VSNodeInfo info = m_pVapourSynthScriptProcessor->nodeInfo(index);
+      const VSAudioInfo *audioInfo = info.isAudio() ? info.getAsAudio() : nullptr;
+      if (!audioInfo || audioInfo->format.numChannels > 2) continue;
+      m_audioWithVideoIndex = index;
+      m_audioWithVideoFormat = *audioInfo;
+      break;
     }
-    else if (bytesPerSample == 2) {
-      std::vector<uint16_t> cache;
-      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
-      auto ptr0 = reinterpret_cast<const uint16_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
-      auto ptr1 = reinterpret_cast<const uint16_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 1));
-      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
-      for (ptrdiff_t i = 0; i < stride; ++i) {
-        cache[2 * i] = ptr0[i];
-        cache[2 * i + 1] = ptr1[i];
+  }
+  m_ui.audioButton->setEnabled(m_audioWithVideoIndex >= 0);
+}
+
+void PreviewDialog::slotToggleAudioWithVideo(bool a_on)
+{
+  m_audioWithVideo = a_on;
+  if (!m_playing || m_currentIsAudio) return;
+  if (!a_on) {
+    stopAudioWithVideo();
+    m_lastFrameShowTime = hr_clock::now();
+    return;
+  }
+  const int numFrames = m_nodeInfo[m_outputIndex].numFrames();
+  if (numFrames > 0) startAudioWithVideo((m_frameShown + 1) % numFrames);
+}
+
+// the audio clock starts at a_firstFrame: from the sample under that frame, the first audio frame cut to it
+bool PreviewDialog::startAudioWithVideo(int a_firstFrame)
+{
+  stopAudioWithVideo();
+  if (m_audioWithVideoIndex < 0 || m_fpsNum <= 0 || m_fpsDen <= 0) return false;
+  const int64_t firstSample = int64_t(a_firstFrame) * m_audioWithVideoFormat.sampleRate * m_fpsDen / m_fpsNum;
+  if (firstSample >= m_audioWithVideoFormat.numSamples) return false;
+  if (!openAudioSink(&m_audioWithVideoFormat, m_audioWithVideoIndex)) {
+    stopAudioOutput();
+    return false;
+  }
+  m_audioWithVideoStartFrame = a_firstFrame;
+  m_audioWithVideoNextRequest = int(firstSample / VS_AUDIO_FRAME_SAMPLES);
+  m_audioWithVideoNextWrite = m_audioWithVideoNextRequest;
+  m_audioWithVideoSkipBytes = int(firstSample % VS_AUDIO_FRAME_SAMPLES) * m_audioWithVideoFormat.format.numChannels * 2;
+  m_audioWithVideoInFlight = 0;
+  m_audioWithVideoActive = true;
+  m_pAudioWithVideoTimer->start();
+  slotFeedAudioWithVideo();
+  return true;
+}
+
+void PreviewDialog::stopAudioWithVideo()
+{
+  if (!m_audioWithVideoActive) return;
+  m_audioWithVideoActive = false;
+  m_pAudioWithVideoTimer->stop();
+  stopAudioOutput();
+  m_audioWithVideoCache.clear();
+  m_audioWithVideoPending.clear();
+}
+
+// seconds played since startAudioWithVideo(): what the sink took, minus what still waits in its buffer
+double PreviewDialog::audioWithVideoClock() const
+{
+  if (!m_pAudioSink) return 0.0;
+  const double bytesPerSecond = double(m_audioWithVideoFormat.sampleRate) * m_audioWithVideoFormat.format.numChannels * 2;
+  const double buffered = double(m_pAudioSink->bufferSize() - m_pAudioSink->bytesFree()) / bytesPerSecond;
+  return std::max(0.0, m_pAudioSink->processedUSecs() / 1e6 - buffered);
+}
+
+void PreviewDialog::slotFeedAudioWithVideo()
+{
+  if (!m_audioWithVideoActive || !m_pAudioSink || !m_pAudioIODevice) return;
+
+  // in order, as much as the sink takes
+  while (true) {
+    if (m_audioWithVideoPending.isEmpty()) {
+      auto it = m_audioWithVideoCache.find(m_audioWithVideoNextWrite);
+      if (it == m_audioWithVideoCache.end()) break;
+      m_audioWithVideoPending = it->second;
+      m_audioWithVideoCache.erase(it);
+      ++m_audioWithVideoNextWrite;
+      if (m_audioWithVideoSkipBytes > 0) {
+        m_audioWithVideoPending.remove(0, m_audioWithVideoSkipBytes);
+        m_audioWithVideoSkipBytes = 0;
       }
-      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+      if (m_audioWithVideoPending.isEmpty()) continue;
     }
-    else {
-      std::vector<uint16_t> cache;
-      cache.reserve(numChannels * VS_AUDIO_FRAME_SAMPLES);
-      auto ptr0 = reinterpret_cast<const uint32_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 0));
-      auto ptr1 = reinterpret_cast<const uint32_t *>(m_cpVSAPI->getReadPtr(a_cpFrame, 1));
-      auto stride = m_cpVSAPI->getStride(a_cpFrame, 0) / bytesPerSample;
-      for (ptrdiff_t i = 0; i < stride; ++i) {
-        cache[2 * i] = dither32to16(ptr0[i]);
-        cache[2 * i + 1] = dither32to16(ptr1[i]);
-      }
-      return QByteArray::fromRawData(reinterpret_cast<const char *>(cache.data()), numChannels * 2 * VS_AUDIO_FRAME_SAMPLES);
+    const qint64 room = m_pAudioSink->bytesFree();
+    if (room <= 0) break;
+    const qint64 written = m_pAudioIODevice->write(m_audioWithVideoPending.constData(), std::min<qint64>(room, m_audioWithVideoPending.size()));
+    if (written <= 0) break;
+    m_audioWithVideoPending.remove(0, written);
+    if (!m_audioWithVideoPending.isEmpty()) break;
+  }
+
+  // about a second requested ahead
+  const int ahead = 16;
+  while ((m_audioWithVideoInFlight + int(m_audioWithVideoCache.size())) < ahead
+         && m_audioWithVideoNextRequest < m_audioWithVideoFormat.numFrames) {
+    m_pVapourSynthScriptProcessor->requestFrameAsync(m_audioWithVideoNextRequest, m_audioWithVideoIndex, false);
+    ++m_audioWithVideoNextRequest;
+    ++m_audioWithVideoInFlight;
+  }
+
+  // the audio ran out before the picture: the picture goes on with its own timing
+  if (m_audioWithVideoNextWrite >= m_audioWithVideoFormat.numFrames && m_audioWithVideoPending.isEmpty()
+      && m_pAudioSink->bytesFree() >= m_pAudioSink->bufferSize()) {
+    stopAudioWithVideo();
+    m_lastFrameShowTime = hr_clock::now();
+  }
+
+  if (m_playing) slotProcessPlayQueue();
+}
+
+// frames requested before a jump would fill the cache and block new requests
+void PreviewDialog::dropStaleFramesForAudioWithVideo(int a_nextFrame, int a_numFrames)
+{
+  const int window = int(m_cachedFramesLimit + 4 * m_maxThreads) + 16;
+  std::list<Frame> &cache = m_framesCache[m_outputIndex];
+  for (auto it = cache.begin(); it != cache.end();) {
+    const int ahead = ((it->number - a_nextFrame) % a_numFrames + a_numFrames) % a_numFrames;
+    if (ahead <= window) {
+      ++it;
+      continue;
     }
+    m_cpVSAPI->freeFrame(it->cpOutputFrame);
+    m_cpVSAPI->freeFrame(it->cpPreviewFrame);
+    it = cache.erase(it);
   }
 }
-#endif
 
 void PreviewDialog::slotToggleFrameProps()
 {
@@ -1957,19 +2089,8 @@ void PreviewDialog::slotSwitchOutputIndex(int a_outputIndex)
   // Check if output index is available
   VSNodeInfo ni = m_pVapourSynthScriptProcessor->nodeInfo(a_outputIndex);
   if (ni.isInvalid()) return;
-#ifdef Q_OS_WIN  // AUDIO
   stopAudioOutput();
   m_currentIsAudio = ni.mediaType() == mtAudio;
-#else
-  if (ni.isAudio()) {
-    QString errorString = tr(
-                            "Output node #%1 is audio. "
-                            "Previewing and encoding audio are not supported.")
-                            .arg(a_outputIndex);
-    emit signalWriteLogMessage(a_outputIndex == 0 ? mtCritical : mtWarning, errorString);
-    return;
-  }
-#endif
   m_outputIndex = a_outputIndex;
 
   // Update stuff
@@ -2003,7 +2124,6 @@ void PreviewDialog::slotSwitchOutputIndex(int a_outputIndex)
   else if (m_frameExpected < 0)
     setExpectedFrame(0);
 
-#ifdef Q_OS_WIN  // AUDIO
   if (m_currentIsAudio) {
     if (m_ui.cropCheckButton->isChecked()) m_ui.cropCheckButton->click();
     m_ui.cropCheckButton->setEnabled(false);
@@ -2027,12 +2147,10 @@ void PreviewDialog::slotSwitchOutputIndex(int a_outputIndex)
     m_ui.playFpsLimitSpinBox->setEnabled(true);
     m_ui.playFpsLimitModeComboBox->setEnabled(true);
   }
-#else
-  resetCropSpinBoxes();
-#endif
   slotSetPlayFPSLimit();
 
   resetCropSpinBoxes();
+  findAudioWithVideo();
 
   m_pVapourSynthScriptProcessor->requestFrameAsync(m_frameExpected, m_outputIndex, true);
 
@@ -2454,6 +2572,9 @@ void PreviewDialog::setUpTimeLinePanel()
   m_ui.timeLinePanel->setVisible(m_pSettingsManager->getTimeLinePanelVisible());
 
   m_ui.playButton->setDefaultAction(m_pActionPlay);
+  m_ui.audioButton->setChecked(m_audioWithVideo);
+  m_ui.audioButton->setEnabled(false);
+  connect(m_ui.audioButton, &QToolButton::toggled, this, &PreviewDialog::slotToggleAudioWithVideo);
   m_ui.timeLineCheckButton->setDefaultAction(m_pActionToggleTimeLinePanel);
   m_ui.timeStepForwardButton->setDefaultAction(m_pActionTimeStepForward);
   m_ui.timeStepBackButton->setDefaultAction(m_pActionTimeStepBack);

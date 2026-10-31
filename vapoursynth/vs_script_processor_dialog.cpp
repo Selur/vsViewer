@@ -96,7 +96,10 @@ bool VSScriptProcessorDialog::initialize(const QString & a_script,
 
   if(m_pVapourSynthScriptProcessor->isInitialized())
   {
+    // the output to initialize is the caller's choice; stopAndCleanUp() would reset it to 0
+    const int outputIndex = m_outputIndex;
     stopAndCleanUp();
+    m_outputIndex = outputIndex;
     bool finalized = m_pVapourSynthScriptProcessor->finalize();
     if(!finalized)
     {
