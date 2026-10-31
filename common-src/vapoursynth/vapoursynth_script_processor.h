@@ -8,6 +8,7 @@
 #include <VSScript4.h>
 
 #include <QObject>
+#include <QSize>
 #include <deque>
 #include <vector>
 #include <map>
@@ -58,6 +59,12 @@ class VapourSynthScriptProcessor : public QObject
     // preview nodes pack RGB30 instead of RGB24; the preview decides, the processor only converts
     void setHighBitDepthOutput(bool a_enabled);
 
+    // the preview node also scales to a_size when the picture is larger (fit to frame on big pictures); empty keeps the native size. True when it changed.
+    bool setPreviewSize(const QSize & a_size);
+
+    // the RGB preview of one frame at native size, for snapshots while the preview runs at display size; the caller frees the frame
+    const VSFrame * previewFrameNative(int a_frameNumber, int a_outputIndex);
+
   public slots:
 
     void slotResetSettings();
@@ -94,6 +101,9 @@ class VapourSynthScriptProcessor : public QObject
     void sendFrameQueueChangeSignal();
 
     bool recreatePreviewNode(NodePair & a_nodePair);
+
+    // the RGB conversion (and packing) node of a video output node; a_size scales it when smaller than the picture
+    VSNode * buildPreviewNode(VSNode * a_pOutputNode, const QSize & a_size);
 
     bool recreateAudioPreviewNode(NodePair & a_nodePair);
 
@@ -132,6 +142,7 @@ class VapourSynthScriptProcessor : public QObject
     YuvMatrixCoefficients m_yuvMatrix;
     DitherType m_ditherType;
     bool m_highBitDepthOutput = false;
+    QSize m_previewSize;
 
     bool m_finalizing;
 };

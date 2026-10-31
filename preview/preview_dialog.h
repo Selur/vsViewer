@@ -233,6 +233,13 @@ class PreviewDialog : public VSScriptProcessorDialog
 
     void setPreviewPixmap();
 
+    // the picture's own size from the node, the current image when the node has no fixed size
+    QSize nativeFrameSize();
+    // the size the preview node converts to: the display size when the picture is larger, else empty for native
+    QSize previewSizeForDisplay();
+    // hands the display size to the processor and shows the current frame again when it changed
+    void updatePreviewSize();
+
     void recalculateCropMods();
 
     void resetCropSpinBoxes();
@@ -254,8 +261,14 @@ class PreviewDialog : public VSScriptProcessorDialog
     void previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[]);
 
     QImage imageFromRGB(const VSFrame* a_cpFrame);
+    struct FrameHolder
+    {
+        const VSAPI* api;
+        const VSFrame* frame;
+    };
+    static void releaseFrameHolder(void* a_pInfo);
 
-    QImage highBitDepthImage(const QRect& a_crop, const QSize& a_size, Qt::TransformationMode a_mode) const;
+    QImage frameImage(const QRect& a_crop) const;
 
     void setTitle();
 
@@ -278,6 +291,7 @@ class PreviewDialog : public VSScriptProcessorDialog
     bool startAudioWithVideo(int a_firstFrame);
     void stopAudioWithVideo();
     double audioWithVideoClock() const;
+    int playRequestsInFlightLimit() const;
     void dropStaleFramesForAudioWithVideo(int a_nextFrame, int a_numFrames);
 
     Ui::PreviewDialog m_ui;
@@ -296,8 +310,11 @@ class PreviewDialog : public VSScriptProcessorDialog
 
     const VSFrame* m_cpFrame;
     const VSFrame* m_cpPreviewFrame;
+    // the frame as pixmap only on demand (snapshot, clipboard): a copy of a 7680x2160 picture per shown frame costs a frame period
     QPixmap m_framePixmap;
-    QImage m_frameImage10Bit;
+    QPixmap framePixmap();
+    // the unscaled preview picture, ARGB32 or RGB30 with the 10 bit output
+    QImage m_frameImage;
     bool m_highBitDepthOutputActive = false;
     bool m_screenChangeConnected = false;
 

@@ -1,6 +1,7 @@
 #ifndef PREVIEWAREA_H
 #define PREVIEWAREA_H
 
+#include <QImage>
 #include <QPixmap>
 #include <QPoint>
 #include <QScrollArea>
@@ -28,10 +29,15 @@ class PreviewArea : public QScrollArea
 
     int pixmapHeight() const { return m_pixmapHeight; }
 
-    // a_highBitDepthImage: the same picture as RGB30 for the 10 bit view; empty falls back to the pixmap
-    void setPixmap(const QPixmap& a_pixmap, bool a_isVideoFrame = false, const QImage& a_highBitDepthImage = QImage());
+    // a plain picture shown as it is (blank, black)
+    void setPixmap(const QPixmap& a_pixmap);
 
-    bool highBitDepthOutput() const { return m_pHighBitDepthWindow != nullptr; }
+    // the unscaled frame (ARGB32 or RGB30) shown at a_displaySize device pixels: scaled on the GPU where the Direct3D window runs, else by the CPU with a_mode
+    void setFrame(const QImage& a_frame, const QSize& a_displaySize, bool a_isVideoFrame, Qt::TransformationMode a_mode);
+
+    bool gpuDisplay() const { return m_pHighBitDepthWindow != nullptr; }
+
+    bool highBitDepthOutput() const { return m_gpuHdr && m_pHighBitDepthWindow != nullptr; }
 
     void checkMouseOverPreview(const QPointF& a_pixelPos);
 
@@ -41,9 +47,11 @@ class PreviewArea : public QScrollArea
 
     void getScrollBarPositionsFromPreviewer(const QPoint& pos);
 
-    void setHighBitDepthOutput(bool a_enabled);
+    // the Direct3D window shows every frame; a_hdr asks for the scRGB swapchain of the 10 bit output
+    void setGpuDisplay(bool a_hdr);
 
   public slots:
+    void slotGpuDisplayFailed();
 
     void slotScrollLeft();
     void slotScrollRight();
@@ -68,6 +76,8 @@ class PreviewArea : public QScrollArea
     void signalMouseRightButtonReleased();
     void signalMouseOverPoint(double a_normX, double a_normY);
     void signalHighBitDepthStatus(bool a_isError, const QString& a_message);
+    // the Direct3D window could not start: the owner sends the frame again for the CPU path
+    void signalGpuDisplayLost();
 
   protected:
     bool eventFilter(QObject* a_pObject, QEvent* a_pEvent) override;
@@ -93,6 +103,9 @@ class PreviewArea : public QScrollArea
 
     HighBitDepthFrameWindow* m_pHighBitDepthWindow = nullptr;
     QWidget* m_pHighBitDepthContainer = nullptr;
+    bool m_gpuHdr = false;
+    // the label's pixmap under the Direct3D window: only its size matters, for scrolling and mouse mapping
+    QPixmap m_placeholder;
 };
 
 #endif  // PREVIEWAREA_H

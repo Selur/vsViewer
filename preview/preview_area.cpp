@@ -38,6 +38,7 @@ PreviewArea::PreviewArea(QWidget *a_pParent)
 
   m_pPreviewLabel->installEventFilter(this);
   viewport()->installEventFilter(this);
+  setGpuDisplay(false);
 }
 
 // END OF PreviewArea::PreviewArea(QWidget * a_pParent)
@@ -48,17 +49,44 @@ PreviewArea::~PreviewArea() {}
 // END OF PreviewArea::~PreviewArea()
 //==============================================================================
 
-void PreviewArea::setPixmap(const QPixmap &a_pixmap, bool a_isVideoFrame, const QImage &a_highBitDepthImage)
+void PreviewArea::setPixmap(const QPixmap &a_pixmap)
 {
   m_pPreviewLabel->setPixmap(a_pixmap);
   m_pixmapWidth = a_pixmap.width();
   m_pixmapHeight = a_pixmap.height();
 #ifdef Q_OS_WIN
   if (m_pHighBitDepthWindow) {
-    m_pHighBitDepthWindow->setFrame(a_highBitDepthImage.isNull() ? a_pixmap.toImage() : a_highBitDepthImage);
+    m_pHighBitDepthWindow->setFrame(a_pixmap.toImage());
     updateHighBitDepthView();
   }
 #endif
+}
+
+void PreviewArea::setFrame(const QImage &a_frame, const QSize &a_displaySize, bool a_isVideoFrame, Qt::TransformationMode a_mode)
+{
+  const double ratio = devicePixelRatioF();
+  m_pixmapWidth = a_displaySize.width();
+  m_pixmapHeight = a_displaySize.height();
+#ifdef Q_OS_WIN
+  if (m_pHighBitDepthWindow) {
+    // the sizes are device pixels: the placeholder spans the picture for the scroll range, the window draws the frame over it
+    if (m_placeholder.size() != a_displaySize || m_placeholder.devicePixelRatio() != ratio) {
+      m_placeholder = QPixmap(a_displaySize);
+      m_placeholder.fill(Qt::transparent);
+      m_placeholder.setDevicePixelRatio(ratio);
+    }
+    m_pPreviewLabel->setPixmap(m_placeholder);
+    m_pHighBitDepthWindow->setFrame(a_frame, a_displaySize, a_mode == Qt::SmoothTransformation);
+    updateHighBitDepthView();
+  }
+  else
+#endif
+  {
+    QPixmap pixmap = QPixmap::fromImage(a_frame, Qt::NoFormatConversion);
+    if (pixmap.size() != a_displaySize) pixmap = pixmap.scaled(a_displaySize, Qt::IgnoreAspectRatio, a_mode);
+    pixmap.setDevicePixelRatio(ratio);
+    m_pPreviewLabel->setPixmap(pixmap);
+  }
   if (a_isVideoFrame && m_newToPreviewer) {
     m_newToPreviewer = false;
     QCoreApplication::processEvents();
@@ -269,20 +297,19 @@ void PreviewArea::getScrollBarPositionsFromPreviewer(const QPoint &pos)
   m_lastScrollBarPos = pos;
 }
 
-void PreviewArea::setHighBitDepthOutput(bool a_enabled)
+void PreviewArea::setGpuDisplay(bool a_hdr)
 {
 #ifdef Q_OS_WIN
-  if (a_enabled == (m_pHighBitDepthWindow != nullptr)) return;
+  if (m_pHighBitDepthWindow && m_gpuHdr == a_hdr) return;
+  // the swapchain format is fixed at creation, so a new window for the other one; the caller sends the frame again
+  delete m_pHighBitDepthContainer;
+  m_pHighBitDepthContainer = nullptr;
+  m_pHighBitDepthWindow = nullptr;
+  m_gpuHdr = a_hdr;
 
-  if (!a_enabled) {
-    delete m_pHighBitDepthContainer;
-    m_pHighBitDepthContainer = nullptr;
-    m_pHighBitDepthWindow = nullptr;
-    return;
-  }
-
-  m_pHighBitDepthWindow = new HighBitDepthFrameWindow();
+  m_pHighBitDepthWindow = new HighBitDepthFrameWindow(a_hdr);
   connect(m_pHighBitDepthWindow, &HighBitDepthFrameWindow::signalStatus, this, &PreviewArea::signalHighBitDepthStatus);
+  connect(m_pHighBitDepthWindow, &HighBitDepthFrameWindow::signalInitFailed, this, &PreviewArea::slotGpuDisplayFailed);
   // the container takes ownership of the window; mouse input falls through to the viewport
   m_pHighBitDepthContainer = QWidget::createWindowContainer(m_pHighBitDepthWindow, viewport());
   m_pHighBitDepthContainer->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -290,12 +317,22 @@ void PreviewArea::setHighBitDepthOutput(bool a_enabled)
   m_pHighBitDepthContainer->show();
   m_pScrollNavigator->setAttribute(Qt::WA_NativeWindow);
   m_pScrollNavigator->raise();
-
-  QPixmap currentPixmap = m_pPreviewLabel->pixmap();
-  if (!currentPixmap.isNull()) m_pHighBitDepthWindow->setFrame(currentPixmap.toImage());
   updateHighBitDepthView();
 #else
-  Q_UNUSED(a_enabled);
+  Q_UNUSED(a_hdr);
+#endif
+}
+
+// the window reports from inside its own event, so it goes on the next event loop turn; the label shows the frames from then on
+void PreviewArea::slotGpuDisplayFailed()
+{
+#ifdef Q_OS_WIN
+  QWidget *container = m_pHighBitDepthContainer;
+  m_pHighBitDepthContainer = nullptr;
+  m_pHighBitDepthWindow = nullptr;
+  m_gpuHdr = false;
+  if (container) container->deleteLater();
+  emit signalGpuDisplayLost();
 #endif
 }
 

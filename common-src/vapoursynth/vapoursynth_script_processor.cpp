@@ -621,10 +621,63 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
     return recreateAudioPreviewNode(a_nodePair);
   }
 
-  const VSVideoInfo * cpVideoInfo =
-    m_cpVSAPI->getVideoInfo(a_nodePair.pOutputNode);
-  if(!cpVideoInfo)
+  VSNode * pPreviewNode = buildPreviewNode(a_nodePair.pOutputNode, m_previewSize);
+  if(!pPreviewNode)
     return false;
+  a_nodePair.pPreviewNode = pPreviewNode;
+  return true;
+}
+
+// END OF bool VapourSynthScriptProcessor::recreatePreviewNode(
+//		NodePair & a_nodePair)
+//==============================================================================
+
+bool VapourSynthScriptProcessor::setPreviewSize(const QSize & a_size)
+{
+  if(m_previewSize == a_size)
+    return false;
+  m_previewSize = a_size;
+
+  for(std::pair<const int, NodePair> & mapItem : m_nodePairForOutputIndex)
+  {
+    NodePair & nodePair = mapItem.second;
+    if(nodePair.pPreviewNode)
+      recreatePreviewNode(nodePair);
+  }
+  return true;
+}
+
+// END OF bool VapourSynthScriptProcessor::setPreviewSize(const QSize & a_size)
+//==============================================================================
+
+const VSFrame * VapourSynthScriptProcessor::previewFrameNative(int a_frameNumber, int a_outputIndex)
+{
+  if(!m_initialized || !m_cpVSAPI)
+    return nullptr;
+  NodePair & nodePair = getNodePair(a_outputIndex, false);
+  if(!nodePair.pOutputNode || m_cpVSAPI->getNodeType(nodePair.pOutputNode) != mtVideo)
+    return nullptr;
+  VSNode * pNode = buildPreviewNode(nodePair.pOutputNode, QSize());
+  if(!pNode)
+    return nullptr;
+  char errorMessage[1024] = {0};
+  const VSFrame * cpFrame = m_cpVSAPI->getFrame(a_frameNumber, pNode, errorMessage, sizeof(errorMessage));
+  m_cpVSAPI->freeNode(pNode);
+  if(!cpFrame)
+    emit signalWriteLogMessage(mtCritical, tr("Failed to get the native preview frame: %1").arg(errorMessage));
+  return cpFrame;
+}
+
+// END OF const VSFrame * VapourSynthScriptProcessor::previewFrameNative(
+//		int a_frameNumber, int a_outputIndex)
+//==============================================================================
+
+VSNode * VapourSynthScriptProcessor::buildPreviewNode(VSNode * a_pOutputNode, const QSize & a_size)
+{
+  const VSVideoInfo * cpVideoInfo =
+    m_cpVSAPI->getVideoInfo(a_pOutputNode);
+  if(!cpVideoInfo)
+    return nullptr;
   const VSVideoFormat * cpFormat = &cpVideoInfo->format;
 
   bool to_10_bit = m_highBitDepthOutput ||
@@ -636,14 +689,14 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
   {
     to_10_bit = false;
     pResultMap = m_cpVSAPI->createMap();
-    m_cpVSAPI->mapSetNode(pResultMap, "clip", a_nodePair.pOutputNode,
+    m_cpVSAPI->mapSetNode(pResultMap, "clip", a_pOutputNode,
                           maReplace);
   }
   else if(to_10_bit &&
            vsh::isSameVideoPresetFormat(pfRGB30, cpFormat, m_pCore, m_cpVSAPI))
   {
     pResultMap = m_cpVSAPI->createMap();
-    m_cpVSAPI->mapSetNode(pResultMap, "clip", a_nodePair.pOutputNode,
+    m_cpVSAPI->mapSetNode(pResultMap, "clip", a_pOutputNode,
                           maReplace);
   }
   else
@@ -727,7 +780,7 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
     VSMap *pTempMap = m_cpVSAPI->createMap();
     m_cpVSAPI->copyMap(pArgumentMap, pTempMap);
     m_cpVSAPI->mapSetNode(pTempMap, "clip",
-                          a_nodePair.pOutputNode, maReplace);
+                          a_pOutputNode, maReplace);
     setMatrixFilter(pTempMap, pArgumentMap, m_pCore, m_cpVSAPI);
     m_cpVSAPI->clearMap(pTempMap);
 
@@ -769,6 +822,16 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
       }
     }
 
+    // the display size when it is smaller than the picture: conversion and scaling in one pass, the GUI never sees the full picture
+    if(a_size.isValid() && !isVF && a_size.width() < cpVideoInfo->width &&
+       a_size.height() < cpVideoInfo->height)
+    {
+      m_cpVSAPI->mapSetInt(pArgumentMap, "width", a_size.width(), maReplace);
+      m_cpVSAPI->mapSetInt(pArgumentMap, "height", a_size.height(), maReplace);
+      if(QString(resizeName) == "Point")
+        resizeName = "Bicubic";
+    }
+
     pResultMap = m_cpVSAPI->invoke(pResizePlugin, resizeName, pArgumentMap);
 
     m_cpVSAPI->freeMap(pArgumentMap);
@@ -783,23 +846,21 @@ bool VapourSynthScriptProcessor::recreatePreviewNode(NodePair & a_nodePair)
     m_error += cpResultError;
     emit signalWriteLogMessage(mtCritical, m_error);
     m_cpVSAPI->freeMap(pResultMap);
-    return false;
+    return nullptr;
   }
 
   VSNode * pRGBNode = m_cpVSAPI->mapGetNode(pResultMap, "clip", 0, nullptr);
   m_cpVSAPI->freeMap(pResultMap);
 
-  VSNode * pPreviewNode = packRGBFilter(pRGBNode, a_nodePair.pOutputNode,
+  VSNode * pPreviewNode = packRGBFilter(pRGBNode, a_pOutputNode,
                                        to_10_bit, m_pCore, m_cpVSAPI);
 
   Q_ASSERT(pPreviewNode);
-  a_nodePair.pPreviewNode = pPreviewNode;
-
-  return true;
+  return pPreviewNode;
 }
 
-// END OF bool VapourSynthScriptProcessor::recreatePreviewNode(
-//		NodePair & a_nodePair)
+// END OF VSNode * VapourSynthScriptProcessor::buildPreviewNode(
+//		VSNode * a_pOutputNode, const QSize & a_size)
 //==============================================================================
 
 bool VapourSynthScriptProcessor::recreateAudioPreviewNode(NodePair &a_nodePair)

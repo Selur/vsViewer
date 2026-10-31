@@ -41,6 +41,7 @@
 #include <QTimer>
 #include <QWindow>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 #include <QMediaDevices>
@@ -164,6 +165,7 @@ PreviewDialog::PreviewDialog(SettingsManager *a_pSettingsManager, VSScriptLibrar
   connect(m_ui.frameNumberSlider, SIGNAL(signalFrameChanged(int, bool)), this, SLOT(slotShowFrame(int, bool)));
   connect(m_ui.frameNumberSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotShowFrame(int)));
   connect(m_ui.previewArea, SIGNAL(signalSizeChanged()), this, SLOT(slotPreviewAreaSizeChanged()));
+  connect(m_ui.previewArea, &PreviewArea::signalGpuDisplayLost, this, &PreviewDialog::setPreviewPixmap);
   connect(m_ui.previewArea, SIGNAL(signalCtrlWheel(QPoint)), this, SLOT(slotPreviewAreaCtrlWheel(QPoint)));
   connect(m_ui.previewArea, SIGNAL(signalMouseMiddleButtonReleased()), this, SLOT(slotPreviewAreaMouseMiddleButtonReleased()));
   connect(m_ui.previewArea, SIGNAL(signalMouseRightButtonReleased()), this, SLOT(slotPreviewAreaMouseRightButtonReleased()));
@@ -385,7 +387,7 @@ void PreviewDialog::stopAndCleanUp()
   }
   m_frameShown = -1;
   m_framePixmap = QPixmap();
-  m_frameImage10Bit = QImage();
+  m_frameImage = QImage();
   // Replace shown image with a blank one of the same dimension:
   // -helps to keep the scrolling position when refreshing the script;
   // -leaves the image blank on sudden error;
@@ -480,8 +482,10 @@ bool PreviewDialog::updateHighBitDepthOutput()
   if (enabled == m_highBitDepthOutputActive) return false;
 
   m_highBitDepthOutputActive = enabled;
-  m_ui.previewArea->setHighBitDepthOutput(enabled);
+  m_ui.previewArea->setGpuDisplay(enabled);
   m_pVapourSynthScriptProcessor->setHighBitDepthOutput(enabled);
+  // the new window starts empty: the current picture again, 10 bit frames follow from the processor
+  setPreviewPixmap();
   emit signalWriteLogMessage(mtInformation, tr("10 bit preview output %1%2.").arg(enabled ? tr("on") : tr("off"), reason));
   return true;
 }
@@ -639,7 +643,7 @@ void PreviewDialog::slotFrameRequestDiscarded(int a_frameNumber, int a_outputInd
 
 void PreviewDialog::slotShowFrame(int a_frameNumber, bool a_refreshCache)
 {
-  if ((m_frameShown == a_frameNumber) && (!m_framePixmap.isNull())) return;
+  if ((m_frameShown == a_frameNumber) && (!m_frameImage.isNull())) return;
 
   if (m_playing) return;
 
@@ -673,7 +677,7 @@ void PreviewDialog::slotShowFrame(int a_frameNumber, bool a_refreshCache)
 
 void PreviewDialog::slotSaveSnapshot()
 {
-  if ((m_frameShown < 0) || m_framePixmap.isNull()) return;
+  if ((m_frameShown < 0) || m_frameImage.isNull()) return;
 
   if (!m_nodeInfo[m_outputIndex].isVideo()) return;
 
@@ -828,7 +832,7 @@ void PreviewDialog::slotSaveSnapshot()
   else if (silentSnapshot && suffix != "png")
     snapshotFilePath += ".png";
   if (!snapshotFilePath.isEmpty()) {
-    bool success = m_framePixmap
+    bool success = framePixmap()
                      .save(snapshotFilePath, format, format == "webp" ? 100 : m_pSettingsManager->getPNGSnapshotCompressionLevel());
     if (success)
       m_pSettingsManager->setLastSnapshotExtension(suffix);
@@ -877,6 +881,7 @@ void PreviewDialog::slotZoomModeChanged()
     m_ui.zoomModeComboBox->setCurrentIndex(zoomModeIndex);
   }
 
+  updatePreviewSize();
   setPreviewPixmap();
   bool fixedRatio(zoomMode == ZoomMode::FixedRatio);
   m_ui.zoomRatioSpinBox->setEnabled(fixedRatio);
@@ -893,6 +898,7 @@ void PreviewDialog::slotZoomModeChanged()
 
 void PreviewDialog::slotZoomRatioChanged(double a_zoomRatio)
 {
+  updatePreviewSize();
   setPreviewPixmap();
   m_pSettingsManager->setZoomRatio(a_zoomRatio);
 }
@@ -939,6 +945,7 @@ void PreviewDialog::slotScaleModeChanged()
 void PreviewDialog::slotToggleCropPanelVisible(bool a_cropPanelVisible)
 {
   m_ui.cropPanel->setVisible(a_cropPanelVisible);
+  updatePreviewSize();
   setPreviewPixmap();
 }
 
@@ -1278,7 +1285,9 @@ void PreviewDialog::slotSettingsChanged()
 void PreviewDialog::slotPreviewAreaSizeChanged()
 {
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
-  if (zoomMode == ZoomMode::FitToFrame) setPreviewPixmap();
+  if (zoomMode != ZoomMode::FitToFrame) return;
+  updatePreviewSize();
+  setPreviewPixmap();
 }
 
 // END OF void PreviewDialog::slotPreviewAreaSizeChanged()
@@ -1376,7 +1385,7 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(double a_pX, double a_pY)
       zoomRatio = m_ui.zoomRatioSpinBox->value();
     }
     else {
-      if (m_framePixmap.isNull()) {
+      if (m_frameImage.isNull()) {
         m_pStatusBarWidget->setColorPickerString(QString());
         return;
       }
@@ -1384,8 +1393,9 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(double a_pX, double a_pY)
       int cropSize = m_ui.previewArea->frameWidth() * 2;
       int frameWidth = previewRect.width() * m_devicePixelRatio - cropSize;
       int frameHeight = previewRect.height() * m_devicePixelRatio - cropSize;
-      double scaleW = (double)frameWidth / m_framePixmap.width();
-      double scaleH = (double)frameHeight / m_framePixmap.height();
+      const QSize native = nativeFrameSize();
+      double scaleW = (double)frameWidth / native.width();
+      double scaleH = (double)frameHeight / native.height();
       zoomRatio = scaleW < scaleH ? scaleW : scaleH;
     }
     if (zoomRatio <= 0) return;
@@ -1438,10 +1448,10 @@ void PreviewDialog::slotPreviewAreaMouseOverPoint(double a_pX, double a_pY)
 
 void PreviewDialog::slotFrameToClipboard()
 {
-  if (m_framePixmap.isNull()) return;
+  if (m_frameImage.isNull()) return;
 
   QClipboard *pClipboard = QApplication::clipboard();
-  pClipboard->setPixmap(m_framePixmap);
+  pClipboard->setPixmap(framePixmap());
 }
 
 // END OF void PreviewDialog::slotFrameToClipboard()
@@ -1508,6 +1518,7 @@ void PreviewDialog::slotPlay(bool a_play)
     m_ui.outputIndexComboBox->setEnabled(false);
     m_pActionPlay->setIcon(m_iconPause);
     m_lastFrameRequestedForPlay = m_frameShown;
+    m_pVapourSynthScriptProcessor->setPreviewSize(previewSizeForDisplay());
     if (m_currentIsAudio && m_pAudioSink)
       slotProcessAudioPlayQueue();
     else {
@@ -1597,7 +1608,10 @@ void PreviewDialog::slotProcessPlayQueue()
     }
 
     setCurrentFrame(it->cpOutputFrame, it->cpPreviewFrame);
-    m_lastFrameShowTime = hr_clock::now();
+    // the next frame is due one period after this one was due, not after it was drawn; far behind, the schedule restarts now
+    const hr_time_point now = hr_clock::now();
+    const hr_time_point due = m_lastFrameShowTime + std::chrono::duration_cast<hr_clock::duration>(std::chrono::duration<double>(m_secondsBetweenFrames));
+    m_lastFrameShowTime = (m_audioWithVideoActive || duration_to_double(now - due) > m_secondsBetweenFrames) ? now : due;
 
     m_frameShown = nextFrame;
     setExpectedFrame(m_frameShown);
@@ -1612,7 +1626,7 @@ void PreviewDialog::slotProcessPlayQueue()
 
   nextFrame = (m_lastFrameRequestedForPlay + 1) % vi->numFrames;
 
-  while (((m_framesInQueue[m_outputIndex] + m_framesInProcess[m_outputIndex]) < m_maxThreads)
+  while (int(m_framesInQueue[m_outputIndex] + m_framesInProcess[m_outputIndex]) < playRequestsInFlightLimit()
          && (m_framesCache[m_outputIndex].size() <= m_cachedFramesLimit))
   {
     m_pVapourSynthScriptProcessor->requestFrameAsync(nextFrame, m_outputIndex, true);
@@ -1621,6 +1635,20 @@ void PreviewDialog::slotProcessPlayQueue()
   }
 
   m_processingPlayQueue = false;
+}
+
+// The fuller the cache, the fewer requests in flight: a full cache needs a trickle that leaves the CPU to the picture (a burst of
+// one 4K request per thread delayed it by 150 ms), an emptying one needs throughput, so the limit rises linearly to the full
+// thread count at an empty cache and a heavy script settles where production meets consumption.
+int PreviewDialog::playRequestsInFlightLimit() const
+{
+  const auto it = m_framesCache.find(m_outputIndex);
+  const size_t cached = it == m_framesCache.end() ? 0 : it->second.size();
+  const int threads = int(m_maxThreads);
+  const int trickle = std::min(threads, 4);
+  if (m_cachedFramesLimit == 0 || cached >= m_cachedFramesLimit) return trickle;
+  const double fill = double(cached) / double(m_cachedFramesLimit);
+  return std::max(trickle, int(std::lround(threads * (1.0 - fill))));
 }
 
 // END OF void PreviewDialog::slotProcessPlayQueue()
@@ -1679,7 +1707,7 @@ void PreviewDialog::slotProcessAudioPlayQueue()
 
   nextFrame = (m_lastFrameRequestedForPlay + 1) % numFrames;
 
-  while (((m_framesInQueue[m_outputIndex] + m_framesInProcess[m_outputIndex]) < m_maxThreads)
+  while (int(m_framesInQueue[m_outputIndex] + m_framesInProcess[m_outputIndex]) < playRequestsInFlightLimit()
          && (m_framesCache[m_outputIndex].size() <= m_cachedFramesLimit))
   {
     m_pVapourSynthScriptProcessor->requestFrameAsync(nextFrame, m_outputIndex, true);
@@ -2099,6 +2127,7 @@ void PreviewDialog::slotSwitchOutputIndex(int a_outputIndex)
   m_toChangeTitle = true;
 
   m_nodeInfo[m_outputIndex] = ni;
+  m_pVapourSynthScriptProcessor->setPreviewSize(previewSizeForDisplay());
   int lastFrameNumber = m_nodeInfo[m_outputIndex].numFrames() - 1;
   m_ui.frameNumberSpinBox->setMaximum(lastFrameNumber);
   m_ui.frameNumberSlider->setFramesNumber(m_nodeInfo[m_outputIndex].numFrames(), false);
@@ -2653,6 +2682,7 @@ bool PreviewDialog::requestShowFrame(int a_frameNumber)
 
   if ((m_frameShown != -1) && (m_frameShown != m_frameExpected)) return false;
 
+  m_pVapourSynthScriptProcessor->setPreviewSize(previewSizeForDisplay());
   m_pVapourSynthScriptProcessor->requestFrameAsync(a_frameNumber, m_outputIndex, true);
   return true;
 }
@@ -2663,75 +2693,95 @@ bool PreviewDialog::requestShowFrame(int a_frameNumber)
 void PreviewDialog::setPreviewPixmap()
 {
   m_devicePixelRatio = window()->devicePixelRatioF();
-  if (!m_framePixmap.isNull()) m_framePixmap.setDevicePixelRatio(m_devicePixelRatio);
+  // nothing to show yet; scaling a null picture would make Qt warn, and that warning reaches Hybrid
+  if (m_frameImage.isNull()) {
+    m_ui.previewArea->setPixmap(QPixmap());
+    return;
+  }
+  // only the display size is computed here: the preview area scales the unscaled frame, on the GPU where it can
   if (m_ui.cropPanel->isVisible()) {
-    // nothing to crop yet; scaling a null pixmap would make Qt warn, and that warning reaches Hybrid
-    if (m_framePixmap.isNull()) {
-      m_ui.previewArea->setPixmap(QPixmap());
-      return;
-    }
-    int cropLeft = m_ui.cropLeftSpinBox->value();
-    int cropTop = m_ui.cropTopSpinBox->value();
-    int cropWidth = m_ui.cropWidthSpinBox->value();
-    int cropHeight = m_ui.cropHeightSpinBox->value();
-    QPixmap croppedPixmap = m_framePixmap.copy(cropLeft, cropTop, cropWidth, cropHeight);
-    QRect cropRect(cropLeft, cropTop, cropWidth, cropHeight);
-    int ratio = m_ui.cropZoomRatioSpinBox->value();
-
-    if (abs(ratio * m_devicePixelRatio - 1) < 1e-7) {
-      m_ui.previewArea->setPixmap(croppedPixmap, false, highBitDepthImage(cropRect, QSize(), Qt::FastTransformation));
-      return;
-    }
-
-    QPixmap zoomedPixmap
-      = croppedPixmap.scaled(croppedPixmap.width() * ratio, croppedPixmap.height() * ratio, Qt::KeepAspectRatio, Qt::FastTransformation);
-    m_ui.previewArea->setPixmap(zoomedPixmap, false, highBitDepthImage(cropRect, zoomedPixmap.size(), Qt::FastTransformation));
+    const QRect cropRect(m_ui.cropLeftSpinBox->value(), m_ui.cropTopSpinBox->value(), m_ui.cropWidthSpinBox->value(),
+                         m_ui.cropHeightSpinBox->value());
+    const int ratio = m_ui.cropZoomRatioSpinBox->value();
+    const QSize displaySize = abs(ratio * m_devicePixelRatio - 1) < 1e-7 ? cropRect.size() : cropRect.size() * ratio;
+    m_ui.previewArea->setFrame(frameImage(cropRect), displaySize, false, Qt::FastTransformation);
     return;
   }
 
   ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
   if (zoomMode == ZoomMode::NoZoom) {
-    m_ui.previewArea->setPixmap(m_framePixmap, true, highBitDepthImage(QRect(), QSize(), Qt::FastTransformation));
+    m_ui.previewArea->setFrame(m_frameImage, m_frameImage.size(), true, Qt::FastTransformation);
     return;
   }
 
-  QPixmap previewPixmap;
-  int frameWidth = 0;
-  int frameHeight = 0;
   Qt::TransformationMode scaleMode = (Qt::TransformationMode)m_ui.scaleModeComboBox->currentData().toInt();
-
+  // from the picture's own size: the image may already be at display size
+  const QSize native = nativeFrameSize();
+  QSize displaySize;
   if (zoomMode == ZoomMode::FixedRatio) {
     double ratio = m_ui.zoomRatioSpinBox->value();
-    frameWidth = m_framePixmap.width() * ratio;
-    frameHeight = m_framePixmap.height() * ratio;
+    displaySize = QSize(int(native.width() * ratio), int(native.height() * ratio));
   }
   else {
-    if (m_framePixmap.isNull()) return;
     QRect previewRect = m_ui.previewArea->geometry();
     int cropSize = m_ui.previewArea->frameWidth() * 2;
-    frameWidth = previewRect.width() * m_devicePixelRatio - cropSize;
-    frameHeight = previewRect.height() * m_devicePixelRatio - cropSize;
+    displaySize = native.scaled(int(previewRect.width() * m_devicePixelRatio) - cropSize,
+                                int(previewRect.height() * m_devicePixelRatio) - cropSize, Qt::KeepAspectRatio);
   }
-
-  previewPixmap = m_framePixmap.scaled(frameWidth, frameHeight, Qt::KeepAspectRatio, scaleMode);
-
-  m_ui.previewArea->setPixmap(previewPixmap, true, highBitDepthImage(QRect(), previewPixmap.size(), scaleMode));
+  if (displaySize.isEmpty()) return;
+  m_ui.previewArea->setFrame(m_frameImage, displaySize, true, scaleMode);
 }
 
 // END OF bool void PreviewDialog::setPreviewPixmap()
 //==============================================================================
 
-QImage PreviewDialog::highBitDepthImage(const QRect &a_crop, const QSize &a_size, Qt::TransformationMode a_mode) const
+QSize PreviewDialog::nativeFrameSize()
 {
-  if (m_frameImage10Bit.isNull() || !m_ui.previewArea->highBitDepthOutput()) return QImage();
-  QImage image = a_crop.isNull() ? m_frameImage10Bit : m_frameImage10Bit.copy(a_crop);
-  if (a_size.isEmpty() || a_size == image.size()) return image;
-  // scaled as 16 bit per channel so the result keeps all 10 bit
-  return image.convertToFormat(QImage::Format_RGBX64).scaled(a_size, Qt::IgnoreAspectRatio, a_mode).convertToFormat(QImage::Format_RGB30);
+  const VSVideoInfo *vi = m_nodeInfo.count(m_outputIndex) ? m_nodeInfo[m_outputIndex].getAsVideo() : nullptr;
+  if (vi && vi->width > 0 && vi->height > 0) return QSize(vi->width, vi->height);
+  return m_frameImage.size();
 }
 
-// END OF QImage PreviewDialog::highBitDepthImage(const QRect & a_crop,
-//		const QSize & a_size, Qt::TransformationMode a_mode) const
+// native for the crop panel (its coordinates are picture pixels), no zoom and any enlargement; the fit size otherwise
+QSize PreviewDialog::previewSizeForDisplay()
+{
+  const QSize native = nativeFrameSize();
+  if (native.isEmpty() || m_ui.cropPanel->isVisible()) return QSize();
+  const ZoomMode zoomMode = (ZoomMode)m_ui.zoomModeComboBox->currentData().toInt();
+  QSize size;
+  if (zoomMode == ZoomMode::FixedRatio) {
+    const double ratio = m_ui.zoomRatioSpinBox->value();
+    if (ratio >= 1.0) return QSize();
+    size = QSize(int(native.width() * ratio), int(native.height() * ratio));
+  }
+  else if (zoomMode == ZoomMode::FitToFrame) {
+    const double ratio = window()->devicePixelRatioF();
+    const QRect previewRect = m_ui.previewArea->geometry();
+    const int cropSize = m_ui.previewArea->frameWidth() * 2;
+    size = native.scaled(int(previewRect.width() * ratio) - cropSize, int(previewRect.height() * ratio) - cropSize, Qt::KeepAspectRatio);
+  }
+  else {
+    return QSize();
+  }
+  if (size.isEmpty() || size.width() >= native.width() || size.height() >= native.height()) return QSize();
+  return size;
+}
+
+void PreviewDialog::updatePreviewSize()
+{
+  if (!m_pVapourSynthScriptProcessor->setPreviewSize(previewSizeForDisplay())) return;
+  if (!m_playing && !m_currentIsAudio && m_frameShown >= 0) requestShowFrame(m_frameExpected);
+}
+
+// END OF void PreviewDialog::updatePreviewSize()
+//==============================================================================
+
+QImage PreviewDialog::frameImage(const QRect &a_crop) const
+{
+  return a_crop.isNull() ? m_frameImage : m_frameImage.copy(a_crop);
+}
+
+// END OF QImage PreviewDialog::frameImage(const QRect & a_crop) const
 //==============================================================================
 
 void PreviewDialog::recalculateCropMods()
@@ -2826,9 +2876,8 @@ void PreviewDialog::setCurrentFrame(const VSFrame *a_cpOutputFrame, const VSFram
     m_cpVSAPI->freeFrame(m_cpPreviewFrame);
     m_cpPreviewFrame = nullptr;
   }
-  QImage frameImage = imageFromRGB(a_cpPreviewFrame);
-  m_frameImage10Bit = (frameImage.format() == QImage::Format_RGB30) ? frameImage : QImage();
-  m_framePixmap = frameImage.isNull() ? QPixmap() : QPixmap::fromImage(frameImage, Qt::NoFormatConversion);
+  m_frameImage = imageFromRGB(a_cpPreviewFrame);
+  m_framePixmap = QPixmap();
   m_cpPreviewFrame = a_cpPreviewFrame;
   setPreviewPixmap();
   QPointF pixelPos = m_ui.previewArea->pixelPosition();
@@ -2989,10 +3038,35 @@ QImage PreviewDialog::imageFromRGB(const VSFrame *a_cpFrame)
   int stride = m_cpVSAPI->getStride(a_cpFrame, 0);
 
   const uint8_t *pData = m_cpVSAPI->getReadPtr(a_cpFrame, 0);
-  QImage frameImage(reinterpret_cast<const uchar *>(pData), width, height, stride,
-                    is_10_bits ? QImage::Format_RGB30 : QImage::Format_ARGB32);
-  // deep copy: the frame memory goes back to VapourSynth when the next frame arrives
-  return frameImage.copy();
+  // no copy: the image keeps its own reference to the frame and frees it with the last QImage that shares the data
+  FrameHolder *holder = new FrameHolder{m_cpVSAPI, m_cpVSAPI->addFrameRef(a_cpFrame)};
+  return QImage(reinterpret_cast<const uchar *>(pData), width, height, stride, is_10_bits ? QImage::Format_RGB30 : QImage::Format_ARGB32,
+                &PreviewDialog::releaseFrameHolder, holder);
+}
+
+void PreviewDialog::releaseFrameHolder(void *a_pInfo)
+{
+  FrameHolder *holder = static_cast<FrameHolder *>(a_pInfo);
+  holder->api->freeFrame(holder->frame);
+  delete holder;
+}
+
+QPixmap PreviewDialog::framePixmap()
+{
+  if (m_framePixmap.isNull() && !m_frameImage.isNull()) {
+    QImage image = m_frameImage;
+    // the preview arrives at display size while the picture is larger than the window: the snapshot needs the native picture
+    if (image.size() != nativeFrameSize() && m_frameShown >= 0) {
+      const VSFrame *cpFrame = m_pVapourSynthScriptProcessor->previewFrameNative(m_frameShown, m_outputIndex);
+      if (cpFrame) {
+        image = imageFromRGB(cpFrame);
+        m_cpVSAPI->freeFrame(cpFrame);
+      }
+    }
+    m_framePixmap = QPixmap::fromImage(image, Qt::NoFormatConversion);
+    m_framePixmap.setDevicePixelRatio(m_devicePixelRatio);
+  }
+  return m_framePixmap;
 }
 
 // END OF QImage PreviewDialog::imageFromRGB(
