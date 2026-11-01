@@ -6,6 +6,7 @@
 #include "common-src/win32_console.h"
 
 #include <QApplication>
+#include <QThread>
 
 #include <iostream>
 
@@ -68,10 +69,12 @@ void handleQtMessage(QtMsgType a_type, const QMessageLogContext &a_context, cons
   if (!fileString.isEmpty()) fullMessage += lineInfo;
 
   // Qt can warn before MainWindow exists and after it is gone
-  if (pMainWindow)
-    pMainWindow->slotWriteLogMessage(fullMessage, style);
-  else
+  if (!pMainWindow || a_type == QtFatalMsg)
     std::cerr << qPrintable(fullMessage) << std::endl;
+  else if (QThread::currentThread() == pMainWindow->thread())
+    pMainWindow->slotWriteLogMessage(fullMessage, style);
+  else // other threads (e.g. Qt Multimedia's PipeWire thread) must not touch the log widget
+    QMetaObject::invokeMethod(pMainWindow, [fullMessage, style]() { if (pMainWindow) pMainWindow->slotWriteLogMessage(fullMessage, style); }, Qt::QueuedConnection);
 
   if (a_type == QtFatalMsg) abort();
 }
