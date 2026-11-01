@@ -515,7 +515,8 @@ void PreviewDialog::closeEvent(QCloseEvent *a_pEvent)
 
 void PreviewDialog::keyPressEvent(QKeyEvent *a_pEvent)
 {
-  Qt::KeyboardModifiers modifiers = a_pEvent->modifiers();
+  // macOS reports the arrow keys with Qt::KeypadModifier
+  Qt::KeyboardModifiers modifiers = a_pEvent->modifiers() & ~Qt::KeypadModifier;
 
   if (modifiers != Qt::NoModifier) {
     QDialog::keyPressEvent(a_pEvent);

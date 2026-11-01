@@ -333,7 +333,8 @@ void TimeLineSlider::slotGoToNextBookmark()
 
 void TimeLineSlider::keyPressEvent(QKeyEvent *a_pEvent)
 {
-  if (a_pEvent->modifiers() != Qt::NoModifier) {
+  // macOS reports the arrow keys with Qt::KeypadModifier
+  if ((a_pEvent->modifiers() & ~Qt::KeypadModifier) != Qt::NoModifier) {
     QWidget::keyPressEvent(a_pEvent);
     return;
   }
