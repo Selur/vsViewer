@@ -73,7 +73,8 @@ void TimeLineSlider::setFrame(int a_frame, bool a_refreshCache)
   else
     m_currentFrame = a_frame;
 
-  if (m_currentFrame != m_pointerAtFrame) m_pointerAtFrame = m_currentFrame;
+  // while the mouse holds the slider, playback moves the frame but not the pointer the release jumps to
+  if (!m_sliderPressed && m_currentFrame != m_pointerAtFrame) m_pointerAtFrame = m_currentFrame;
 
   if (m_currentFrame == oldCurrentFrame) return;
 

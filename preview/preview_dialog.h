@@ -292,7 +292,7 @@ class PreviewDialog : public VSScriptProcessorDialog
     void stopAudioWithVideo();
     double audioWithVideoClock() const;
     int playRequestsInFlightLimit() const;
-    void dropStaleFramesForAudioWithVideo(int a_nextFrame, int a_numFrames);
+    void dropStaleFramesForPlay(int a_nextFrame, int a_numFrames);
 
     Ui::PreviewDialog m_ui;
 

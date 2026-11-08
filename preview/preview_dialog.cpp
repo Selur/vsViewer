@@ -646,11 +646,26 @@ void PreviewDialog::slotShowFrame(int a_frameNumber, bool a_refreshCache)
 {
   if ((m_frameShown == a_frameNumber) && (!m_frameImage.isNull())) return;
 
-  if (m_playing) return;
-
   static bool requestingFrame = false;
   if (requestingFrame) return;
   requestingFrame = true;
+
+  // a jump during playback restarts playback, and the audio with it, at the new frame
+  if (m_playing) {
+    const int numFrames = m_nodeInfo[m_outputIndex].numFrames();
+    if (a_frameNumber >= 0 && a_frameNumber < numFrames) {
+      slotPlay(false);
+      // an audio output keeps its sink across play and pause: the queued audio goes, so it does not overlap the jump
+      if (m_currentIsAudio && m_pAudioSink) {
+        m_pAudioSink->reset();
+        m_pAudioIODevice = m_pAudioSink->start();
+      }
+      m_frameShown = a_frameNumber - 1;
+      slotPlay(true);
+    }
+    requestingFrame = false;
+    return;
+  }
 
   if (a_refreshCache) {
     int frameDiff = m_frameShown - a_frameNumber;
@@ -1568,8 +1583,8 @@ void PreviewDialog::slotProcessPlayQueue()
         referenceFrame.number = nextFrame;
       }
     }
-    dropStaleFramesForAudioWithVideo(nextFrame, vi->numFrames);
   }
+  dropStaleFramesForPlay(nextFrame, vi->numFrames);
 
   while (!m_framesCache[m_outputIndex].empty()) {
     std::list<Frame>::const_iterator it
@@ -1666,6 +1681,7 @@ void PreviewDialog::slotProcessAudioPlayQueue()
   int nextFrame = (m_frameShown + 1) % numFrames;
 
   static double delay_estimate = 0.0;
+  dropStaleFramesForPlay(nextFrame, numFrames);
 
   while (!m_framesCache[m_outputIndex].empty()) {
     auto ait = m_audioCache.find(nextFrame);
@@ -1910,7 +1926,8 @@ void PreviewDialog::stopAudioOutput()
 {
   if (m_pAudioSink) {
     if (m_pAudioIODevice) m_pAudioIODevice->close();
-    m_pAudioSink->stop();
+    // reset() discards the queued audio; stop() drains it, so it would overlap the next start
+    m_pAudioSink->reset();
     delete m_pAudioSink;
     m_pAudioSink = nullptr;
     m_pAudioIODevice = nullptr;
@@ -2019,13 +2036,19 @@ void PreviewDialog::stopAudioWithVideo()
   m_audioWithVideoPending.clear();
 }
 
-// seconds played since startAudioWithVideo(): what the sink took, minus what still waits in its buffer
+// seconds played since startAudioWithVideo()
 double PreviewDialog::audioWithVideoClock() const
 {
   if (!m_pAudioSink) return 0.0;
+#ifdef Q_OS_WIN
+  // the Windows backend's processedUSecs() already leaves out the sink buffer
+  return std::max(0.0, m_pAudioSink->processedUSecs() / 1e6);
+#else
+  // what the sink took, minus what still waits in its buffer (not measured on these backends)
   const double bytesPerSecond = double(m_audioWithVideoFormat.sampleRate) * m_audioWithVideoFormat.format.numChannels * 2;
   const double buffered = double(m_pAudioSink->bufferSize() - m_pAudioSink->bytesFree()) / bytesPerSecond;
   return std::max(0.0, m_pAudioSink->processedUSecs() / 1e6 - buffered);
+#endif
 }
 
 void PreviewDialog::slotFeedAudioWithVideo()
@@ -2074,7 +2097,7 @@ void PreviewDialog::slotFeedAudioWithVideo()
 }
 
 // frames requested before a jump would fill the cache and block new requests
-void PreviewDialog::dropStaleFramesForAudioWithVideo(int a_nextFrame, int a_numFrames)
+void PreviewDialog::dropStaleFramesForPlay(int a_nextFrame, int a_numFrames)
 {
   const int window = int(m_cachedFramesLimit + 4 * m_maxThreads) + 16;
   std::list<Frame> &cache = m_framesCache[m_outputIndex];
@@ -2087,6 +2110,10 @@ void PreviewDialog::dropStaleFramesForAudioWithVideo(int a_nextFrame, int a_numF
     m_cpVSAPI->freeFrame(it->cpOutputFrame);
     m_cpVSAPI->freeFrame(it->cpPreviewFrame);
     it = cache.erase(it);
+  }
+  for (auto it = m_audioCache.begin(); it != m_audioCache.end();) {
+    const int ahead = ((it->first - a_nextFrame) % a_numFrames + a_numFrames) % a_numFrames;
+    it = ahead <= window ? std::next(it) : m_audioCache.erase(it);
   }
 }
 
