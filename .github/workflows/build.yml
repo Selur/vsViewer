@@ -1,0 +1,159 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['r*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Only the headers are needed, the VapourSynth library is loaded at runtime.
+  VAPOURSYNTH_REF: R82
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows x64, os: windows-latest, platform: windows-x64, qt: '6.10.1' }
+          # Debian forky ships a current Qt 6 with Qt Multimedia; the runner's Ubuntu is too old.
+          - { name: Linux x86_64, os: ubuntu-latest, platform: linux-x86_64, container: 'debian:forky' }
+          # Qt 6.10's qyieldcpu.h does not compile with the runner's Xcode.
+          - { name: macOS arm64, os: macos-latest, platform: macos-arm64, qt: '6.11.1' }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git g++ make xz-utils \
+            qmake6 qt6-base-dev qt6-base-dev-tools qt6-multimedia-dev
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/checkout@v7
+        with:
+          repository: vapoursynth/vapoursynth
+          ref: ${{ env.VAPOURSYNTH_REF }}
+          path: vapoursynth-sdk
+          sparse-checkout: include
+
+      - name: Package name
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/r* ]]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="$(sed -n 's/^#define VSE_VERSION_STR "\(.*\)"$/\1/p' common-src/version_info.h)-git-${GITHUB_SHA::7}"
+          fi
+          echo "PACKAGE=vsViewer-$version-${{ matrix.platform }}" >> "$GITHUB_ENV"
+
+      - name: Install Qt
+        if: runner.os != 'Linux'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          arch: ${{ runner.os == 'Windows' && 'win64_msvc2022_64' || '' }}
+          modules: qtmultimedia
+          cache: true
+
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build
+        if: runner.os != 'Windows'
+        run: |
+          vsinc="$GITHUB_WORKSPACE/vapoursynth-sdk/include"
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            qmake6 CONFIG+=release VAPOURSYNTH_INCLUDE="$vsinc" vsViewer.pro
+            make -j"$(nproc)"
+          else
+            qmake CONFIG+=release VAPOURSYNTH_INCLUDE="$vsinc" vsViewer.pro
+            make -j"$(sysctl -n hw.ncpu)"
+          fi
+
+      # cmd: in Git Bash, coreutils' link shadows the MSVC linker
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          qmake CONFIG+=release VAPOURSYNTH_INCLUDE=%GITHUB_WORKSPACE%/vapoursynth-sdk/include vsViewer.pro || exit /b 1
+          nmake -f Makefile.Release
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          exe=build/release-64bit-gcc/vsViewer
+          "$exe" --version
+          mkdir -p "dist/$PACKAGE"
+          cp "$exe" README.md LICENSE "dist/$PACKAGE/"
+          tar -C dist -cJf "$PACKAGE.tar.xz" "$PACKAGE"
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          app=$(find build -maxdepth 2 -name vsViewer.app -type d | head -n1)
+          out="dist/$PACKAGE"
+          mkdir -p "$out"
+          cp -R "$app" "$out/"
+          # Copies the Qt frameworks and plugins into the bundle.
+          macdeployqt "$out/vsViewer.app" -always-overwrite
+          codesign --force --deep --sign - "$out/vsViewer.app"
+          "$out/vsViewer.app/Contents/MacOS/vsViewer" --version
+          cp README.md LICENSE "$out/"
+          ditto -c -k --keepParent "$out" "$PACKAGE.zip"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          out="dist/$PACKAGE"
+          mkdir -p "$out"
+          cp build/release-64bit-msvc/vsViewer.exe README.md LICENSE "$out/"
+          windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw \
+            --no-compiler-runtime "$out/vsViewer.exe"
+          # Ship the MSVC runtime next to the executable.
+          for dll in msvcp140.dll msvcp140_1.dll vcruntime140.dll vcruntime140_1.dll; do
+            cp "/c/Windows/System32/$dll" "$out/"
+          done
+          # Fails if a DLL is missing.
+          timeout 60 "$out/vsViewer.exe" --version
+          (cd dist && 7z a -tzip "../$PACKAGE.zip" "$PACKAGE" > /dev/null)
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.PACKAGE }}
+          path: |
+            ${{ env.PACKAGE }}.zip
+            ${{ env.PACKAGE }}.tar.xz
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/r')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/*.zip
+            dist/*.tar.xz
+          generate_release_notes: true

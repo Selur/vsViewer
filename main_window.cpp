@@ -513,8 +513,17 @@ void MainWindow::slotAbout()
   QResource aboutResource(":readme");
   QByteArray aboutData((const char *)aboutResource.data(),
     aboutResource.size());
-  QString aboutString = QString::fromUtf8(aboutData);
-  QMessageBox::about(this, "VapourSynth Editor", aboutString);
+  const QString readme = QString::fromUtf8(aboutData);
+  // the README's title line and its credits section
+  QString aboutString = readme.section('\n', 0, 0);
+  const QString creditsHeading = QStringLiteral("## Credits and license");
+  const qsizetype creditsPos = readme.indexOf(creditsHeading);
+  if (creditsPos >= 0) aboutString += "\n\n" + readme.mid(creditsPos + creditsHeading.size()).trimmed();
+  QMessageBox aboutBox(this);
+  aboutBox.setWindowTitle("VapourSynth Editor");
+  aboutBox.setTextFormat(Qt::MarkdownText);
+  aboutBox.setText(aboutString);
+  aboutBox.exec();
 }
 
 // END OF void MainWindow::slotAbout()

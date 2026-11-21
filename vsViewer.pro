@@ -134,7 +134,7 @@ win32 {
     #INCLUDEPATH += 'F:/workspace/VapourSynth/include'
     #INCLUDEPATH += 'C:/Program Files/VapourSynth/sdk/include/'
     #INCLUDEPATH += 'F:/Hybrid/64bit/VapourSynth/sdk/include/vapoursynth'
-    INCLUDEPATH += 'F:/Hybrid/64bit/Vapoursynth/Lib/site-packages/vapoursynth/include'
+    isEmpty(VAPOURSYNTH_INCLUDE): INCLUDEPATH += 'F:/Hybrid/64bit/Vapoursynth/Lib/site-packages/vapoursynth/include'
 
 
     contains(ARCHITECTURE_64_BIT, true) {
@@ -158,6 +158,9 @@ contains(QMAKE_COMPILER, gcc) {
 } else {
     CONFIG += c++17
 }
+
+# VapourSynth headers from elsewhere: qmake VAPOURSYNTH_INCLUDE=<dir>
+!isEmpty(VAPOURSYNTH_INCLUDE): INCLUDEPATH += $$VAPOURSYNTH_INCLUDE
 
 # ----------------------
 # General project settings
