@@ -3,6 +3,12 @@
 #include "scroll_navigator.h"
 #ifdef Q_OS_WIN
 #include "high_bit_depth_frame_window.h"
+
+#include <QWindow>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #endif
 
 #include <QCoreApplication>
@@ -38,13 +44,14 @@ PreviewArea::PreviewArea(QWidget *a_pParent)
 
   m_pPreviewLabel->installEventFilter(this);
   viewport()->installEventFilter(this);
+  QCoreApplication::instance()->installNativeEventFilter(this);
   setGpuDisplay(false);
 }
 
 // END OF PreviewArea::PreviewArea(QWidget * a_pParent)
 //==============================================================================
 
-PreviewArea::~PreviewArea() {}
+PreviewArea::~PreviewArea() { QCoreApplication::instance()->removeNativeEventFilter(this); }
 
 // END OF PreviewArea::~PreviewArea()
 //==============================================================================
@@ -321,6 +328,27 @@ void PreviewArea::setGpuDisplay(bool a_hdr)
   updateHighBitDepthView();
 #else
   Q_UNUSED(a_hdr);
+#endif
+}
+
+// the Direct3D window and its container answer the hit test with HTTRANSPARENT, so Windows passes the mouse to the viewport below
+bool PreviewArea::nativeEventFilter(const QByteArray &a_eventType, void *a_pMessage, qintptr *a_pResult)
+{
+#ifdef Q_OS_WIN
+  if (!m_pHighBitDepthContainer || a_eventType != "windows_generic_MSG") return false;
+  const MSG *pMessage = static_cast<const MSG *>(a_pMessage);
+  if (pMessage->message != WM_NCHITTEST) return false;
+  const QWindow *pContainerWindow = m_pHighBitDepthContainer->windowHandle();
+  const bool ownWindow = (m_pHighBitDepthWindow->handle() && HWND(m_pHighBitDepthWindow->winId()) == pMessage->hwnd)
+                         || (pContainerWindow && pContainerWindow->handle() && HWND(pContainerWindow->winId()) == pMessage->hwnd);
+  if (!ownWindow) return false;
+  *a_pResult = HTTRANSPARENT;
+  return true;
+#else
+  Q_UNUSED(a_eventType);
+  Q_UNUSED(a_pMessage);
+  Q_UNUSED(a_pResult);
+  return false;
 #endif
 }
 

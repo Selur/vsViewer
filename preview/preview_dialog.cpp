@@ -2993,8 +2993,20 @@ void PreviewDialog::previewValueAtPoint(size_t a_x, size_t a_y, int a_ret[])
 
   const uint8_t *cpPlane = m_cpVSAPI->getReadPtr(m_cpPreviewFrame, 0);
 
+  // the preview frame may be scaled down to the display size: picture coordinates are mapped onto it
   size_t x = a_x;
   size_t y = a_y;
+  const int previewWidth = m_cpVSAPI->getFrameWidth(m_cpPreviewFrame, 0);
+  const int previewHeight = m_cpVSAPI->getFrameHeight(m_cpPreviewFrame, 0);
+  if (previewWidth <= 0 || previewHeight <= 0) return;
+  if (m_cpFrame) {
+    const int width = m_cpVSAPI->getFrameWidth(m_cpFrame, 0);
+    const int height = m_cpVSAPI->getFrameHeight(m_cpFrame, 0);
+    if (width > 0 && width != previewWidth) x = (size_t)((double)a_x * previewWidth / width);
+    if (height > 0 && height != previewHeight) y = (size_t)((double)a_y * previewHeight / height);
+  }
+  if (x >= (size_t)previewWidth) x = previewWidth - 1;
+  if (y >= (size_t)previewHeight) y = previewHeight - 1;
 
   int stride = m_cpVSAPI->getStride(m_cpPreviewFrame, 0);
   const uint8_t *cpLoc = cpPlane + y * stride + x * 4;

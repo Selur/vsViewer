@@ -1,6 +1,7 @@
 #ifndef PREVIEWAREA_H
 #define PREVIEWAREA_H
 
+#include <QAbstractNativeEventFilter>
 #include <QImage>
 #include <QPixmap>
 #include <QPoint>
@@ -14,7 +15,7 @@ class QWheelEvent;
 class QMouseEvent;
 class QEnterEvent;
 
-class PreviewArea : public QScrollArea
+class PreviewArea : public QScrollArea, public QAbstractNativeEventFilter
 {
     Q_OBJECT
 
@@ -49,6 +50,8 @@ class PreviewArea : public QScrollArea
 
     // the Direct3D window shows every frame; a_hdr asks for the scRGB swapchain of the 10 bit output
     void setGpuDisplay(bool a_hdr);
+
+    bool nativeEventFilter(const QByteArray& a_eventType, void* a_pMessage, qintptr* a_pResult) override;
 
   public slots:
     void slotGpuDisplayFailed();
